@@ -13,7 +13,9 @@
     "restart:bff": "pnpm stop:bff && pnpm dev:bff",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -21,6 +23,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "typescript": "^5.9.2"
   }
 }
