@@ -28,3 +28,4 @@ skills-lock.json
 
 # macOS
 .DS_Store
+test-results/
