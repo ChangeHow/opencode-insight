@@ -67,7 +67,7 @@ function computeDataFingerprint(dbPath: string, legacyDir: string): string {
     const stat = fs.statSync(legacyDir);
     parts.push(`legacy:${stat.ino}:${Math.trunc(stat.mtimeMs)}`);
   }
-  return parts.length > 0 ? parts.join("|") : `paths:${dbPath}|${legacyDir}`;
+  return parts.length > 0 ? parts.join("|") : "empty";
 }
 
 function emptyBreakdown(): TokenBreakdown {

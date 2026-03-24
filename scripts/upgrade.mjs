@@ -29,8 +29,8 @@ function findPm() {
     execSync("pnpm --version", { stdio: "pipe" });
     return { cmd: "pnpm", args: [] };
   } catch {
-    // Fall back to npm
-    return { cmd: path.join(path.dirname(NODE), "npm"), args: [] };
+    // Fall back to npm from PATH
+    return { cmd: "npm", args: [] };
   }
 }
 

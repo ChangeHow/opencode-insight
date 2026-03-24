@@ -38,18 +38,23 @@ if (!existsSync(path.join(WEB_DIST, "index.html"))) {
 
 // Check for an already-running daemon
 if (existsSync(PID_FILE)) {
-  let pid;
-  try {
-    pid = parseInt(readFileSync(PID_FILE, "utf8").trim(), 10);
-    process.kill(pid, 0); // throws if process doesn't exist
-    console.error(`❌ Daemon is already running (PID: ${pid}). Run 'pnpm daemon:stop' first.`);
-    process.exit(1);
-  } catch (err) {
-    if (err.code !== "ESRCH" && err.code !== "EPERM" && err.code !== "NaN") {
-      // Stale PID file — process is gone
+  const raw = readFileSync(PID_FILE, "utf8").trim();
+  const existingPid = parseInt(raw, 10);
+  if (Number.isInteger(existingPid) && existingPid > 0) {
+    try {
+      process.kill(existingPid, 0); // throws if process doesn't exist (ESRCH)
+      console.error(`❌ Daemon is already running (PID: ${existingPid}). Run 'pnpm daemon:stop' first.`);
+      process.exit(1);
+    } catch (err) {
+      if (err.code !== "ESRCH") {
+        // Process exists but we lack permission — still report as running
+        console.error(`❌ Daemon is already running (PID: ${existingPid}). Run 'pnpm daemon:stop' first.`);
+        process.exit(1);
+      }
+      // ESRCH = process does not exist; stale PID file, fall through to clean up
     }
-    try { unlinkSync(PID_FILE); } catch { /* ignore */ }
   }
+  try { unlinkSync(PID_FILE); } catch { /* ignore */ }
 }
 
 const port = Number(process.env.PORT ?? 8787);

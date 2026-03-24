@@ -13,8 +13,8 @@ const webDistDir = process.env.WEB_DIST_DIR;
 
 if (webDistDir) {
   const resolvedWebDist = path.resolve(webDistDir);
-  const relRoot = path.relative(process.cwd(), resolvedWebDist);
-  app.use("/*", serveStatic({ root: relRoot }));
+  // Pass the absolute path so serveStatic works regardless of cwd
+  app.use("/*", serveStatic({ root: resolvedWebDist }));
   app.get("/*", (c) => {
     const indexPath = path.join(resolvedWebDist, "index.html");
     if (fs.existsSync(indexPath)) {
