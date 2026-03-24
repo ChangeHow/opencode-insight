@@ -14,7 +14,7 @@ describe("API Client Functions", () => {
   const mockFetch = vi.fn();
 
   beforeEach(() => {
-    global.fetch = mockFetch;
+    globalThis.fetch = mockFetch;
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({}),
