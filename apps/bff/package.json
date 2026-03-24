@@ -8,7 +8,10 @@
     "dev": "PROCESS_TITLE=opencode-telescope-bff NODE_OPTIONS='--require=../../scripts/set-process-title.cjs' vite --config vite.config.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.4",
@@ -19,7 +22,9 @@
   "devDependencies": {
     "@hono/vite-dev-server": "^0.25.1",
     "@types/node": "^24.5.2",
+    "@vitest/coverage-v8": "^4.1.1",
     "tsx": "^4.20.5",
-    "vite": "^8.0.2"
+    "vite": "^8.0.2",
+    "vitest": "^4.1.1"
   }
 }

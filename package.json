@@ -17,7 +17,9 @@
     "daemon:start": "node ./scripts/daemon.mjs",
     "daemon:stop": "node ./scripts/stop-daemon.mjs",
     "daemon:restart": "node ./scripts/stop-daemon.mjs && node ./scripts/daemon.mjs",
-    "upgrade:app": "node ./scripts/upgrade.mjs"
+    "upgrade:app": "node ./scripts/upgrade.mjs",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -25,6 +27,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "typescript": "^5.9.2"
   }
 }
