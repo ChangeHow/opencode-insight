@@ -21,6 +21,8 @@ apps/web/components.json
 .coco
 .trae
 @design
+design/
+apps/web/design/
 log
 logs
 skills-lock.json

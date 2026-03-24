@@ -41,9 +41,64 @@ Then set:
 OPENCODE_DATA_DIR=/absolute/path/to/opencode
 ```
 
-## Run
+## Recommended: run as a background daemon
 
-Start both apps in separate terminals:
+For daily use, the recommended way is to build once and let the dashboard run in the background.
+This gives you a single command to start, a single command to stop, and a predictable upgrade flow.
+
+### First start
+
+```bash
+pnpm build
+pnpm daemon:start
+```
+
+Open the dashboard at:
+
+- Dashboard: `http://127.0.0.1:8787`
+
+The daemon command prints:
+
+- the current PID
+- the access URL
+- the log path: `logs/bff.log`
+- the error log path: `logs/bff-error.log`
+
+### Common daemon operations
+
+```bash
+pnpm daemon:start
+pnpm daemon:stop
+pnpm daemon:restart
+```
+
+Useful log command:
+
+```bash
+tail -f logs/bff.log
+```
+
+### Upgrade while running in the background
+
+If the dashboard is already running as a daemon, use the built-in upgrade script:
+
+```bash
+pnpm upgrade:app
+```
+
+That flow will:
+
+1. `git pull`
+2. install updated dependencies
+3. rebuild the app
+4. stop the old daemon
+5. start the new daemon
+
+If any step fails, the script exits with an error so you can inspect the output before retrying.
+
+## Development mode
+
+If you are actively changing code, run the web app and BFF in separate terminals:
 
 ```bash
 pnpm dev:bff
@@ -72,6 +127,10 @@ pnpm stop:bff
 pnpm stop:web
 pnpm restart:bff
 pnpm restart:web
+pnpm daemon:start
+pnpm daemon:stop
+pnpm daemon:restart
+pnpm upgrade:app
 pnpm build
 pnpm typecheck
 pnpm lint
