@@ -22,9 +22,11 @@ apps/web/components.json
 .trae
 @design
 log
+logs
 skills-lock.json
 .env.local
 .env.*.local
+.telescope-daemon.pid
 
 # macOS
 .DS_Store
