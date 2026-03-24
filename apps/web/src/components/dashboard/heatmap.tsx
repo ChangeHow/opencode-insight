@@ -24,7 +24,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">Daily ledger</p>
-            <h2 className="mt-2 font-[Newsreader_Variable] text-3xl text-[var(--foreground)]">Token intensity over time</h2>
+            <h2 className="mt-2 font-[Newsreader_Variable] text-3xl text-[var(--foreground)]">Calendar</h2>
           </div>
           <div className="hidden items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--muted-foreground)] sm:flex">
             <span>Quiet</span>
@@ -34,7 +34,8 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
             <span>Loud</span>
           </div>
         </div>
-        <div className="grid grid-cols-7 gap-2">
+        <div>
+          <div className="grid grid-cols-7 gap-2">
           {days.map((day) => (
             <Tooltip key={day.date}>
               <TooltipTrigger asChild>
@@ -42,7 +43,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                   type="button"
                   onClick={() => onSelect(day.date)}
                   className={cn(
-                    "group flex aspect-square flex-col justify-between rounded-[18px] border p-2 text-left transition-transform duration-200 hover:-translate-y-0.5",
+                    "group flex aspect-square cursor-pointer flex-col justify-between rounded-[18px] border p-2 text-left transition-transform duration-200 hover:-translate-y-0.5 outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                     intensityClass[day.intensity],
                     selectedDate === day.date ? "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]" : "border-transparent",
                   )}
@@ -57,6 +58,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
               </TooltipContent>
             </Tooltip>
           ))}
+          </div>
         </div>
       </div>
     </TooltipProvider>

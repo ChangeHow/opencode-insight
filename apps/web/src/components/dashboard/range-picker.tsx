@@ -6,22 +6,26 @@ interface RangePickerProps {
   onChange: (range: TimeRange) => void;
 }
 
-const ranges: TimeRange[] = ["7d", "30d", "90d"];
+const ranges: Array<{ value: TimeRange; label: string }> = [
+  { value: "month", label: "This month" },
+  { value: "3mo", label: "-3 months" },
+  { value: "year", label: "This year" },
+];
 
 export function RangePicker({ value, onChange }: RangePickerProps) {
   return (
-    <div className="inline-flex rounded-full border border-[var(--border)] bg-[var(--panel)] p-1">
+    <div className="inline-flex h-10 rounded-[18px] border border-[var(--border)] bg-[var(--panel)] p-1">
       {ranges.map((range) => (
         <button
-          key={range}
+          key={range.value}
           type="button"
-          onClick={() => onChange(range)}
+          onClick={() => onChange(range.value)}
           className={cn(
-            "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-colors",
-            value === range ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
+            "inline-flex h-8 items-center justify-center rounded-[14px] px-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors outline-none focus:ring-2 focus:ring-[var(--ring)]",
+            value === range.value ? "bg-[var(--accent)] text-[var(--accent-foreground)]" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
           )}
         >
-          {range}
+          {range.label}
         </button>
       ))}
     </div>

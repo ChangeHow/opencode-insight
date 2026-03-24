@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "predev": "node ../../scripts/check-port.mjs 8787 'BFF'",
+    "dev": "PROCESS_TITLE=opencode-telescope-bff NODE_OPTIONS='--require=../../scripts/set-process-title.cjs' vite --config vite.config.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit"
@@ -12,12 +13,13 @@
   "dependencies": {
     "@hono/node-server": "^1.14.4",
     "@opencode-dashboard/shared": "workspace:*",
-    "better-sqlite3": "^12.2.0",
+    "dotenv": "^17.2.2",
     "hono": "^4.7.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
+    "@hono/vite-dev-server": "^0.25.1",
     "@types/node": "^24.5.2",
-    "tsx": "^4.20.5"
+    "tsx": "^4.20.5",
+    "vite": "^8.0.2"
   }
 }

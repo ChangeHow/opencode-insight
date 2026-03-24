@@ -1,4 +1,4 @@
-export type TimeRange = "7d" | "30d" | "90d";
+export type TimeRange = "month" | "3mo" | "year";
 
 export interface TokenBreakdown {
   input: number;
@@ -11,6 +11,8 @@ export interface TokenBreakdown {
 export interface DashboardSummary {
   totalTokens: number;
   totalCost: number;
+  pricedTokens: number;
+  pricingCoverage: number;
   totalMessages: number;
   activeDays: number;
   averageTokensPerActiveDay: number;
@@ -52,10 +54,55 @@ export interface TrendPoint {
   messages: number;
 }
 
+export interface CostSeriesOption {
+  key: string;
+  label: string;
+  providerId: string;
+  modelId: string;
+  totalCost: number;
+  totalTokens: number;
+  totalMessages: number;
+}
+
+export interface CostSeriesLine {
+  key: string;
+  label: string;
+  providerId: string;
+  modelId: string;
+  points: TrendPoint[];
+}
+
+export interface CostSeriesPayload {
+  options: CostSeriesOption[];
+  lines: CostSeriesLine[];
+}
+
+export interface ProviderInsight {
+  providerId: string;
+  totalCost: number;
+  totalTokens: number;
+  pricedTokens: number;
+  pricingCoverage: number;
+  totalMessages: number;
+  activeDays: number;
+  modelCount: number;
+  topModel: {
+    modelId: string;
+    tokens: number;
+    cost: number;
+  } | null;
+  trend: TrendPoint[];
+}
+
+export interface ProviderInsightsPayload {
+  providers: ProviderInsight[];
+}
+
 export interface ModelBreakdown {
   modelId: string;
   providerId: string;
   tokens: number;
+  pricedTokens: number;
   cost: number;
   messages: number;
   breakdown: TokenBreakdown;
@@ -64,6 +111,7 @@ export interface ModelBreakdown {
 export interface DayBreakdown {
   date: string;
   tokens: number;
+  pricedTokens: number;
   cost: number;
   messages: number;
   breakdown: TokenBreakdown;
