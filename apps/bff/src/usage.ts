@@ -50,11 +50,25 @@ interface SerializedUsageSnapshot {
   heatmap: HeatmapDay[];
   trendByRange: Record<TimeRange, TrendPoint[]>;
   breakdownByDate: DayBreakdown[];
+  dataFingerprint?: string;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const SNAPSHOT_CACHE_FILE = path.join(CACHE_DIR, "usage-snapshot.json");
+
+function computeDataFingerprint(dbPath: string, legacyDir: string): string {
+  const parts: string[] = [];
+  if (fs.existsSync(dbPath)) {
+    const stat = fs.statSync(dbPath);
+    parts.push(`db:${stat.ino}:${stat.size}`);
+  }
+  if (fs.existsSync(legacyDir)) {
+    const stat = fs.statSync(legacyDir);
+    parts.push(`legacy:${stat.ino}:${Math.trunc(stat.mtimeMs)}`);
+  }
+  return parts.length > 0 ? parts.join("|") : "empty";
+}
 
 function emptyBreakdown(): TokenBreakdown {
   return {
@@ -727,32 +741,44 @@ function deserializeSnapshot(snapshot: SerializedUsageSnapshot): UsageSnapshot {
   };
 }
 
-function readSnapshotCache() {
+function readSnapshotCache(dbPath: string, legacyDir: string) {
   if (!fs.existsSync(SNAPSHOT_CACHE_FILE)) {
     return null;
   }
 
   try {
-    return deserializeSnapshot(JSON.parse(fs.readFileSync(SNAPSHOT_CACHE_FILE, "utf8")) as SerializedUsageSnapshot);
+    const cached = JSON.parse(fs.readFileSync(SNAPSHOT_CACHE_FILE, "utf8")) as SerializedUsageSnapshot;
+    if (cached.dataFingerprint !== undefined) {
+      const currentFingerprint = computeDataFingerprint(dbPath, legacyDir);
+      if (cached.dataFingerprint !== currentFingerprint) {
+        return null;
+      }
+    }
+    return deserializeSnapshot(cached);
   } catch {
     return null;
   }
 }
 
-function writeSnapshotCache(snapshot: UsageSnapshot) {
+function writeSnapshotCache(snapshot: UsageSnapshot, dbPath: string, legacyDir: string) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
-  fs.writeFileSync(SNAPSHOT_CACHE_FILE, JSON.stringify(serializeSnapshot(snapshot)), "utf8");
+  const serialized: SerializedUsageSnapshot = {
+    ...serializeSnapshot(snapshot),
+    dataFingerprint: computeDataFingerprint(dbPath, legacyDir),
+  };
+  fs.writeFileSync(SNAPSHOT_CACHE_FILE, JSON.stringify(serialized), "utf8");
 }
 
 export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
+  const { dbPath, legacyDir } = getOpenCodePaths();
+
   if (!options?.forceRefresh) {
-    const cached = readSnapshotCache();
+    const cached = readSnapshotCache(dbPath, legacyDir);
     if (cached) {
       return cached;
     }
   }
 
-  const { dbPath, legacyDir } = getOpenCodePaths();
   const sqliteMessages = readSqliteMessages(dbPath);
   const legacyMessages = readLegacyMessages(legacyDir);
   const messages = await enrichMessages(dedupeMessages([...sqliteMessages, ...legacyMessages]));
@@ -768,7 +794,7 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
 
   const paths = [dbPath, legacyDir].filter((currentPath) => fs.existsSync(currentPath));
   const snapshot = buildSnapshot(messages, sourceKind, paths);
-  writeSnapshotCache(snapshot);
+  writeSnapshotCache(snapshot, dbPath, legacyDir);
   return snapshot;
 }
 

@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process";
 
-const [, , portArg, labelArg] = process.argv;
-const port = Number(portArg);
+const [, , portArg, labelArg, portEnvVarArg] = process.argv;
+const portEnvVar = portEnvVarArg || "PORT";
+const port = Number(process.env[portEnvVar] ?? portArg);
 const label = labelArg ?? "service";
 
 if (!Number.isInteger(port) || port <= 0) {

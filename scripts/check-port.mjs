@@ -1,13 +1,14 @@
 import net from "node:net";
 import { execFileSync } from "node:child_process";
 
-const [, , fallbackPortArg, labelArg] = process.argv;
+const [, , fallbackPortArg, labelArg, portEnvVarArg] = process.argv;
 const fallbackPort = Number(fallbackPortArg);
-const port = Number(process.env.PORT ?? fallbackPort);
+const portEnvVar = portEnvVarArg || "PORT";
+const port = Number(process.env[portEnvVar] ?? fallbackPort);
 const label = labelArg ?? "service";
 
 if (!Number.isInteger(port) || port <= 0) {
-  console.error(`Invalid port: ${process.env.PORT ?? fallbackPortArg}`);
+  console.error(`Invalid port: ${process.env[portEnvVar] ?? fallbackPortArg}`);
   process.exit(1);
 }
 
@@ -55,7 +56,7 @@ const existingListener = lookupListener(port);
 if (existingListener) {
   const ownerMessage = ` Current listener: PID ${existingListener.pid}${existingListener.command ? ` (${existingListener.command})` : ""}.`;
   console.error(
-    `Port ${port} is already in use. Stop the existing process or change PORT before starting the ${label}.${ownerMessage}`,
+    `Port ${port} is already in use. Stop the existing process or change ${portEnvVar} before starting the ${label}.${ownerMessage}`,
   );
   process.exit(1);
 }
@@ -70,7 +71,7 @@ try {
       : "";
 
     console.error(
-      `Port ${port} is already in use. Stop the existing process or change PORT before starting the ${label}.${ownerMessage}`,
+      `Port ${port} is already in use. Stop the existing process or change ${portEnvVar} before starting the ${label}.${ownerMessage}`,
     );
     process.exit(1);
   }

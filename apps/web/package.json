@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "node ../../scripts/check-port.mjs 3000 'frontend'",
-    "dev": "PROCESS_TITLE=opencode-telescope-client NODE_OPTIONS='--require=../../scripts/set-process-title.cjs' vite --host 127.0.0.1",
+    "predev": "node ../../scripts/check-port.mjs 3000 'frontend' WEB_PORT",
+    "dev": "PROCESS_TITLE=opencode-telescope-client NODE_OPTIONS='--require=../../scripts/set-process-title.cjs' vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "lint": "tsc -p tsconfig.app.json --noEmit",
