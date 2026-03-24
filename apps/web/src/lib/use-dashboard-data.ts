@@ -1,30 +1,38 @@
 import { useEffect } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
-  dayAtom,
-  detailLoadingAtom,
+  customDateRangeAtom,
   errorAtom,
   heatmapAtom,
   loadingAtom,
+  providerInsightsAtom,
   rangeAtom,
   refreshTickAtom,
-  selectedDateAtom,
+  selectedSeriesKeysAtom,
+  seriesLinesAtom,
+  seriesOptionsAtom,
   summaryAtom,
   trendAtom,
 } from "@/lib/atoms";
-import { fetchDay, fetchHeatmap, fetchSummary, fetchTrend } from "@/lib/api";
+import { fetchHeatmap, fetchProviders, fetchSeries, fetchSummary, fetchTrend } from "@/lib/api";
+
+function hasSeriesValue(option: { totalCost: number; totalTokens: number; totalMessages: number }) {
+  return option.totalCost > 0 || option.totalTokens > 0 || option.totalMessages > 0;
+}
 
 export function useDashboardData() {
   const range = useAtomValue(rangeAtom);
+  const customDateRange = useAtomValue(customDateRangeAtom);
   const refreshTick = useAtomValue(refreshTickAtom);
-  const [selectedDate, setSelectedDate] = useAtom(selectedDateAtom);
   const setSummary = useSetAtom(summaryAtom);
   const setHeatmap = useSetAtom(heatmapAtom);
   const setTrend = useSetAtom(trendAtom);
+  const setSeriesOptions = useSetAtom(seriesOptionsAtom);
+  const setSeriesLines = useSetAtom(seriesLinesAtom);
+  const setProviderInsights = useSetAtom(providerInsightsAtom);
+  const setSelectedSeriesKeys = useSetAtom(selectedSeriesKeysAtom);
   const setLoading = useSetAtom(loadingAtom);
   const setError = useSetAtom(errorAtom);
-  const setDay = useSetAtom(dayAtom);
-  const setDetailLoading = useSetAtom(detailLoadingAtom);
 
   useEffect(() => {
     let canceled = false;
@@ -34,10 +42,12 @@ export function useDashboardData() {
       setError(null);
 
       try {
-        const [summary, heatmap, trend] = await Promise.all([
-          fetchSummary(range),
-          fetchHeatmap(range),
-          fetchTrend(range),
+        const [summary, heatmap, trend, series, providers] = await Promise.all([
+          fetchSummary(range, customDateRange),
+          fetchHeatmap(range, customDateRange),
+          fetchTrend(range, customDateRange),
+          fetchSeries(range, [], customDateRange),
+          fetchProviders(range, customDateRange),
         ]);
 
         if (canceled) {
@@ -47,19 +57,23 @@ export function useDashboardData() {
         setSummary(summary);
         setHeatmap(heatmap);
         setTrend(trend);
-
-        const fallbackDate = selectedDate && heatmap.some((item) => item.date === selectedDate)
-          ? selectedDate
-          : heatmap.at(-1)?.date ?? null;
-
-        setSelectedDate(fallbackDate);
+        setSeriesOptions(series.options);
+        setSeriesLines(series.lines);
+        setProviderInsights(providers.providers);
+        setSelectedSeriesKeys((current) => {
+          const visibleOptions = series.options.filter(hasSeriesValue).slice(0, 10);
+          const valid = current.filter((key) => visibleOptions.some((option) => option.key === key));
+          return valid.length > 0 ? valid : visibleOptions.slice(0, 3).map((option) => option.key);
+        });
       } catch (error) {
         if (!canceled) {
           setError(error instanceof Error ? error.message : "Failed to load dashboard.");
           setSummary(null);
           setHeatmap([]);
           setTrend([]);
-          setDay(null);
+          setSeriesOptions([]);
+          setSeriesLines([]);
+          setProviderInsights([]);
         }
       } finally {
         if (!canceled) {
@@ -73,40 +87,18 @@ export function useDashboardData() {
     return () => {
       canceled = true;
     };
-  }, [range, refreshTick, selectedDate, setDay, setError, setHeatmap, setLoading, setSelectedDate, setSummary, setTrend]);
-
-  useEffect(() => {
-    if (!selectedDate) {
-      setDay(null);
-      return;
-    }
-
-    let canceled = false;
-    const date = selectedDate;
-
-    async function loadDetail() {
-      setDetailLoading(true);
-
-      try {
-        const detail = await fetchDay(range, date);
-        if (!canceled) {
-          setDay(detail);
-        }
-      } catch {
-        if (!canceled) {
-          setDay(null);
-        }
-      } finally {
-        if (!canceled) {
-          setDetailLoading(false);
-        }
-      }
-    }
-
-    void loadDetail();
-
-    return () => {
-      canceled = true;
-    };
-  }, [range, selectedDate, setDay, setDetailLoading]);
+  }, [
+    customDateRange,
+    range,
+    refreshTick,
+    setError,
+    setHeatmap,
+    setLoading,
+    setProviderInsights,
+    setSeriesLines,
+    setSeriesOptions,
+    setSelectedSeriesKeys,
+    setSummary,
+    setTrend,
+  ]);
 }

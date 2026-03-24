@@ -5,13 +5,18 @@
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
+    "dev:web": "cd apps/web && pnpm dev",
+    "dev:bff": "cd apps/bff && pnpm dev",
+    "stop:web": "node ./scripts/stop-port.mjs 3000 'frontend'",
+    "stop:bff": "node ./scripts/stop-port.mjs 8787 'BFF'",
+    "restart:web": "pnpm stop:web && pnpm dev:web",
+    "restart:bff": "pnpm stop:bff && pnpm dev:bff",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "better-sqlite3",
       "esbuild"
     ]
   },

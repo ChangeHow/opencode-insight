@@ -1,3 +1,12 @@
+function parseUtcDate(value: string) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatCompactNumber(value: number) {
   return new Intl.NumberFormat("en-US", {
     notation: "compact",
@@ -15,17 +24,27 @@ export function formatCurrency(value: number) {
 }
 
 export function formatDateLabel(value: string) {
+  const date = parseUtcDate(value);
+  if (!date) {
+    return value || "—";
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-  }).format(new Date(`${value}T00:00:00.000Z`));
+  }).format(date);
 }
 
 export function formatLongDateLabel(value: string) {
+  const date = parseUtcDate(value);
+  if (!date) {
+    return value || "—";
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(`${value}T00:00:00.000Z`));
+  }).format(date);
 }

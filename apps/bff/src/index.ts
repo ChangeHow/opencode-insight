@@ -1,5 +1,8 @@
+import "./env.js";
 import { serve } from "@hono/node-server";
 import app from "./app.js";
+
+process.title = "opencode-telescope-bff";
 
 const port = Number(process.env.PORT ?? 8787);
 

@@ -1,14 +1,30 @@
+# dependencies
 node_modules
-.DS_Store
+.pnpm-store
+
+# build artifacts
 dist
 dist-node
 coverage
 .turbo
 .vite
+.cache
 *.tsbuildinfo
+
+# logs
+*.log
+pnpm-debug.log*
+
+# local tool state
 apps/web/components.json
 .agents
 .coco
 .trae
+@design
 log
 skills-lock.json
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
