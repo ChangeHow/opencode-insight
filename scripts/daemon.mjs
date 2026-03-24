@@ -7,24 +7,13 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { box } from "@clack/prompts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PID_FILE = path.join(ROOT, ".telescope-daemon.pid");
 const LOG_DIR = path.join(ROOT, "logs");
 const BFF_ENTRY = path.join(ROOT, "apps", "bff", "dist", "index.js");
 const WEB_DIST = path.join(ROOT, "apps", "web", "dist");
-
-function printBox(title, lines) {
-  const maxLen = Math.max(title.length, ...lines.map((l) => l.length), 36);
-  const border = "─".repeat(maxLen + 2);
-  process.stdout.write(`\n┌${border}┐\n`);
-  process.stdout.write(`│ ${title.padEnd(maxLen)} │\n`);
-  process.stdout.write(`├${border}┤\n`);
-  for (const line of lines) {
-    process.stdout.write(`│ ${line.padEnd(maxLen)} │\n`);
-  }
-  process.stdout.write(`└${border}┘\n\n`);
-}
 
 // Verify builds exist
 if (!existsSync(BFF_ENTRY)) {
@@ -109,15 +98,18 @@ if (!alive) {
 const displayHost = host === "0.0.0.0" ? "localhost" : host;
 const url = `http://${displayHost}:${port}`;
 
-printBox("opencode-telescope daemon", [
-  `Status : Running`,
-  `PID    : ${pid}`,
-  `Port   : ${port}`,
-  `Host   : ${host}`,
-  `Access : ${url}`,
-  `Log    : logs/bff.log`,
-  `Errors : logs/bff-error.log`,
-]);
+box(
+  [
+    `Status : Running`,
+    `PID    : ${pid}`,
+    `Port   : ${port}`,
+    `Host   : ${host}`,
+    `Access : ${url}`,
+    `Log    : logs/bff.log`,
+    `Errors : logs/bff-error.log`,
+  ].join("\n"),
+  "opencode-telescope daemon",
+);
 
 console.log("✓ Dashboard is running in the background.");
 console.log(`  Open in your browser: ${url}`);
