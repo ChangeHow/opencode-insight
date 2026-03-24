@@ -1,0 +1,14 @@
+node_modules
+.DS_Store
+dist
+dist-node
+coverage
+.turbo
+.vite
+*.tsbuildinfo
+apps/web/components.json
+.agents
+.coco
+.trae
+log
+skills-lock.json

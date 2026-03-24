@@ -1,0 +1,52 @@
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/manrope";
+@import "tailwindcss";
+@import "tw-animate-css";
+
+:root {
+  --background: oklch(0.97 0.014 70);
+  --foreground: oklch(0.28 0.04 43);
+  --muted-foreground: oklch(0.5 0.028 44);
+  --panel: color-mix(in oklch, white 72%, oklch(0.92 0.024 70) 28%);
+  --panel-strong: color-mix(in oklch, white 45%, oklch(0.91 0.03 75) 55%);
+  --border: oklch(0.85 0.02 70);
+  --accent: oklch(0.62 0.15 41);
+  --accent-foreground: oklch(0.98 0.01 70);
+  --accent-soft: color-mix(in oklch, var(--accent) 14%, white);
+  --ring: color-mix(in oklch, var(--accent) 62%, white);
+  --heat-0: color-mix(in oklch, var(--accent) 4%, white);
+  --heat-1: oklch(0.9 0.05 76);
+  --heat-2: oklch(0.82 0.08 70);
+  --heat-3: oklch(0.72 0.11 55);
+  --heat-4: oklch(0.62 0.15 41);
+  --chart: oklch(0.6 0.14 39);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top left, rgba(197, 142, 100, 0.18), transparent 28%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(247, 240, 231, 0.94));
+  color: var(--foreground);
+  font-family: "Manrope Variable", sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
