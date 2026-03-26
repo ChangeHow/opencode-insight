@@ -8,16 +8,23 @@ import type {
   DayBreakdown,
   HeatmapDay,
   ProviderInsight,
+  SessionBreakdown,
   TimeRange,
   TokenBreakdown,
   TrendPoint,
 } from "@opencode-dashboard/shared";
+import { DEFAULT_TIME_ZONE, formatDateInTimeZone, getDateKeyWeekday, getPresetDateRange, shiftDateKey } from "@opencode-dashboard/shared";
+import { logger } from "./logger.js";
 import { estimateUsageCostFromDataset, getPricingDataset } from "./pricing.js";
 
 type SourceKind = DashboardSummary["source"]["kind"];
 
 interface RawMessage {
   id: string;
+  sessionId: string;
+  sessionTitle: string;
+  sessionSlug: string;
+  sessionDirectory: string;
   date: string;
   timestampMs: number;
   modelId: string;
@@ -40,6 +47,7 @@ interface RangeData {
 
 interface UsageSnapshot {
   summary: DashboardSummary;
+  messages: RawMessage[];
   heatmap: HeatmapDay[];
   trendByRange: Record<TimeRange, TrendPoint[]>;
   breakdownByDate: Map<string, DayBreakdown>;
@@ -47,6 +55,7 @@ interface UsageSnapshot {
 
 interface SerializedUsageSnapshot {
   summary: DashboardSummary;
+  messages: RawMessage[];
   heatmap: HeatmapDay[];
   trendByRange: Record<TimeRange, TrendPoint[]>;
   breakdownByDate: DayBreakdown[];
@@ -80,15 +89,40 @@ function emptyBreakdown(): TokenBreakdown {
   };
 }
 
+function emptyDayBreakdown(date: string): DayBreakdown {
+  return {
+    date,
+    tokens: 0,
+    pricedTokens: 0,
+    cost: 0,
+    messages: 0,
+    breakdown: emptyBreakdown(),
+    models: [],
+    sessions: [],
+  };
+}
+
+function normalizeDayBreakdown(day: DayBreakdown): DayBreakdown {
+  return {
+    ...day,
+    sessions: day.sessions ?? [],
+  };
+}
+
 function getOpenCodePaths() {
   const configuredRoot = process.env.OPENCODE_DATA_DIR;
+  const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  const defaultRoot = path.join(homeDir, ".local", "share", "opencode");
   const root =
     configuredRoot && configuredRoot.trim().length > 0
       ? configuredRoot
-      : path.join(process.cwd(), ".missing-opencode-data-dir");
+      : defaultRoot;
+  const isDefault = !configuredRoot || configuredRoot.trim().length === 0;
   return {
     dbPath: path.join(root, "opencode.db"),
     legacyDir: path.join(root, "storage", "message"),
+    root,
+    isDefault,
   };
 }
 
@@ -111,11 +145,7 @@ function totalTokens(tokens: TokenBreakdown) {
   return tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite + tokens.reasoning;
 }
 
-function toDate(timestampMs: number) {
-  return new Date(timestampMs).toISOString().slice(0, 10);
-}
-
-function parseAssistantMessage(input: unknown, fallbackId: string): RawMessage | null {
+function parseAssistantMessage(input: unknown, fallbackId: string, session: { id: string; title: string; slug: string; directory: string }): RawMessage | null {
   if (!input || typeof input !== "object") {
     return null;
   }
@@ -144,7 +174,11 @@ function parseAssistantMessage(input: unknown, fallbackId: string): RawMessage |
 
   return {
     id: message.id ?? fallbackId,
-    date: toDate(timestampMs),
+    sessionId: session.id,
+    sessionTitle: session.title,
+    sessionSlug: session.slug,
+    sessionDirectory: session.directory,
+    date: formatDateInTimeZone(timestampMs, DEFAULT_TIME_ZONE),
     timestampMs,
     modelId: message.modelID,
     providerId: message.providerID ?? "unknown",
@@ -162,8 +196,9 @@ function readSqliteMessages(dbPath: string) {
 
   try {
     const query = `
-      SELECT id, data
-      FROM message
+      SELECT m.id, m.data, s.id AS session_id, s.title AS session_title, s.slug AS session_slug, s.directory AS session_directory
+      FROM message m
+      JOIN session s ON s.id = m.session_id
       WHERE json_extract(data, '$.role') = 'assistant'
         AND json_extract(data, '$.tokens') IS NOT NULL
     `;
@@ -173,12 +208,26 @@ function readSqliteMessages(dbPath: string) {
       maxBuffer: 128 * 1024 * 1024,
     }).trim();
 
-    const rows = output.length > 0 ? (JSON.parse(output) as Array<{ id: string; data: string }>) : [];
+    const rows = output.length > 0
+      ? (JSON.parse(output) as Array<{
+          id: string;
+          data: string;
+          session_id: string;
+          session_title: string;
+          session_slug: string | null;
+          session_directory: string;
+        }>)
+      : [];
 
     return rows
       .map((row) => {
         try {
-          return parseAssistantMessage(JSON.parse(row.data), row.id);
+          return parseAssistantMessage(JSON.parse(row.data), row.id, {
+            id: row.session_id,
+            title: row.session_title,
+            slug: row.session_slug ?? "",
+            directory: row.session_directory,
+          });
         } catch {
           return null;
         }
@@ -200,7 +249,12 @@ function readLegacyMessages(legacyDir: string) {
     .map((file) => {
       try {
         const raw = fs.readFileSync(path.join(legacyDir, file), "utf8");
-        return parseAssistantMessage(JSON.parse(raw), file.replace(/\.json$/, ""));
+        return parseAssistantMessage(JSON.parse(raw), file.replace(/\.json$/, ""), {
+          id: file.replace(/\.json$/, ""),
+          title: file.replace(/\.json$/, ""),
+          slug: "",
+          directory: legacyDir,
+        });
       } catch {
         return null;
       }
@@ -239,26 +293,25 @@ function computeStreak(days: string[]) {
   let longest = 0;
 
   for (const day of days) {
-    const previous = new Date(`${day}T00:00:00.000Z`).getTime() - DAY_MS;
-    const previousDay = new Date(previous).toISOString().slice(0, 10);
+    const previousDay = shiftDateKey(day, -1);
     if (set.has(previousDay)) {
       continue;
     }
 
     let streak = 1;
-    let cursor = new Date(`${day}T00:00:00.000Z`).getTime();
-    while (set.has(new Date(cursor + DAY_MS).toISOString().slice(0, 10))) {
+    let cursor = day;
+    while (set.has(shiftDateKey(cursor, 1))) {
       streak += 1;
-      cursor += DAY_MS;
+      cursor = shiftDateKey(cursor, 1);
     }
     longest = Math.max(longest, streak);
   }
 
   let current = 0;
-  let cursor = new Date(`${days[days.length - 1]}T00:00:00.000Z`).getTime();
-  while (set.has(new Date(cursor).toISOString().slice(0, 10))) {
+  let cursor = days[days.length - 1];
+  while (set.has(cursor)) {
     current += 1;
-    cursor -= DAY_MS;
+    cursor = shiftDateKey(cursor, -1);
   }
 
   return { current, longest };
@@ -273,39 +326,12 @@ function buildTrend(days: HeatmapDay[], takeLast: number): TrendPoint[] {
   }));
 }
 
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function getPresetBounds(range: TimeRange, timeZone: string) {
+  return getPresetDateRange(range, { timeZone });
 }
 
-function getPresetBounds(range: TimeRange) {
-  const today = new Date();
-  const end = formatLocalDate(today);
-
-  if (range === "month") {
-    return {
-      start: formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1)),
-      end,
-    };
-  }
-
-  if (range === "3mo") {
-    return {
-      start: formatLocalDate(new Date(today.getFullYear(), today.getMonth() - 2, 1)),
-      end,
-    };
-  }
-
-  return {
-    start: formatLocalDate(new Date(today.getFullYear(), 0, 1)),
-    end,
-  };
-}
-
-function trimHeatmap(days: HeatmapDay[], range: TimeRange) {
-  const { start, end } = getPresetBounds(range);
+function trimHeatmap(days: HeatmapDay[], range: TimeRange, timeZone: string) {
+  const { start, end } = getPresetBounds(range, timeZone);
   const selected = filterByDateRange(days, start, end);
   const maxTokens = Math.max(...selected.map((item) => item.tokens), 0);
 
@@ -327,6 +353,40 @@ function filterByDateRange<T extends { date: string }>(items: T[], start?: strin
     if (end && item.date > end) return false;
     return true;
   });
+}
+
+function nextDate(date: string) {
+  return shiftDateKey(date, 1);
+}
+
+function resolveWindowBounds(dates: string[], start?: string, end?: string) {
+  const sortedDates = [...dates].sort();
+  const rangeStart = start ?? sortedDates[0] ?? end;
+  const rangeEnd = end ?? sortedDates[sortedDates.length - 1] ?? start;
+
+  if (!rangeStart || !rangeEnd || rangeStart > rangeEnd) {
+    return null;
+  }
+
+  return { start: rangeStart, end: rangeEnd };
+}
+
+function buildContinuousBreakdowns(daysByDate: Map<string, DayBreakdown>, start?: string, end?: string) {
+  const bounds = resolveWindowBounds([...daysByDate.keys()], start, end);
+
+  if (!bounds) {
+    return [] as DayBreakdown[];
+  }
+
+  const days: DayBreakdown[] = [];
+  let cursor = bounds.start;
+
+  while (cursor <= bounds.end) {
+    days.push(daysByDate.get(cursor) ?? emptyDayBreakdown(cursor));
+    cursor = nextDate(cursor);
+  }
+
+  return days;
 }
 
 function filterDayByModels(day: DayBreakdown, modelKeys: string[]) {
@@ -362,6 +422,7 @@ function filterDayByModels(day: DayBreakdown, modelKeys: string[]) {
     messages,
     breakdown,
     models,
+    sessions: day.sessions,
   } satisfies DayBreakdown;
 }
 
@@ -369,7 +430,7 @@ function buildHeatmap(days: DayBreakdown[]) {
   const maxTokens = Math.max(...days.map((item) => item.tokens), 0);
 
   return days.map((day, index) => {
-    const weekday = new Date(`${day.date}T00:00:00.000Z`).getUTCDay();
+    const weekday = getDateKeyWeekday(day.date);
     const intensity: HeatmapDay["intensity"] =
       day.tokens === 0 || maxTokens === 0 ? 0 : (Math.ceil((day.tokens / maxTokens) * 4) as 1 | 2 | 3 | 4);
 
@@ -584,7 +645,7 @@ function buildRangeSummary(snapshot: UsageSnapshot, summaryDays: DayBreakdown[])
   } satisfies DashboardSummary;
 }
 
-function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: string[]): UsageSnapshot {
+function buildDayMap(messages: RawMessage[], timeZone: string) {
   const dayMap = new Map<string, DayBreakdown>();
   const modelMap = new Map<
     string,
@@ -598,22 +659,36 @@ function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: st
       breakdown: TokenBreakdown;
     }
   >();
-  let totalTokensAll = 0;
-  let totalCostAll = 0;
-  let pricedTokensAll = 0;
-  let totalMessagesAll = 0;
+  const sessionMap = new Map<
+    string,
+    {
+      date: string;
+      sessionId: string;
+      title: string;
+      slug: string;
+      directory: string;
+      tokens: number;
+      pricedTokens: number;
+      cost: number;
+      messages: number;
+      breakdown: TokenBreakdown;
+      models: Map<string, SessionBreakdown["models"][number]>;
+    }
+  >();
 
   for (const message of messages) {
+    const date = formatDateInTimeZone(message.timestampMs, timeZone);
     const day =
-      dayMap.get(message.date) ??
+      dayMap.get(date) ??
       {
-        date: message.date,
+        date,
         tokens: 0,
         pricedTokens: 0,
         cost: 0,
         messages: 0,
         breakdown: emptyBreakdown(),
         models: [],
+        sessions: [],
       };
 
     const messageTokens = totalTokens(message.tokens);
@@ -627,7 +702,7 @@ function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: st
     day.breakdown.cacheWrite += message.tokens.cacheWrite;
     day.breakdown.reasoning += message.tokens.reasoning;
 
-    const modelKey = `${message.date}:${message.providerId}:${message.modelId}`;
+    const modelKey = `${date}:${message.providerId}:${message.modelId}`;
     const model =
       modelMap.get(modelKey) ??
       {
@@ -649,13 +724,57 @@ function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: st
     model.breakdown.cacheRead += message.tokens.cacheRead;
     model.breakdown.cacheWrite += message.tokens.cacheWrite;
     model.breakdown.reasoning += message.tokens.reasoning;
-
     modelMap.set(modelKey, model);
-    dayMap.set(message.date, day);
-    totalTokensAll += messageTokens;
-    totalCostAll += message.estimatedCost;
-    pricedTokensAll += message.pricedTokens;
-    totalMessagesAll += 1;
+
+    const sessionKey = `${date}:${message.sessionId}`;
+    const sessionEntry = sessionMap.get(sessionKey) ?? {
+      date,
+      sessionId: message.sessionId,
+      title: message.sessionTitle,
+      slug: message.sessionSlug,
+      directory: message.sessionDirectory,
+      tokens: 0,
+      pricedTokens: 0,
+      cost: 0,
+      messages: 0,
+      breakdown: emptyBreakdown(),
+      models: new Map<string, SessionBreakdown["models"][number]>(),
+    };
+
+    sessionEntry.tokens += messageTokens;
+    sessionEntry.pricedTokens += message.pricedTokens;
+    sessionEntry.cost += message.estimatedCost;
+    sessionEntry.messages += 1;
+    sessionEntry.breakdown.input += message.tokens.input;
+    sessionEntry.breakdown.output += message.tokens.output;
+    sessionEntry.breakdown.cacheRead += message.tokens.cacheRead;
+    sessionEntry.breakdown.cacheWrite += message.tokens.cacheWrite;
+    sessionEntry.breakdown.reasoning += message.tokens.reasoning;
+
+    const sessionModelKey = `${message.providerId}:${message.modelId}`;
+    const sessionModel = sessionEntry.models.get(sessionModelKey) ?? {
+      modelId: message.modelId,
+      providerId: message.providerId,
+      tokens: 0,
+      pricedTokens: 0,
+      cost: 0,
+      messages: 0,
+      breakdown: emptyBreakdown(),
+    };
+
+    sessionModel.tokens += messageTokens;
+    sessionModel.pricedTokens += message.pricedTokens;
+    sessionModel.cost += message.estimatedCost;
+    sessionModel.messages += 1;
+    sessionModel.breakdown.input += message.tokens.input;
+    sessionModel.breakdown.output += message.tokens.output;
+    sessionModel.breakdown.cacheRead += message.tokens.cacheRead;
+    sessionModel.breakdown.cacheWrite += message.tokens.cacheWrite;
+    sessionModel.breakdown.reasoning += message.tokens.reasoning;
+    sessionEntry.models.set(sessionModelKey, sessionModel);
+    sessionMap.set(sessionKey, sessionEntry);
+
+    dayMap.set(date, day);
   }
 
   for (const [key, model] of modelMap.entries()) {
@@ -666,18 +785,49 @@ function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: st
     }
   }
 
+  for (const session of sessionMap.values()) {
+    const day = dayMap.get(session.date);
+    if (!day) continue;
+
+    day.sessions.push({
+      sessionId: session.sessionId,
+      title: session.title,
+      slug: session.slug,
+      directory: session.directory,
+      tokens: session.tokens,
+      pricedTokens: session.pricedTokens,
+      cost: Number(session.cost.toFixed(4)),
+      messages: session.messages,
+      breakdown: session.breakdown,
+      models: [...session.models.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens),
+    });
+  }
+
+  for (const day of dayMap.values()) {
+    day.models.sort((a, b) => b.cost - a.cost || b.tokens - a.tokens);
+    day.sessions.sort((a, b) => b.tokens - a.tokens || b.cost - a.cost || a.sessionId.localeCompare(b.sessionId));
+  }
+
+  return dayMap;
+}
+
+function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: string[]): UsageSnapshot {
+  const dayMap = buildDayMap(messages, DEFAULT_TIME_ZONE);
+  const totalTokensAll = messages.reduce((sum, message) => sum + totalTokens(message.tokens), 0);
+  const totalCostAll = messages.reduce((sum, message) => sum + message.estimatedCost, 0);
+  const pricedTokensAll = messages.reduce((sum, message) => sum + message.pricedTokens, 0);
+  const totalMessagesAll = messages.length;
+
   const orderedDates = [...dayMap.keys()].sort();
-  const topModel = [...modelMap.values()].sort((a, b) => b.tokens - a.tokens)[0] ?? null;
+  const topModel = [...dayMap.values()].flatMap((day) => day.models).sort((a, b) => b.tokens - a.tokens)[0] ?? null;
   const bestDay = [...dayMap.values()].sort((a, b) => b.tokens - a.tokens)[0] ?? null;
   const streaks = computeStreak(orderedDates);
   const maxTokens = Math.max(...[...dayMap.values()].map((item) => item.tokens), 0);
 
   const heatmap: HeatmapDay[] = orderedDates.map((date, index) => {
     const day = dayMap.get(date)!;
-    const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+    const weekday = getDateKeyWeekday(date);
     const intensity = maxTokens === 0 ? 0 : (Math.ceil((day.tokens / maxTokens) * 4) as 1 | 2 | 3 | 4);
-
-    day.models.sort((a, b) => b.cost - a.cost || b.tokens - a.tokens);
 
     return {
       date,
@@ -692,9 +842,10 @@ function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: st
   });
 
   const trendByRange = {
-    month: buildTrend(trimHeatmap(heatmap, "month"), Number.MAX_SAFE_INTEGER),
-    "3mo": buildTrend(trimHeatmap(heatmap, "3mo"), Number.MAX_SAFE_INTEGER),
-    year: buildTrend(trimHeatmap(heatmap, "year"), Number.MAX_SAFE_INTEGER),
+    "7d": buildTrend(trimHeatmap(heatmap, "7d", DEFAULT_TIME_ZONE), Number.MAX_SAFE_INTEGER),
+    month: buildTrend(trimHeatmap(heatmap, "month", DEFAULT_TIME_ZONE), Number.MAX_SAFE_INTEGER),
+    "3mo": buildTrend(trimHeatmap(heatmap, "3mo", DEFAULT_TIME_ZONE), Number.MAX_SAFE_INTEGER),
+    year: buildTrend(trimHeatmap(heatmap, "year", DEFAULT_TIME_ZONE), Number.MAX_SAFE_INTEGER),
   } satisfies Record<TimeRange, TrendPoint[]>;
 
   return {
@@ -710,13 +861,14 @@ function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: st
       longestStreak: streaks.longest,
       bestDay: bestDay ? { date: bestDay.date, tokens: bestDay.tokens, cost: Number(bestDay.cost.toFixed(4)) } : null,
       topModel: topModel ? { modelId: topModel.modelId, tokens: topModel.tokens, cost: Number(topModel.cost.toFixed(4)) } : null,
-      availableRanges: ["month", "3mo", "year"],
+      availableRanges: ["7d", "month", "3mo", "year"],
       scannedAt: new Date().toISOString(),
       source: {
         kind: sourceKind,
         paths,
       },
     },
+    messages,
     heatmap,
     trendByRange,
     breakdownByDate: dayMap,
@@ -726,6 +878,7 @@ function buildSnapshot(messages: RawMessage[], sourceKind: SourceKind, paths: st
 function serializeSnapshot(snapshot: UsageSnapshot): SerializedUsageSnapshot {
   return {
     summary: snapshot.summary,
+    messages: snapshot.messages,
     heatmap: snapshot.heatmap,
     trendByRange: snapshot.trendByRange,
     breakdownByDate: [...snapshot.breakdownByDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
@@ -735,9 +888,10 @@ function serializeSnapshot(snapshot: UsageSnapshot): SerializedUsageSnapshot {
 function deserializeSnapshot(snapshot: SerializedUsageSnapshot): UsageSnapshot {
   return {
     summary: snapshot.summary,
+    messages: snapshot.messages,
     heatmap: snapshot.heatmap,
     trendByRange: snapshot.trendByRange,
-    breakdownByDate: new Map(snapshot.breakdownByDate.map((day) => [day.date, day])),
+    breakdownByDate: new Map(snapshot.breakdownByDate.map((day) => [day.date, normalizeDayBreakdown(day)])),
   };
 }
 
@@ -748,6 +902,10 @@ function readSnapshotCache(dbPath: string, legacyDir: string) {
 
   try {
     const cached = JSON.parse(fs.readFileSync(SNAPSHOT_CACHE_FILE, "utf8")) as SerializedUsageSnapshot;
+    const missingSessionShape = cached.breakdownByDate.some((day) => !("sessions" in day));
+    if (missingSessionShape) {
+      return null;
+    }
     if (cached.dataFingerprint !== undefined) {
       const currentFingerprint = computeDataFingerprint(dbPath, legacyDir);
       if (cached.dataFingerprint !== currentFingerprint) {
@@ -770,11 +928,14 @@ function writeSnapshotCache(snapshot: UsageSnapshot, dbPath: string, legacyDir: 
 }
 
 export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
-  const { dbPath, legacyDir } = getOpenCodePaths();
+  const { dbPath, legacyDir, root, isDefault } = getOpenCodePaths();
+
+  logger.debug({ dbPath, legacyDir, dbExists: fs.existsSync(dbPath), legacyExists: fs.existsSync(legacyDir), isDefault }, "Checking data sources");
 
   if (!options?.forceRefresh) {
     const cached = readSnapshotCache(dbPath, legacyDir);
     if (cached) {
+      logger.info({ source: cached.summary.source, dayCount: cached.breakdownByDate.size, fromCache: true }, "Loaded usage snapshot from cache");
       return cached;
     }
   }
@@ -794,25 +955,53 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
 
   const paths = [dbPath, legacyDir].filter((currentPath) => fs.existsSync(currentPath));
   const snapshot = buildSnapshot(messages, sourceKind, paths);
+
+  if (messages.length === 0) {
+    logger.warn(
+      {
+        dataDir: root,
+        isDefault,
+        dbPath,
+        legacyDir,
+        dbExists: fs.existsSync(dbPath),
+        legacyExists: fs.existsSync(legacyDir),
+        hint: isDefault
+          ? "Using default path. Set OPENCODE_DATA_DIR if your data is elsewhere."
+          : "Check if OPENCODE_DATA_DIR points to a valid opencode data directory",
+      },
+      "No usage messages found",
+    );
+  } else {
+    logger.info(
+      {
+        source: sourceKind,
+        dataDir: root,
+        isDefault,
+        messageCount: messages.length,
+        sqliteCount: sqliteMessages.length,
+        legacyCount: legacyMessages.length,
+        dateRange: messages.length > 0 ? `${messages[0].date} ~ ${messages[messages.length - 1].date}` : null,
+      },
+      "Loaded usage messages",
+    );
+  }
+
   writeSnapshotCache(snapshot, dbPath, legacyDir);
   return snapshot;
 }
 
-export function getRangeData(snapshot: UsageSnapshot, range: TimeRange, modelKeys: string[] = []): RangeData {
-  const windowDays = trimHeatmap(snapshot.heatmap, range);
-  const selectedDates = new Set(windowDays.map((item) => item.date));
+export function getRangeData(snapshot: UsageSnapshot, range: TimeRange, modelKeys: string[] = [], timeZone = DEFAULT_TIME_ZONE): RangeData {
+  const { start, end } = getPresetBounds(range, timeZone);
+  const sourceByDate = buildDayMap(snapshot.messages, timeZone);
   const byDate = new Map<string, DayBreakdown>();
 
-  for (const [date, breakdown] of snapshot.breakdownByDate.entries()) {
-    if (selectedDates.has(date)) {
-      byDate.set(date, filterDayByModels(breakdown, modelKeys));
+  for (const [date, breakdown] of sourceByDate.entries()) {
+    if (date >= start && date <= end) {
+      byDate.set(date, filterDayByModels(normalizeDayBreakdown(breakdown), modelKeys));
     }
   }
 
-  const windowBreakdowns = windowDays
-    .map((day) => byDate.get(day.date))
-    .filter((item): item is DayBreakdown => item !== undefined)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const windowBreakdowns = buildContinuousBreakdowns(byDate, start, end);
   const activityDays = windowBreakdowns.filter((day) => day.tokens > 0);
   const { seriesLines, seriesOptions } = buildSeries(activityDays);
   const providers = buildProviderInsights(activityDays);
@@ -829,19 +1018,16 @@ export function getRangeData(snapshot: UsageSnapshot, range: TimeRange, modelKey
   };
 }
 
-export function getDateFilteredData(snapshot: UsageSnapshot, start?: string, end?: string, modelKeys: string[] = []): RangeData {
-  const selected = filterByDateRange(snapshot.heatmap, start, end);
+export function getDateFilteredData(snapshot: UsageSnapshot, start?: string, end?: string, modelKeys: string[] = [], timeZone = DEFAULT_TIME_ZONE): RangeData {
+  const sourceByDate = buildDayMap(snapshot.messages, timeZone);
   const byDate = new Map<string, DayBreakdown>();
-  for (const [date, breakdown] of snapshot.breakdownByDate.entries()) {
+  for (const [date, breakdown] of sourceByDate.entries()) {
     if ((!start || date >= start) && (!end || date <= end)) {
-      byDate.set(date, filterDayByModels(breakdown, modelKeys));
+      byDate.set(date, filterDayByModels(normalizeDayBreakdown(breakdown), modelKeys));
     }
   }
 
-  const windowBreakdowns = selected
-    .map((day) => byDate.get(day.date))
-    .filter((item): item is DayBreakdown => item !== undefined)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const windowBreakdowns = buildContinuousBreakdowns(byDate, start, end);
   const activityDays = windowBreakdowns.filter((day) => day.tokens > 0);
   const { seriesLines, seriesOptions } = buildSeries(activityDays);
   const providers = buildProviderInsights(activityDays);
