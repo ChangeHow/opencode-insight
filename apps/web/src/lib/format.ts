@@ -1,11 +1,4 @@
-function parseUtcDate(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
+import { formatDateLabelInTimeZone, getCurrentTimeZone } from "@opencode-dashboard/shared";
 
 export function formatCompactNumber(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -24,27 +17,37 @@ export function formatCurrency(value: number) {
 }
 
 export function formatDateLabel(value: string) {
-  const date = parseUtcDate(value);
-  if (!date) {
+  if (!value) {
     return value || "—";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return formatDateLabelInTimeZone(value, {
     month: "short",
     day: "numeric",
-  }).format(date);
+  }, getCurrentTimeZone()) ?? value;
 }
 
 export function formatLongDateLabel(value: string) {
-  const date = parseUtcDate(value);
-  if (!date) {
+  if (!value) {
     return value || "—";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return formatDateLabelInTimeZone(value, {
     weekday: "short",
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).format(date);
+  }, getCurrentTimeZone()) ?? value;
+}
+
+export function formatDateWithYearLabel(value: string) {
+  if (!value) {
+    return value || "—";
+  }
+
+  return formatDateLabelInTimeZone(value, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }, getCurrentTimeZone()) ?? value;
 }
