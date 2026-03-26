@@ -2,7 +2,10 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createStore, Provider } from "jotai";
 import type { ReactNode } from "react";
+import { getCurrentTimeZone } from "@opencode-dashboard/shared";
 import {
+  customDateRangeAtom,
+  dashboardStateAtom,
   rangeAtom,
   loadingAtom,
   errorAtom,
@@ -16,32 +19,25 @@ import {
 } from "../lib/atoms.js";
 import {
   makeDashboardSummary,
+  makeCostSeriesLine,
+  makeCostSeriesOption,
   makeHeatmapDay,
   makeTrendPoint,
   makeCostSeriesPayload,
   makeProviderInsightsPayload,
-  makeCostSeriesOption,
 } from "./factories.js";
 
 // vi.mock is hoisted by vitest, so the mocked modules below are already mocked at import time
 vi.mock("../lib/api.js", () => ({
-  fetchSummary: vi.fn(),
-  fetchHeatmap: vi.fn(),
-  fetchTrend: vi.fn(),
-  fetchSeries: vi.fn(),
-  fetchProviders: vi.fn(),
+  fetchDashboard: vi.fn(),
   fetchDay: vi.fn(),
   refreshSnapshot: vi.fn(),
 }));
 
 import { useDashboardData } from "../lib/use-dashboard-data.js";
-import { fetchSummary, fetchHeatmap, fetchTrend, fetchSeries, fetchProviders } from "../lib/api.js";
+import { fetchDashboard } from "../lib/api.js";
 
-const mockFetchSummary = vi.mocked(fetchSummary);
-const mockFetchHeatmap = vi.mocked(fetchHeatmap);
-const mockFetchTrend = vi.mocked(fetchTrend);
-const mockFetchSeries = vi.mocked(fetchSeries);
-const mockFetchProviders = vi.mocked(fetchProviders);
+const mockFetchDashboard = vi.mocked(fetchDashboard);
 
 describe("useDashboardData Hook", () => {
   let store: ReturnType<typeof createStore>;
@@ -49,12 +45,15 @@ describe("useDashboardData Hook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     store = createStore();
-    
-    mockFetchSummary.mockResolvedValue(makeDashboardSummary());
-    mockFetchHeatmap.mockResolvedValue([makeHeatmapDay()]);
-    mockFetchTrend.mockResolvedValue([makeTrendPoint()]);
-    mockFetchSeries.mockResolvedValue(makeCostSeriesPayload());
-    mockFetchProviders.mockResolvedValue(makeProviderInsightsPayload());
+
+    mockFetchDashboard.mockResolvedValue({
+      summary: makeDashboardSummary(),
+      heatmap: [makeHeatmapDay()],
+      trend: [makeTrendPoint()],
+      series: makeCostSeriesPayload(),
+      providers: makeProviderInsightsPayload().providers,
+      selectedDay: null,
+    });
   });
 
   function wrapper({ children }: { children: ReactNode }) {
@@ -77,11 +76,14 @@ describe("useDashboardData Hook", () => {
       const series = makeCostSeriesPayload();
       const providers = makeProviderInsightsPayload();
 
-      mockFetchSummary.mockResolvedValue(summary);
-      mockFetchHeatmap.mockResolvedValue(heatmap);
-      mockFetchTrend.mockResolvedValue(trend);
-      mockFetchSeries.mockResolvedValue(series);
-      mockFetchProviders.mockResolvedValue(providers);
+      mockFetchDashboard.mockResolvedValue({
+        summary,
+        heatmap,
+        trend,
+        series,
+        providers: providers.providers,
+        selectedDay: null,
+      });
 
       renderHook(() => useDashboardData(), { wrapper });
 
@@ -109,7 +111,14 @@ describe("useDashboardData Hook", () => {
         ],
       });
 
-      mockFetchSeries.mockResolvedValue(series);
+      mockFetchDashboard.mockResolvedValue({
+        summary: makeDashboardSummary(),
+        heatmap: [makeHeatmapDay()],
+        trend: [makeTrendPoint()],
+        series,
+        providers: makeProviderInsightsPayload().providers,
+        selectedDay: null,
+      });
 
       renderHook(() => useDashboardData(), { wrapper });
 
@@ -133,7 +142,7 @@ describe("useDashboardData Hook", () => {
         expect(store.get(loadingAtom)).toBe(false);
       });
 
-      expect(mockFetchSummary).toHaveBeenCalledTimes(1);
+      const before = mockFetchDashboard.mock.calls.length;
 
       // Change range
       act(() => {
@@ -142,14 +151,37 @@ describe("useDashboardData Hook", () => {
       rerender();
 
       await waitFor(() => {
-        expect(mockFetchSummary).toHaveBeenCalledTimes(2);
+        expect(mockFetchDashboard.mock.calls.length).toBeGreaterThan(before);
       });
+    });
+  });
+
+  describe("When same range state is revisited", () => {
+    it("should reuse cached atoms without fetching again", async () => {
+      store.set(summaryAtom, makeDashboardSummary({ totalTokens: 999 }));
+      store.set(heatmapAtom, [makeHeatmapDay("2025-01-25")]);
+      store.set(trendAtom, [makeTrendPoint("2025-01-25")]);
+      store.set(seriesOptionsAtom, [makeCostSeriesOption({ key: "cached" })]);
+      store.set(seriesLinesAtom, [makeCostSeriesLine({ key: "cached" })]);
+      store.set(providerInsightsAtom, makeProviderInsightsPayload().providers);
+      store.set(dashboardStateAtom, { key: `${getCurrentTimeZone()}:7d:2025-01-01:2025-01-07`, refreshTick: 0, lastRefreshAt: null });
+      store.set(rangeAtom, "7d");
+      store.set(customDateRangeAtom, { start: "2025-01-01", end: "2025-01-07" });
+
+      renderHook(() => useDashboardData(), { wrapper });
+
+      await waitFor(() => {
+        expect(store.get(loadingAtom)).toBe(false);
+      });
+
+      expect(mockFetchDashboard).not.toHaveBeenCalled();
+      expect(store.get(summaryAtom)?.totalTokens).toBe(999);
     });
   });
 
   describe("When API returns an error", () => {
     it("should set error atom and clear data atoms", async () => {
-      mockFetchSummary.mockRejectedValue(new Error("API error"));
+      mockFetchDashboard.mockRejectedValue(new Error("API error"));
 
       renderHook(() => useDashboardData(), { wrapper });
 

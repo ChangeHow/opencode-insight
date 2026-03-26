@@ -1,30 +1,37 @@
 import { describe, it, expect } from "vitest";
+import { formatDateInTimeZone, getPresetDateRange, shiftDateKey } from "@opencode-dashboard/shared";
 import { getRangeData, getDateFilteredData } from "../usage.js";
 import {
   makeUsageSnapshot,
   makeHeatmapDay,
   makeDayBreakdown,
   makeModelBreakdown,
+  makeRawMessage,
 } from "./factories.js";
 
 function getTodayDate(): string {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return formatDateInTimeZone(new Date(), "Asia/Shanghai");
 }
 
 function getRelativeDate(daysOffset: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + daysOffset);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return shiftDateKey(getTodayDate(), daysOffset);
 }
 
 describe("Usage Module", () => {
+  describe("shared timezone date helpers", () => {
+    it("should format instants using caller time zone boundaries", () => {
+      expect(formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "Asia/Shanghai")).toBe("2026-03-26");
+      expect(formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "America/Los_Angeles")).toBe("2026-03-25");
+    });
+
+    it("should build preset ranges from provided time zone", () => {
+      expect(getPresetDateRange("7d", { now: new Date("2026-03-25T16:30:00.000Z"), timeZone: "Asia/Shanghai" })).toEqual({
+        start: "2026-03-20",
+        end: "2026-03-26",
+      });
+    });
+  });
+
   describe("Given days in snapshot", () => {
     it("should return only days in current month when getRangeData is called with 'month'", () => {
       const today = getTodayDate();
@@ -72,6 +79,10 @@ describe("Usage Module", () => {
 
       const snapshot = makeUsageSnapshot({
         heatmap: [makeHeatmapDay(today)],
+        messages: [
+          makeRawMessage(today, { modelId: "claude-3-5-sonnet", providerId: "anthropic" }),
+          makeRawMessage(today, { id: "msg_2", modelId: "gpt-4o", providerId: "openai" }),
+        ],
         breakdownByDate: new Map([
           [
             today,
@@ -116,6 +127,41 @@ describe("Usage Module", () => {
       expect(result.summary.totalCost).toBe(0);
       expect(result.summary.totalMessages).toBe(0);
       expect(result.summary.activeDays).toBe(0);
+    });
+  });
+
+  describe("Given gaps inside the selected period", () => {
+    it("should include zero-value days across the full preset range", () => {
+      const today = getTodayDate();
+      const twoDaysAgo = getRelativeDate(-2);
+
+      const snapshot = makeUsageSnapshot({
+        heatmap: [
+          makeHeatmapDay(twoDaysAgo, { tokens: 3000, messages: 3 }),
+          makeHeatmapDay(today, { tokens: 5000, messages: 5 }),
+        ],
+        breakdownByDate: new Map([
+          [twoDaysAgo, makeDayBreakdown(twoDaysAgo, { tokens: 3000, messages: 3 })],
+          [today, makeDayBreakdown(today, { tokens: 5000, messages: 5 })],
+        ]),
+      });
+
+      const result = getDateFilteredData(snapshot, twoDaysAgo, today);
+
+      expect(result.heatmap.map((day) => day.date)).toEqual([twoDaysAgo, getRelativeDate(-1), today]);
+      expect(result.heatmap[1]).toMatchObject({
+        date: getRelativeDate(-1),
+        tokens: 0,
+        cost: 0,
+        messages: 0,
+        intensity: 0,
+      });
+      expect(result.trend[1]).toMatchObject({
+        date: getRelativeDate(-1),
+        tokens: 0,
+        cost: 0,
+        messages: 0,
+      });
     });
   });
 
@@ -217,6 +263,7 @@ describe("Usage Module", () => {
           makeHeatmapDay(today, { tokens: 5000 }),
           makeHeatmapDay(yesterday, { tokens: 0 }),
         ],
+        messages: [makeRawMessage(today)],
         breakdownByDate: new Map([
           [today, makeDayBreakdown(today, { tokens: 5000 })],
           [yesterday, makeDayBreakdown(yesterday, { tokens: 0 })],

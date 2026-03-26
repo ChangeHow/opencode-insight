@@ -8,6 +8,7 @@ import type {
   CostSeriesOption,
   CostSeriesLine,
   ProviderInsight,
+  SessionBreakdown,
   TimeRange,
 } from "@opencode-dashboard/shared";
 
@@ -23,6 +24,21 @@ interface RangeData {
 
 interface UsageSnapshot {
   summary: DashboardSummary;
+  messages: Array<{
+    id: string;
+    sessionId: string;
+    sessionTitle: string;
+    sessionSlug: string;
+    sessionDirectory: string;
+    date: string;
+    timestampMs: number;
+    modelId: string;
+    providerId: string;
+    cost: number;
+    estimatedCost: number;
+    pricedTokens: number;
+    tokens: TokenBreakdown;
+  }>;
   heatmap: HeatmapDay[];
   trendByRange: Record<TimeRange, TrendPoint[]>;
   breakdownByDate: Map<string, DayBreakdown>;
@@ -67,6 +83,46 @@ export function makeDayBreakdown(date?: string, overrides?: Partial<DayBreakdown
     messages: model.messages,
     breakdown: model.breakdown,
     models: [model],
+    sessions: [makeSessionBreakdown(undefined, { models: [model] })],
+    ...overrides,
+  };
+}
+
+export function makeSessionBreakdown(sessionId?: string, overrides?: Partial<SessionBreakdown>): SessionBreakdown {
+  const id = sessionId ?? "ses_123";
+  const model = makeModelBreakdown();
+  return {
+    sessionId: id,
+    title: "Session title",
+    slug: "calm-river",
+    directory: "/Users/changehow/workspace/opencode-token-dashboard",
+    tokens: model.tokens,
+    pricedTokens: model.pricedTokens,
+    cost: model.cost,
+    messages: model.messages,
+    breakdown: model.breakdown,
+    models: [model],
+    ...overrides,
+  };
+}
+
+export function makeRawMessage(date = "2025-01-15", overrides?: Partial<UsageSnapshot["messages"][number]>) {
+  const timestampMs = new Date(`${date}T12:00:00.000Z`).getTime();
+  const tokens = makeTokenBreakdown();
+  return {
+    id: `msg_${date}`,
+    sessionId: "ses_123",
+    sessionTitle: "Session title",
+    sessionSlug: "calm-river",
+    sessionDirectory: "/Users/changehow/workspace/opencode-token-dashboard",
+    date,
+    timestampMs,
+    modelId: "claude-3-5-sonnet-20241022",
+    providerId: "anthropic",
+    cost: 0.05,
+    estimatedCost: 0.05,
+    pricedTokens: tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite + tokens.reasoning,
+    tokens,
     ...overrides,
   };
 }
@@ -128,7 +184,7 @@ export function makeDashboardSummary(overrides?: Partial<DashboardSummary>): Das
       tokens: 50000,
       cost: 1.2,
     },
-    availableRanges: ["month", "3mo", "year"],
+    availableRanges: ["7d", "month", "3mo", "year"],
     scannedAt: new Date().toISOString(),
     source: {
       kind: "sqlite",
@@ -213,25 +269,29 @@ export function makeRangeData(options?: {
 
 export function makeUsageSnapshot(options?: {
   summary?: Partial<DashboardSummary>;
+  messages?: UsageSnapshot["messages"];
   heatmap?: HeatmapDay[];
   trendByRange?: Partial<Record<TimeRange, TrendPoint[]>>;
   breakdownByDate?: Map<string, DayBreakdown>;
 }): UsageSnapshot {
   const defaultTrend = [makeTrendPoint("2025-01-15"), makeTrendPoint("2025-01-16")];
+  const breakdownByDate = options?.breakdownByDate ?? new Map([
+    ["2025-01-15", makeDayBreakdown("2025-01-15")],
+    ["2025-01-16", makeDayBreakdown("2025-01-16")],
+  ]);
   
   return {
     summary: makeDashboardSummary(options?.summary),
+    messages: options?.messages ?? [...breakdownByDate.keys()].map((date, index) => makeRawMessage(date, { id: `msg_${index}_${date}` })),
     heatmap: options?.heatmap ?? [makeHeatmapDay("2025-01-15"), makeHeatmapDay("2025-01-16")],
     trendByRange: {
+      "7d": defaultTrend,
       month: defaultTrend,
       "3mo": defaultTrend,
       year: defaultTrend,
       ...options?.trendByRange,
     },
-    breakdownByDate: options?.breakdownByDate ?? new Map([
-      ["2025-01-15", makeDayBreakdown("2025-01-15")],
-      ["2025-01-16", makeDayBreakdown("2025-01-16")],
-    ]),
+    breakdownByDate,
   };
 }
 
