@@ -27,7 +27,7 @@ export function Calendar({ className, classNames, showOutsideDays = true, ...pro
         day: "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected].rdp-range_end)]:rounded-r-xl [&:has([aria-selected].rdp-range_start)]:rounded-l-xl [&:has([aria-selected].rdp-range_middle)]:rounded-none",
         day_button: "inline-flex size-9 items-center justify-center rounded-xl text-sm text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         selected: "bg-[var(--accent)] text-[var(--accent-foreground)]",
-        today: "font-semibold",
+        today: "",
         outside: "text-[var(--muted-foreground)] opacity-50",
         disabled: "opacity-35",
         range_start: "bg-[var(--accent-soft)]",

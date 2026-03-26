@@ -3,6 +3,46 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@layer components {
+  .ui-pill-surface {
+    @apply border border-[var(--border)] text-[var(--foreground)];
+    background: var(--pill-surface);
+  }
+
+  .ui-pill-chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)];
+    background: var(--pill-surface);
+  }
+
+  .ui-pill-card {
+    @apply rounded-[16px] border border-[var(--border)] px-3 py-2.5 text-[var(--foreground)];
+    background: var(--pill-surface);
+  }
+
+  .ui-collapsible-panel {
+    @apply mt-1.5 max-h-64 overflow-y-auto rounded-[10px] bg-[var(--panel)] p-3;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  .ui-collapsible-panel::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .ui-collapsible-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .ui-collapsible-panel::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--scrollbar-thumb);
+  }
+
+  .ui-collapsible-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-active);
+  }
+}
+
 :root {
   --background: oklch(0.97 0.014 70);
   --foreground: oklch(0.28 0.04 43);
@@ -14,11 +54,19 @@
   --accent-foreground: oklch(0.98 0.01 70);
   --accent-soft: color-mix(in oklch, var(--accent) 14%, white);
   --ring: color-mix(in oklch, var(--accent) 62%, white);
-  --heat-0: color-mix(in oklch, var(--accent) 4%, white);
-  --heat-1: oklch(0.9 0.05 76);
-  --heat-2: oklch(0.82 0.08 70);
-  --heat-3: oklch(0.72 0.11 55);
-  --heat-4: oklch(0.62 0.15 41);
+  --heat-0: color-mix(in oklch, oklch(0.98 0.01 70) 92%, var(--accent) 8%);
+  --heat-1: oklch(0.92 0.03 86);
+  --heat-2: oklch(0.84 0.07 78);
+  --heat-3: oklch(0.71 0.13 58);
+  --heat-4: oklch(0.58 0.16 42);
+  --heat-fg-0: color-mix(in oklch, var(--foreground) 38%, white);
+  --heat-fg-1: oklch(0.53 0.05 58);
+  --heat-fg-2: oklch(0.42 0.06 55);
+  --heat-fg-3: oklch(0.97 0.01 70);
+  --heat-fg-4: oklch(0.98 0.01 70);
+  --heat-token: rgba(28, 22, 17, 0.52);
+  --heat-empty-fg: color-mix(in oklch, var(--foreground) 26%, white);
+  --heat-empty-date: color-mix(in oklch, var(--foreground) 20%, white);
   --chart: oklch(0.6 0.14 39);
   --metric-violet: oklch(0.69 0.2 300);
   --metric-green: oklch(0.72 0.18 150);
@@ -28,6 +76,7 @@
   --chart-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(246, 239, 229, 0.72));
   --scrollbar-thumb: rgba(126, 118, 108, 0.38);
   --scrollbar-thumb-active: rgba(112, 104, 95, 0.52);
+  --pill-surface: rgba(255, 255, 255, 0.42);
 }
 
 :root[data-theme="dark"] {
@@ -41,11 +90,19 @@
   --accent-foreground: oklch(0.14 0.015 42);
   --accent-soft: color-mix(in oklch, var(--accent) 18%, oklch(0.24 0.02 40));
   --ring: color-mix(in oklch, var(--accent) 70%, white);
-  --heat-0: color-mix(in oklch, var(--accent) 10%, oklch(0.26 0.02 40));
-  --heat-1: oklch(0.38 0.05 60);
-  --heat-2: oklch(0.49 0.08 58);
-  --heat-3: oklch(0.61 0.11 55);
-  --heat-4: oklch(0.74 0.14 50);
+  --heat-0: color-mix(in oklch, var(--accent) 9%, oklch(0.25 0.02 40));
+  --heat-1: oklch(0.35 0.04 28);
+  --heat-2: oklch(0.43 0.06 42);
+  --heat-3: oklch(0.56 0.11 58);
+  --heat-4: oklch(0.66 0.14 54);
+  --heat-fg-0: oklch(0.71 0.018 55);
+  --heat-fg-1: oklch(0.76 0.02 60);
+  --heat-fg-2: oklch(0.83 0.02 62);
+  --heat-fg-3: oklch(0.95 0.01 70);
+  --heat-fg-4: oklch(0.17 0.02 38);
+  --heat-token: rgba(255, 255, 255, 0.62);
+  --heat-empty-fg: oklch(0.44 0.018 45);
+  --heat-empty-date: oklch(0.74 0.018 58);
   --chart: oklch(0.76 0.15 52);
   --metric-violet: oklch(0.74 0.18 305);
   --metric-green: oklch(0.76 0.16 155);
@@ -55,6 +112,7 @@
   --chart-surface: linear-gradient(180deg, rgba(56, 49, 44, 0.96), rgba(42, 37, 33, 0.98));
   --scrollbar-thumb: rgba(164, 156, 146, 0.28);
   --scrollbar-thumb-active: rgba(176, 168, 158, 0.42);
+  --pill-surface: rgba(255, 255, 255, 0.08);
 }
 
 * {
