@@ -1,4 +1,4 @@
-export type TimeRange = "month" | "3mo" | "year";
+export type TimeRange = "7d" | "month" | "3mo" | "year";
 
 export interface TokenBreakdown {
   input: number;
@@ -108,8 +108,11 @@ export interface ModelBreakdown {
   breakdown: TokenBreakdown;
 }
 
-export interface DayBreakdown {
-  date: string;
+export interface SessionBreakdown {
+  sessionId: string;
+  title: string;
+  slug: string;
+  directory: string;
   tokens: number;
   pricedTokens: number;
   cost: number;
@@ -118,13 +121,116 @@ export interface DayBreakdown {
   models: ModelBreakdown[];
 }
 
+export interface DayBreakdown {
+  date: string;
+  tokens: number;
+  pricedTokens: number;
+  cost: number;
+  messages: number;
+  breakdown: TokenBreakdown;
+  models: ModelBreakdown[];
+  sessions: SessionBreakdown[];
+}
+
 export interface DashboardPayload {
   summary: DashboardSummary;
   heatmap: HeatmapDay[];
   trend: TrendPoint[];
+  series: CostSeriesPayload;
+  providers: ProviderInsight[];
   selectedDay: DayBreakdown | null;
 }
 
 export interface ApiErrorPayload {
   error: string;
 }
+
+// --- Message-level analytics types ---
+
+export interface MessagePartText {
+  type: "text";
+  text: string;
+  time: { start: number; end: number };
+}
+
+export interface MessagePartTool {
+  type: "tool";
+  callId: string;
+  toolName: string;
+  status: "completed" | "error" | "pending";
+  input: unknown;
+  output: string;
+  title?: string;
+  time: { start: number; end: number };
+}
+
+export interface MessagePartReasoning {
+  type: "reasoning";
+  text: string;
+  time: { start: number; end: number };
+}
+
+export type MessagePart = MessagePartText | MessagePartTool | MessagePartReasoning;
+
+export interface MessageDetail {
+  id: string;
+  role: "user" | "assistant";
+  createdAt: number;
+  completedAt?: number;
+  modelId?: string;
+  providerId?: string;
+  cost: number;
+  tokens: TokenBreakdown;
+  finish?: string;
+  parts: MessagePart[];
+}
+
+export interface MessageListPayload {
+  messages: MessageDetail[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface TimelinePoint {
+  messageIndex: number;
+  role: "user" | "assistant";
+  createdAt: number;
+  tokens: TokenBreakdown;
+  cost: number;
+  cumulativeTokens: number;
+  cumulativeCost: number;
+}
+
+export interface ToolUsageStat {
+  tool: string;
+  count: number;
+  totalTokens: number;
+}
+
+export interface MessageOverviewPayload {
+  timeline: TimelinePoint[];
+  toolUsage: ToolUsageStat[];
+  totalMessages: number;
+}
+
+export interface MessageTokenPoint {
+  messageIndex: number;
+  messageId: string;
+  role: "user" | "assistant";
+  modelId?: string;
+  providerId?: string;
+  tokens: TokenBreakdown;
+}
+
+export interface MessageDistributionPayload {
+  points: MessageTokenPoint[];
+  totalMessages: number;
+}
+
+export interface MessageAnalyticsPayload {
+  overview: MessageOverviewPayload;
+  distribution: MessageDistributionPayload;
+}
+
+export * from "./date";
