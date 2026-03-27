@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import Database from "better-sqlite3";
 import type {
   CostSeriesLine,
   CostSeriesOption,
@@ -194,30 +194,23 @@ function readSqliteMessages(dbPath: string) {
     return [] as RawMessage[];
   }
 
+  let db: Database.Database | null = null;
   try {
-    const query = `
+    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const rows = db.prepare<[], {
+      id: string;
+      data: string;
+      session_id: string;
+      session_title: string;
+      session_slug: string | null;
+      session_directory: string;
+    }>(`
       SELECT m.id, m.data, s.id AS session_id, s.title AS session_title, s.slug AS session_slug, s.directory AS session_directory
       FROM message m
       JOIN session s ON s.id = m.session_id
       WHERE json_extract(data, '$.role') = 'assistant'
         AND json_extract(data, '$.tokens') IS NOT NULL
-    `;
-
-    const output = execFileSync("sqlite3", ["-json", dbPath, query], {
-      encoding: "utf8",
-      maxBuffer: 128 * 1024 * 1024,
-    }).trim();
-
-    const rows = output.length > 0
-      ? (JSON.parse(output) as Array<{
-          id: string;
-          data: string;
-          session_id: string;
-          session_title: string;
-          session_slug: string | null;
-          session_directory: string;
-        }>)
-      : [];
+    `).all();
 
     return rows
       .map((row) => {
@@ -233,8 +226,11 @@ function readSqliteMessages(dbPath: string) {
         }
       })
       .filter((item): item is RawMessage => item !== null);
-  } catch {
+  } catch (err) {
+    logger.error({ err, dbPath }, "Failed to read sqlite usage messages");
     return [] as RawMessage[];
+  } finally {
+    db?.close();
   }
 }
 
