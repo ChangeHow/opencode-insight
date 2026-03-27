@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import Database from "better-sqlite3";
 import type {
   MessageDetail,
   MessageDistributionPayload,
@@ -15,6 +15,7 @@ import type {
   TokenBreakdown,
   ToolUsageStat,
 } from "@opencode-dashboard/shared";
+import { logger } from "./logger.js";
 
 // ---------- path helper (mirrors usage.ts) ----------
 
@@ -150,40 +151,42 @@ export function invalidateMessagePayloadCache() {
 
 function queryMessages(dbPath: string, sessionId: string): RawMessageRow[] {
   if (!fs.existsSync(dbPath)) return [];
+  let db: Database.Database | null = null;
   try {
-    const sql = `
+    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const stmt = db.prepare<[string], RawMessageRow>(`
       SELECT m.id, m.data, m.session_id
       FROM message m
-      WHERE m.session_id = '${sessionId.replace(/'/g, "''")}'
+      WHERE m.session_id = ?
       ORDER BY m.time_created ASC
-    `;
-    const out = execFileSync("sqlite3", ["-json", dbPath, sql], {
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024,
-    }).trim();
-    return out.length > 0 ? (JSON.parse(out) as RawMessageRow[]) : [];
-  } catch {
+    `);
+    return stmt.all(sessionId);
+  } catch (err) {
+    logger.error({ err, dbPath, sessionId }, "Failed to query messages");
     return [];
+  } finally {
+    db?.close();
   }
 }
 
 function queryParts(dbPath: string, sessionId: string): RawPartRow[] {
   if (!fs.existsSync(dbPath)) return [];
+  let db: Database.Database | null = null;
   try {
-    const sql = `
+    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const stmt = db.prepare<[string], RawPartRow>(`
       SELECT p.id, p.message_id, p.data
       FROM part p
-      WHERE p.session_id = '${sessionId.replace(/'/g, "''")}'
+      WHERE p.session_id = ?
         AND json_extract(p.data, '$.type') IN ('text', 'tool', 'reasoning')
       ORDER BY p.time_created ASC
-    `;
-    const out = execFileSync("sqlite3", ["-json", dbPath, sql], {
-      encoding: "utf8",
-      maxBuffer: 128 * 1024 * 1024,
-    }).trim();
-    return out.length > 0 ? (JSON.parse(out) as RawPartRow[]) : [];
-  } catch {
+    `);
+    return stmt.all(sessionId);
+  } catch (err) {
+    logger.error({ err, dbPath, sessionId }, "Failed to query parts");
     return [];
+  } finally {
+    db?.close();
   }
 }
 

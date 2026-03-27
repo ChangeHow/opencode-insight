@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import {
+  makeMockDashboard,
   makeMockSummary,
   makeMockHeatmap,
   makeMockTrend,
@@ -9,6 +10,14 @@ import {
 } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/dashboard**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(makeMockDashboard()),
+    });
+  });
+
   await page.route("**/api/summary**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -89,13 +98,11 @@ test.describe("Dashboard User Flows", () => {
     await page.goto("/overview");
     await page.waitForLoadState("domcontentloaded");
 
-    // The range button is labelled "-3 months"
-    const threeMonthButton = page.getByRole("button", { name: "-3 months" });
+    const threeMonthButton = page.getByRole("button", { name: "last 3m" });
     await expect(threeMonthButton).toBeVisible({ timeout: 5_000 });
     await threeMonthButton.click();
 
-    // After clicking, the new series request should have fired
-    await expect(page.getByRole("button", { name: "This month" })).toBeVisible();
+    await expect(threeMonthButton).toHaveClass(/bg-\[var\(--accent\)\]/);
   });
 
   test("User navigates to providers view", async ({ page }) => {

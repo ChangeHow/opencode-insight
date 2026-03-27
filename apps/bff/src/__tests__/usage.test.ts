@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { formatDateInTimeZone, getPresetDateRange, shiftDateKey } from "@opencode-dashboard/shared";
+import { describe, test, expect } from "vitest";
+import { DEFAULT_TIME_ZONE, formatDateInTimeZone, getPresetDateRange, shiftDateKey } from "@opencode-dashboard/shared";
 import { getRangeData, getDateFilteredData } from "../usage.js";
 import {
   makeUsageSnapshot,
@@ -10,7 +10,7 @@ import {
 } from "./factories.js";
 
 function getTodayDate(): string {
-  return formatDateInTimeZone(new Date(), "Asia/Shanghai");
+  return formatDateInTimeZone(new Date(), DEFAULT_TIME_ZONE);
 }
 
 function getRelativeDate(daysOffset: number): string {
@@ -19,12 +19,12 @@ function getRelativeDate(daysOffset: number): string {
 
 describe("Usage Module", () => {
   describe("shared timezone date helpers", () => {
-    it("should format instants using caller time zone boundaries", () => {
+    test("should format instants using caller time zone boundaries", () => {
       expect(formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "Asia/Shanghai")).toBe("2026-03-26");
       expect(formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "America/Los_Angeles")).toBe("2026-03-25");
     });
 
-    it("should build preset ranges from provided time zone", () => {
+    test("should build preset ranges from provided time zone", () => {
       expect(getPresetDateRange("7d", { now: new Date("2026-03-25T16:30:00.000Z"), timeZone: "Asia/Shanghai" })).toEqual({
         start: "2026-03-20",
         end: "2026-03-26",
@@ -33,7 +33,7 @@ describe("Usage Module", () => {
   });
 
   describe("Given days in snapshot", () => {
-    it("should return only days in current month when getRangeData is called with 'month'", () => {
+    test("should return only days in current month when getRangeData is called with 'month'", () => {
       const today = getTodayDate();
       const yesterday = getRelativeDate(-1);
       const twoDaysAgo = getRelativeDate(-2);
@@ -66,7 +66,7 @@ describe("Usage Module", () => {
   });
 
   describe("Given multiple models used on one day", () => {
-    it("should include series data per model when getRangeData is called", () => {
+    test("should include series data per model when getRangeData is called", () => {
       const today = getTodayDate();
       const model1 = makeModelBreakdown({
         modelId: "claude-3-5-sonnet",
@@ -104,7 +104,7 @@ describe("Usage Module", () => {
   });
 
   describe("Given empty snapshot", () => {
-    it("should return zero totals when getRangeData is called", () => {
+    test("should return zero totals when getRangeData is called", () => {
       const snapshot = makeUsageSnapshot({
         heatmap: [],
         breakdownByDate: new Map(),
@@ -131,7 +131,7 @@ describe("Usage Module", () => {
   });
 
   describe("Given gaps inside the selected period", () => {
-    it("should include zero-value days across the full preset range", () => {
+    test("should include zero-value days across the full preset range", () => {
       const today = getTodayDate();
       const twoDaysAgo = getRelativeDate(-2);
 
@@ -166,7 +166,7 @@ describe("Usage Module", () => {
   });
 
   describe("getDateFilteredData with start date", () => {
-    it("should filter out earlier dates", () => {
+    test("should filter out earlier dates", () => {
       const today = getTodayDate();
       const yesterday = getRelativeDate(-1);
       const twoDaysAgo = getRelativeDate(-2);
@@ -194,7 +194,7 @@ describe("Usage Module", () => {
   });
 
   describe("getDateFilteredData with end date", () => {
-    it("should filter out later dates", () => {
+    test("should filter out later dates", () => {
       const today = getTodayDate();
       const yesterday = getRelativeDate(-1);
       const twoDaysAgo = getRelativeDate(-2);
@@ -222,7 +222,7 @@ describe("Usage Module", () => {
   });
 
   describe("getDateFilteredData with both start and end", () => {
-    it("should return only dates in range", () => {
+    test("should return only dates in range", () => {
       const today = getTodayDate();
       const yesterday = getRelativeDate(-1);
       const twoDaysAgo = getRelativeDate(-2);
@@ -254,7 +254,7 @@ describe("Usage Module", () => {
   });
 
   describe("Given a day with no tokens", () => {
-    it("should exclude that day from series data (only active days included)", () => {
+    test("should exclude that day from series data (only active days included)", () => {
       const today = getTodayDate();
       const yesterday = getRelativeDate(-1);
 
