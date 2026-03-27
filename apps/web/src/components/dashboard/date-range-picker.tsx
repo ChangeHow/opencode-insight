@@ -1,18 +1,20 @@
 import { useMemo } from "react";
 import { CalendarRange } from "lucide-react";
-import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
+import { formatCalendarDate } from "@opencode-dashboard/shared";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { getPresetDateRange, parseInputDate } from "@/lib/date-range";
+import { formatDateWithYearLabel } from "@/lib/format";
+import type { TimeRange } from "@opencode-dashboard/shared";
 
 export function DateRangePicker({
   range,
   value,
   onChange,
 }: {
-  range: "month" | "3mo" | "year";
+  range: TimeRange;
   value: { start: string; end: string };
   onChange: (value: { start: string; end: string }) => void;
 }) {
@@ -24,15 +26,19 @@ export function DateRangePicker({
     [value.end, value.start],
   );
 
-  const label = selected?.from
-    ? `${format(selected.from, "MMM d, yyyy")}${selected.to ? ` - ${format(selected.to, "MMM d, yyyy")}` : ""}`
+  const label = value.start
+    ? `${formatDateWithYearLabel(value.start)}${value.end ? ` - ${formatDateWithYearLabel(value.end)}` : ""}`
     : "Select a date range";
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9 min-w-[18rem] justify-start rounded-[16px] px-3 text-left text-xs font-medium">
-          <CalendarRange className="size-4 shrink-0 text-[var(--muted-foreground)]" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 min-w-[16.5rem] justify-start rounded-[16px] border-[var(--border)] bg-[var(--panel)]/92 px-3 text-left text-[11px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+        >
+          <CalendarRange className="size-3.5 shrink-0 text-[var(--muted-foreground)]" />
           <span className="truncate">{label}</span>
         </Button>
       </PopoverTrigger>
@@ -53,8 +59,8 @@ export function DateRangePicker({
             selected={selected}
             onSelect={(next) => {
               onChange({
-                start: next?.from ? format(next.from, "yyyy-MM-dd") : "",
-                end: next?.to ? format(next.to, "yyyy-MM-dd") : next?.from ? format(next.from, "yyyy-MM-dd") : "",
+                start: next?.from ? formatCalendarDate(next.from) : "",
+                end: next?.to ? formatCalendarDate(next.to) : next?.from ? formatCalendarDate(next.from) : "",
               });
             }}
             numberOfMonths={2}

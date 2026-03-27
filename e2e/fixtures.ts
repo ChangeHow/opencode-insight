@@ -1,4 +1,5 @@
 import type {
+  DashboardPayload,
   DashboardSummary,
   HeatmapDay,
   TrendPoint,
@@ -208,6 +209,22 @@ export function makeMockProviders(): ProviderInsightsPayload {
         })),
       },
     ],
+  };
+}
+
+export function makeMockDashboard(): DashboardPayload {
+  const heatmap = makeMockHeatmap();
+  const trend = makeMockTrend();
+  const series = makeMockSeries();
+  const providers = makeMockProviders();
+
+  return {
+    summary: makeMockSummary(),
+    heatmap,
+    trend,
+    series,
+    providers: providers.providers,
+    selectedDay: null,
   };
 }
 

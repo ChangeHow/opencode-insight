@@ -3,7 +3,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { ChevronDown, LineChart as LineChartIcon } from "lucide-react";
 import type { CostSeriesLine, CostSeriesOption, TrendPoint } from "@opencode-dashboard/shared";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ProviderIcon } from "./provider-icon";
@@ -31,7 +31,7 @@ export function TrendChart({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-w-0 flex-col space-y-4">
       <div className="space-y-2">
         <div className="space-y-2">
           <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
@@ -42,7 +42,7 @@ export function TrendChart({
           <p className="text-xs leading-5 text-[var(--muted-foreground)]">Toggle up to four model and provider pairs. The dashed line stays as total daily spend.</p>
         </div>
       </div>
-      <div className="h-84">
+      <div className="h-84 min-w-0 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={composeChartData(data, lines)}>
             <CartesianGrid vertical={false} stroke="rgba(77, 61, 44, 0.08)" />
@@ -63,7 +63,7 @@ export function TrendChart({
               labelFormatter={(label) => label}
             />
             <Line
-              type="monotone"
+              type="natural"
               dataKey="totalCost"
               name="Total spend"
               stroke="rgba(77, 61, 44, 0.45)"
@@ -75,7 +75,7 @@ export function TrendChart({
             {lines.map((line, index) => (
               <Line
                 key={line.key}
-                type="monotone"
+                type="natural"
                 dataKey={line.key}
                 name={line.label}
                 stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
@@ -109,29 +109,29 @@ export function TrendChart({
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
-          <ScrollArea className="max-h-64 pr-1">
+          <div className="max-h-64 overflow-y-auto pr-1">
             <div className="space-y-2">
               {options.map((option) => {
                 const active = selectedKeys.includes(option.key);
 
-                    return (
-                      <label
-                        key={option.key}
+                return (
+                  <label
+                    key={option.key}
                     className={cn(
                       "flex cursor-pointer items-start justify-between gap-3 rounded-[16px] border px-3 py-2.5 transition",
                       active ? "border-transparent bg-[var(--accent-soft)]" : "border-[var(--border)] bg-white/40 hover:bg-black/5",
                     )}
-                      >
-                        <span className="min-w-0 space-y-1">
-                          <span className="flex items-center gap-2">
-                            <ProviderIcon providerId={option.providerId} className="size-3.5" withTooltip />
-                            <span className="block truncate text-sm font-semibold text-[var(--foreground)]">{option.modelId}</span>
-                          </span>
-                          <span className="block text-xs text-[var(--muted-foreground)]">
-                            {formatCurrency(option.totalCost)} • {formatCompactNumber(option.totalTokens)} tokens
+                  >
+                    <span className="min-w-0 space-y-1">
+                      <span className="flex items-center gap-2">
+                        <ProviderIcon providerId={option.providerId} className="size-3.5" withTooltip />
+                        <span className="block truncate text-sm font-semibold text-[var(--foreground)]">{option.modelId}</span>
+                      </span>
+                      <span className="block text-xs text-[var(--muted-foreground)]">
+                        {formatCurrency(option.totalCost)} • {formatCompactNumber(option.totalTokens)} tokens
                       </span>
                     </span>
-                        <input
+                    <input
                       type="checkbox"
                       checked={active}
                       onChange={() => onToggle(option.key)}
@@ -141,7 +141,7 @@ export function TrendChart({
                 );
               })}
             </div>
-          </ScrollArea>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

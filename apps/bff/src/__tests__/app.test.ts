@@ -1,6 +1,6 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, test, expect, beforeEach } from "vitest";
 import type { TimeRange } from "@opencode-dashboard/shared";
-import { makeUsageSnapshot, makeRangeData, makeDayBreakdown } from "./factories.js";
+import { makeUsageSnapshot, makeRangeData, makeDayBreakdown, makeSessionBreakdown } from "./factories.js";
 
 vi.mock("../usage.js", () => ({
   loadUsageSnapshot: vi.fn(),
@@ -12,14 +12,24 @@ vi.mock("../pricing.js", () => ({
   invalidatePricingCache: vi.fn(),
 }));
 
+vi.mock("../messages.js", () => ({
+  buildMessagePayloads: vi.fn(),
+  getDbPath: vi.fn(() => "/tmp/opencode.db"),
+  invalidateMessagePayloadCache: vi.fn(),
+}));
+
 import app from "../app.js";
 import { loadUsageSnapshot, getRangeData, getDateFilteredData } from "../usage.js";
 import { invalidatePricingCache } from "../pricing.js";
+import { buildMessagePayloads, invalidateMessagePayloadCache } from "../messages.js";
 
 const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
 const mockGetRangeData = vi.mocked(getRangeData);
 const mockGetDateFilteredData = vi.mocked(getDateFilteredData);
 const mockInvalidatePricingCache = vi.mocked(invalidatePricingCache);
+const mockBuildMessagePayloads = vi.mocked(buildMessagePayloads);
+const mockInvalidateMessagePayloadCache = vi.mocked(invalidateMessagePayloadCache);
+const timeZone = "Asia/Shanghai";
 
 describe("BFF API Routes", () => {
   beforeEach(() => {
@@ -28,49 +38,53 @@ describe("BFF API Routes", () => {
     mockLoadUsageSnapshot.mockResolvedValue(snapshot);
     mockGetRangeData.mockReturnValue(makeRangeData());
     mockGetDateFilteredData.mockReturnValue(makeRangeData());
+    mockBuildMessagePayloads.mockReturnValue({
+      overview: { timeline: [], toolUsage: [], totalMessages: 0 },
+      distribution: { points: [], totalMessages: 0 },
+      listFn: (page, pageSize) => ({ messages: [], total: 0, page, pageSize }),
+    });
   });
 
-  describe("GET /api/summary", () => {
-    it("should return summary JSON when requested", async () => {
+  test("GET /api/summary returns summary JSON when requested", async () => {
       const rangeData = makeRangeData();
       mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/summary?range=month");
+      const res = await app.request(`/api/summary?range=month&timeZone=${timeZone}`);
 
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json).toEqual(rangeData.summary);
-    });
+  });
 
-    it("should use range parameter to filter data", async () => {
+  test("GET /api/summary uses range parameter to filter data", async () => {
       const rangeData = makeRangeData();
       mockGetRangeData.mockReturnValue(rangeData);
 
-      await app.request("/api/summary?range=3mo");
+      await app.request(`/api/summary?range=3mo&timeZone=${timeZone}`);
 
       // Verify the function was called with the correct range parameter (second argument)
       expect(mockGetRangeData).toHaveBeenCalled();
       const callArgs = mockGetRangeData.mock.calls[0];
       expect(callArgs[1]).toBe("3mo");
-    });
+      expect(callArgs[3]).toBe(timeZone);
+  });
 
-    it("should use custom date range when start and end are provided", async () => {
+  test("GET /api/summary uses custom date range when start and end are provided", async () => {
       const rangeData = makeRangeData();
       mockGetDateFilteredData.mockReturnValue(rangeData);
 
-      await app.request("/api/summary?start=2025-01-01&end=2025-01-31");
+      await app.request(`/api/summary?start=2025-01-01&end=2025-01-31&timeZone=${timeZone}`);
 
       // Verify getDateFilteredData was called with start and end
       expect(mockGetDateFilteredData).toHaveBeenCalled();
       const callArgs = mockGetDateFilteredData.mock.calls[0];
       expect(callArgs[1]).toBe("2025-01-01");
       expect(callArgs[2]).toBe("2025-01-31");
+      expect(callArgs[4]).toBe(timeZone);
       expect(mockGetRangeData).not.toHaveBeenCalled();
-    });
   });
 
-  describe("GET /api/heatmap", () => {
-    it("should return heatmap array", async () => {
+  test("GET /api/heatmap returns heatmap array", async () => {
       const rangeData = makeRangeData();
       mockGetRangeData.mockReturnValue(rangeData);
 
@@ -79,11 +93,9 @@ describe("BFF API Routes", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json).toEqual(rangeData.heatmap);
-    });
   });
 
-  describe("GET /api/trend", () => {
-    it("should return trend array", async () => {
+  test("GET /api/trend returns trend array", async () => {
       const rangeData = makeRangeData();
       mockGetRangeData.mockReturnValue(rangeData);
 
@@ -92,11 +104,9 @@ describe("BFF API Routes", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json).toEqual(rangeData.trend);
-    });
   });
 
-  describe("GET /api/series", () => {
-    it("should return all series by default", async () => {
+  test("GET /api/series returns all series by default", async () => {
       const rangeData = makeRangeData();
       mockGetRangeData.mockReturnValue(rangeData);
 
@@ -108,9 +118,9 @@ describe("BFF API Routes", () => {
         options: rangeData.seriesOptions,
         lines: rangeData.seriesLines,
       });
-    });
+  });
 
-    it("should filter series when series params are provided", async () => {
+  test("GET /api/series filters series when params are provided", async () => {
       const rangeData = makeRangeData({
         seriesLines: [
           { key: "anthropic/claude-3-5-sonnet", label: "Claude", providerId: "anthropic", modelId: "claude-3-5-sonnet", points: [] },
@@ -125,11 +135,9 @@ describe("BFF API Routes", () => {
       const json = await res.json();
       expect(json.lines).toHaveLength(1);
       expect(json.lines[0].key).toBe("anthropic/claude-3-5-sonnet");
-    });
   });
 
-  describe("GET /api/providers", () => {
-    it("should return providers payload", async () => {
+  test("GET /api/providers returns providers payload", async () => {
       const rangeData = makeRangeData();
       mockGetRangeData.mockReturnValue(rangeData);
 
@@ -140,11 +148,30 @@ describe("BFF API Routes", () => {
       expect(json).toEqual({
         providers: rangeData.providers,
       });
-    });
   });
 
-  describe("GET /api/day/:date", () => {
-    it("should return day breakdown when date exists", async () => {
+  test("GET /api/dashboard returns consolidated dashboard payload", async () => {
+      const rangeData = makeRangeData();
+      mockGetRangeData.mockReturnValue(rangeData);
+
+      const res = await app.request("/api/dashboard?range=month");
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json).toEqual({
+        summary: rangeData.summary,
+        heatmap: rangeData.heatmap,
+        trend: rangeData.trend,
+        series: {
+          options: rangeData.seriesOptions,
+          lines: rangeData.seriesLines,
+        },
+        providers: rangeData.providers,
+        selectedDay: null,
+      });
+  });
+
+  test("GET /api/day/:date returns day breakdown when date exists", async () => {
       const dayData = makeDayBreakdown("2025-01-15");
       const rangeData = makeRangeData({
         byDate: new Map([["2025-01-15", dayData]]),
@@ -156,9 +183,9 @@ describe("BFF API Routes", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json).toEqual(dayData);
-    });
+  });
 
-    it("should return 404 when date is not found", async () => {
+  test("GET /api/day/:date returns 404 when date is not found", async () => {
       const rangeData = makeRangeData({
         byDate: new Map(),
       });
@@ -171,11 +198,40 @@ describe("BFF API Routes", () => {
       expect(json).toEqual({
         error: "No usage found for that date.",
       });
-    });
   });
 
-  describe("POST /api/refresh", () => {
-    it("should invalidate cache and return new scannedAt", async () => {
+  test("GET /api/day/:date/session/:sessionId returns session breakdown when session exists", async () => {
+      const session = makeSessionBreakdown("ses_abc");
+      const dayData = makeDayBreakdown("2025-01-15", { sessions: [session] });
+      const rangeData = makeRangeData({
+        byDate: new Map([["2025-01-15", dayData]]),
+      });
+      mockGetRangeData.mockReturnValue(rangeData);
+
+      const res = await app.request("/api/day/2025-01-15/session/ses_abc?range=month");
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json).toEqual(session);
+  });
+
+  test("GET /api/day/:date/session/:sessionId returns 404 when session is not found", async () => {
+      const dayData = makeDayBreakdown("2025-01-15", { sessions: [] });
+      const rangeData = makeRangeData({
+        byDate: new Map([["2025-01-15", dayData]]),
+      });
+      mockGetRangeData.mockReturnValue(rangeData);
+
+      const res = await app.request("/api/day/2025-01-15/session/ses_missing?range=month");
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json).toEqual({
+        error: "No session found for that date.",
+      });
+  });
+
+  test("POST /api/refresh invalidates cache and returns new scannedAt", async () => {
       const newSnapshot = makeUsageSnapshot({
         summary: { scannedAt: "2025-01-20T12:00:00.000Z" },
       });
@@ -185,6 +241,7 @@ describe("BFF API Routes", () => {
 
       expect(res.status).toBe(200);
       expect(mockInvalidatePricingCache).toHaveBeenCalled();
+      expect(mockInvalidateMessagePayloadCache).toHaveBeenCalled();
       expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
       
       const json = await res.json();
@@ -192,6 +249,38 @@ describe("BFF API Routes", () => {
         ok: true,
         scannedAt: "2025-01-20T12:00:00.000Z",
       });
+  });
+
+  test("message analytics endpoints return payloads per request", async () => {
+    mockBuildMessagePayloads.mockReturnValue({
+      overview: { timeline: [], toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }], totalMessages: 3 },
+      distribution: { points: [], totalMessages: 3 },
+      listFn: (page, pageSize) => ({
+        messages: [],
+        total: 3,
+        page,
+        pageSize,
+      }),
     });
+
+    const analyticsRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/analytics");
+    const overviewRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/overview");
+    const distributionRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/distribution");
+    const listRes = await app.request("/api/day/2025-01-15/session/ses_abc/message?page=1&pageSize=25");
+
+    expect(analyticsRes.status).toBe(200);
+    expect(overviewRes.status).toBe(200);
+    expect(distributionRes.status).toBe(200);
+    expect(listRes.status).toBe(200);
+    expect(mockBuildMessagePayloads).toHaveBeenCalledTimes(4);
+
+    const analyticsJson = await analyticsRes.json();
+    expect(analyticsJson).toEqual({
+      overview: { timeline: [], toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }], totalMessages: 3 },
+      distribution: { points: [], totalMessages: 3 },
+    });
+
+    const listJson = await listRes.json();
+    expect(listJson).toEqual({ messages: [], total: 3, page: 1, pageSize: 25 });
   });
 });

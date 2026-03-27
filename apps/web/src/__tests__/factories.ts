@@ -10,6 +10,7 @@ import type {
   CostSeriesPayload,
   ProviderInsight,
   ProviderInsightsPayload,
+  SessionBreakdown,
 } from "@opencode-dashboard/shared";
 
 export function makeTokenBreakdown(overrides?: Partial<TokenBreakdown>): TokenBreakdown {
@@ -45,6 +46,26 @@ export function makeDayBreakdown(date?: string, overrides?: Partial<DayBreakdown
   
   return {
     date: defaultDate,
+    tokens: model.tokens,
+    pricedTokens: model.pricedTokens,
+    cost: model.cost,
+    messages: model.messages,
+    breakdown: model.breakdown,
+    models: [model],
+    sessions: [makeSessionBreakdown(undefined, { models: [model] })],
+    ...overrides,
+  };
+}
+
+export function makeSessionBreakdown(sessionId?: string, overrides?: Partial<SessionBreakdown>): SessionBreakdown {
+  const id = sessionId ?? "ses_123";
+  const model = makeModelBreakdown();
+
+  return {
+    sessionId: id,
+    title: "Session title",
+    slug: "calm-river",
+    directory: "/Users/changehow/workspace/opencode-token-dashboard",
     tokens: model.tokens,
     pricedTokens: model.pricedTokens,
     cost: model.cost,

@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { useAtomValue } from "jotai";
 import { Navigate, Outlet, RouterProvider, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { themeAtom } from "@/lib/atoms";
-import { DashboardPage, DetailPage, ProvidersPage } from "@/routes/dashboard";
+import { DashboardPage, DetailPage, ProvidersPage, SessionDetailPage } from "@/routes/dashboard";
 import "./styles.css";
 
 const rootRoute = createRootRoute({
@@ -60,7 +60,13 @@ const detailRoute = createRoute({
   component: DetailPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, overviewRoute, providersRoute, detailRoute]);
+const sessionDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/detail/$date/$session",
+  component: SessionDetailPage,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, overviewRoute, providersRoute, detailRoute, sessionDetailRoute]);
 
 const router = createRouter({
   routeTree,
