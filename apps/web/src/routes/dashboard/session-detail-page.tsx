@@ -4,6 +4,7 @@ import { useAtom, useAtomValue } from "jotai";
 import { useParams } from "@tanstack/react-router";
 import { Layers3, Pin } from "lucide-react";
 import type { SessionBreakdown } from "@opencode-dashboard/shared";
+import { HorizontalPanelRail } from "@/components/dashboard/horizontal-panel-rail";
 import { CostByModelPanel, ModelTokenSharePanel } from "@/components/dashboard/model-breakdown-panels";
 import { TokenBreakdownPanel } from "@/components/dashboard/token-breakdown-panel";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
@@ -170,15 +171,13 @@ function SessionBreakdownPanel({
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto overflow-y-hidden">
-        <div className="flex h-[26rem] w-max min-w-full gap-6 px-6 sm:px-8 lg:px-10">
+      <HorizontalPanelRail contentClassName="h-[26rem] gap-6 px-6 sm:px-8 lg:px-10">
           <TokenBreakdownPanel breakdown={session.breakdown} eyebrow="Token mix" />
 
           <CostByModelPanel eyebrow="Session spend" entries={costByModel} />
 
           <ModelTokenSharePanel eyebrow="Model share" entries={modelTokenMix} />
-        </div>
-      </div>
+      </HorizontalPanelRail>
 
       <div className="px-6 sm:px-8 lg:px-10">
         <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">

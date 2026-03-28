@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronDown, LineChart as LineChartIcon } from "lucide-react";
 import type { CostSeriesLine, CostSeriesOption, TrendPoint } from "@opencode-dashboard/shared";
@@ -29,6 +29,8 @@ export function TrendChart({
   onToggle: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const chartData = useMemo(() => composeChartData(data, lines), [data, lines]);
+  const yAxisMax = useMemo(() => computeYAxisMax(data, lines), [data, lines]);
 
   return (
     <div className="flex h-full min-w-0 flex-col space-y-4">
@@ -39,15 +41,15 @@ export function TrendChart({
             Spend curves
           </p>
           <h2 className="text-xl font-semibold text-[var(--foreground)]">Model and provider lines</h2>
-          <p className="text-xs leading-5 text-[var(--muted-foreground)]">Toggle up to four model and provider pairs. The dashed line stays as total daily spend.</p>
+          <p className="text-xs leading-5 text-[var(--muted-foreground)]">Toggle up to four model and provider pairs. The chart rescales to emphasize the selected spend patterns.</p>
         </div>
       </div>
       <div className="h-84 min-w-0 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={composeChartData(data, lines)}>
+          <LineChart data={chartData}>
             <CartesianGrid vertical={false} stroke="rgba(77, 61, 44, 0.08)" />
             <XAxis dataKey="date" tickFormatter={(value) => value.slice(5)} tickLine={false} axisLine={false} />
-            <YAxis tickFormatter={formatCurrencyCompact} tickLine={false} axisLine={false} width={52} />
+            <YAxis domain={[0, yAxisMax]} tickCount={5} tickFormatter={formatCurrencyCompact} tickLine={false} axisLine={false} width={52} />
             <Tooltip
               cursor={{ stroke: "rgba(174, 85, 43, 0.2)", strokeWidth: 1 }}
               contentStyle={{
@@ -58,24 +60,14 @@ export function TrendChart({
               }}
               formatter={(value, name) => [
                 typeof value === "number" ? formatCurrency(value) : value,
-                name === "totalCost" ? "Total spend" : name,
+                name,
               ]}
               labelFormatter={(label) => label}
-            />
-            <Line
-              type="natural"
-              dataKey="totalCost"
-              name="Total spend"
-              stroke="rgba(77, 61, 44, 0.45)"
-              strokeDasharray="4 4"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4 }}
             />
             {lines.map((line, index) => (
               <Line
                 key={line.key}
-                type="natural"
+                type="monotone"
                 dataKey={line.key}
                 name={line.label}
                 stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
@@ -152,7 +144,6 @@ function composeChartData(data: TrendPoint[], lines: CostSeriesLine[]) {
   return data.map((point) => {
     const entry: Record<string, number | string> = {
       date: point.date,
-      totalCost: point.cost,
     };
 
     for (const line of lines) {
@@ -169,4 +160,55 @@ function formatCurrencyCompact(value: number) {
   }
 
   return formatCurrency(value);
+}
+
+function computeYAxisMax(data: TrendPoint[], lines: CostSeriesLine[]) {
+  const primaryValues = lines.length > 0 ? lines.flatMap((line) => line.points.map((point) => point.cost)) : data.map((point) => point.cost);
+
+  const values = primaryValues.filter((value) => Number.isFinite(value) && value >= 0);
+
+  const maxValue = Math.max(...values, 0);
+
+  if (maxValue <= 0) {
+    return 1;
+  }
+
+  const paddedMax = maxValue * (maxValue <= 1 ? 1.5 : maxValue <= 5 ? 1.35 : maxValue <= 20 ? 1.22 : 1.14);
+  return roundUpToNiceStep(paddedMax);
+}
+
+function roundUpToNiceStep(value: number) {
+  if (value <= 0) {
+    return 1;
+  }
+
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+
+  if (normalized <= 1) {
+    return magnitude;
+  }
+  if (normalized <= 1.5) {
+    return 1.5 * magnitude;
+  }
+  if (normalized <= 2) {
+    return 2 * magnitude;
+  }
+  if (normalized <= 2.5) {
+    return 2.5 * magnitude;
+  }
+  if (normalized <= 3) {
+    return 3 * magnitude;
+  }
+  if (normalized <= 4) {
+    return 4 * magnitude;
+  }
+  if (normalized <= 5) {
+    return 5 * magnitude;
+  }
+  if (normalized <= 7.5) {
+    return 7.5 * magnitude;
+  }
+
+  return 10 * magnitude;
 }
