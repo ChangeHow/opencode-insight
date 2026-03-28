@@ -3,6 +3,7 @@ import type { DayBreakdown } from "@opencode-dashboard/shared";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { CostByModelPanel, ModelTokenSharePanel } from "@/components/dashboard/model-breakdown-panels";
 import { PinnedPlaceholderPanel } from "@/components/dashboard/pinned-placeholder-panel";
+import { HorizontalPanelRail } from "@/components/dashboard/horizontal-panel-rail";
 import { TokenBreakdownPanel } from "@/components/dashboard/token-breakdown-panel";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -75,16 +76,14 @@ export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; 
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto overflow-y-hidden">
-        <div className="flex h-[26rem] w-max min-w-full gap-6 px-6 sm:px-8 lg:px-10">
+      <HorizontalPanelRail contentClassName="h-[26rem] gap-6 px-6 sm:px-8 lg:px-10">
           <TokenBreakdownPanel breakdown={day.breakdown} />
 
           <CostByModelPanel eyebrow="Pinned spend" entries={costByModel} />
 
           <ModelTokenSharePanel eyebrow="Pinned share" entries={modelTokenMix} />
           <PinnedPlaceholderPanel />
-        </div>
-      </div>
+      </HorizontalPanelRail>
 
       <div className="px-6 sm:px-8 lg:px-10">
         <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">

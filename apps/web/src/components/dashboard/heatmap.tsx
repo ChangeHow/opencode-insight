@@ -54,12 +54,15 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
 
     if (!entry) {
       return (
-          <DayPickerDayButton
-            {...props}
-            className="group relative flex size-full flex-col items-start justify-between rounded-[18px] border border-transparent bg-transparent p-2 text-left text-[var(--heat-empty-fg)] outline-none"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--heat-empty-date)]">{dateKey.slice(8)}</span>
-          </DayPickerDayButton>
+        <DayPickerDayButton
+          {...props}
+          className={cn(
+            "group relative flex size-full flex-col items-start justify-between rounded-[18px] border border-transparent bg-transparent p-2 text-left text-[var(--heat-empty-fg)] outline-none",
+            props.modifiers.outside && "opacity-42",
+          )}
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--heat-empty-date)]">{dateKey.slice(8)}</span>
+        </DayPickerDayButton>
       );
     }
 
@@ -75,6 +78,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
               intensityClass[entry.intensity],
               isDisabled ? "cursor-not-allowed opacity-80 saturate-75" : "cursor-pointer hover:-translate-y-0.5",
               props.modifiers.selected ? "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]" : "border-transparent",
+              props.modifiers.outside && "opacity-48 saturate-75",
             )}
           >
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">{dateKey.slice(8)}</span>
@@ -147,7 +151,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                 }}
                 numberOfMonths={1}
                 fixedWeeks
-                showOutsideDays={false}
+                showOutsideDays
                 disabled={(date) => {
                   const dateKey = formatCalendarDate(date);
                   const entry = dayMap.get(dateKey);

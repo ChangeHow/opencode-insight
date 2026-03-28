@@ -5,9 +5,10 @@ import { cn } from "@/lib/utils";
 
 export type CalendarProps = ComponentProps<typeof DayPicker>;
 
-export function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+export function Calendar({ className, classNames, showOutsideDays = true, fixedWeeks = true, ...props }: CalendarProps) {
   return (
     <DayPicker
+      fixedWeeks={fixedWeeks}
       showOutsideDays={showOutsideDays}
       className={cn("p-0", className)}
       classNames={{
@@ -28,7 +29,7 @@ export function Calendar({ className, classNames, showOutsideDays = true, ...pro
         day_button: "inline-flex size-9 items-center justify-center rounded-xl text-sm text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         selected: "bg-[var(--accent)] text-[var(--accent-foreground)]",
         today: "",
-        outside: "text-[var(--muted-foreground)] opacity-50",
+        outside: "text-[var(--muted-foreground)] opacity-45",
         disabled: "opacity-35",
         range_start: "bg-[var(--accent-soft)]",
         range_middle: "bg-[var(--accent-soft)]",
