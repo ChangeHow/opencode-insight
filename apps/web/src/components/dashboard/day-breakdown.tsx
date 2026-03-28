@@ -10,7 +10,7 @@ import { formatCompactNumber, formatCurrency, formatLongDateLabel } from "@/lib/
 
 export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; loading: boolean }) {
   if (loading) {
-    return <div className="mx-6 rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)] sm:mx-8 lg:mx-10">Loading day detail...</div>;
+    return <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10"><div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">Loading day detail...</div></div>;
   }
 
   if (!day) {

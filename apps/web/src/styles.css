@@ -77,6 +77,7 @@
   --scrollbar-thumb: rgba(126, 118, 108, 0.38);
   --scrollbar-thumb-active: rgba(112, 104, 95, 0.52);
   --pill-surface: rgba(255, 255, 255, 0.42);
+  --header-shadow-color: rgba(30, 22, 16, 0.08);
 }
 
 :root[data-theme="dark"] {
@@ -113,6 +114,7 @@
   --scrollbar-thumb: rgba(164, 156, 146, 0.28);
   --scrollbar-thumb-active: rgba(176, 168, 158, 0.42);
   --pill-surface: rgba(255, 255, 255, 0.08);
+  --header-shadow-color: rgba(0, 0, 0, 0.25);
 }
 
 * {
