@@ -68,7 +68,7 @@ export function buildSeries(
 
   for (const day of days) {
     for (const model of day.models) {
-      const key = `${model.providerId}::${model.modelId}`;
+      const key = `${model.providerId}/${model.modelId}`;
       const entry = map.get(key) ?? {
         key,
         label: `${model.modelId} / ${model.providerId}`,
@@ -219,7 +219,7 @@ export function buildRangeSummary(snapshot: UsageSnapshot, summaryDays: DayBreak
 
   for (const day of summaryDays) {
     for (const model of day.models) {
-      const key = `${model.providerId}::${model.modelId}`;
+      const key = `${model.providerId}/${model.modelId}`;
       const entry = modelGroups.get(key) ?? { modelId: model.modelId, tokens: 0, cost: 0 };
       entry.tokens += model.tokens;
       entry.cost += model.cost;

@@ -72,7 +72,7 @@ function filterDayByModels(day: DayBreakdown, modelKeys: string[]) {
     return day;
   }
   const allowed = new Set(modelKeys);
-  const models = day.models.filter((model) => allowed.has(`${model.providerId}::${model.modelId}`));
+  const models = day.models.filter((model) => allowed.has(`${model.providerId}/${model.modelId}`));
   const breakdown = emptyBreakdown();
   let tokens = 0;
   let pricedTokens = 0;
