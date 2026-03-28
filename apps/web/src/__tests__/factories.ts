@@ -8,6 +8,7 @@ import type {
   CostSeriesOption,
   CostSeriesLine,
   CostSeriesPayload,
+  ProviderDashboardPayload,
   ProviderInsight,
   ProviderInsightsPayload,
   SessionBreakdown,
@@ -204,6 +205,26 @@ export function makeCostSeriesPayload(overrides?: Partial<CostSeriesPayload>): C
 export function makeProviderInsightsPayload(overrides?: Partial<ProviderInsightsPayload>): ProviderInsightsPayload {
   return {
     providers: [makeProviderInsight()],
+    ...overrides,
+  };
+}
+
+export function makeProviderDashboardPayload(overrides?: Partial<ProviderDashboardPayload>): ProviderDashboardPayload {
+  const provider = makeProviderInsight();
+  const summary = makeDashboardSummary({ totalCost: provider.totalCost, totalTokens: provider.totalTokens, totalMessages: provider.totalMessages });
+  const series = makeCostSeriesPayload({
+    options: [makeCostSeriesOption({ providerId: provider.providerId })],
+    lines: [makeCostSeriesLine({ providerId: provider.providerId })],
+  });
+
+  return {
+    provider,
+    summary,
+    heatmap: [makeHeatmapDay()],
+    trend: provider.trend,
+    series,
+    providers: [provider],
+    selectedDay: null,
     ...overrides,
   };
 }

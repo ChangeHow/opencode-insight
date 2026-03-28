@@ -1,15 +1,59 @@
-import { Activity, Building2, Wallet } from "lucide-react";
+import { useRef } from "react";
+import { createPortal } from "react-dom";
+import { Activity, Building2, ChevronRight, Wallet } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { ProviderInsight } from "@opencode-dashboard/shared";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { formatCompactNumber, formatCurrency, formatDateLabel } from "@/lib/format";
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
+}
+
+type TrendTooltipProps = {
+  active?: boolean;
+  payload?: ReadonlyArray<{ value?: unknown; payload?: { date?: string } }>;
+  coordinate?: { x: number; y: number };
+  container: HTMLDivElement | null;
+};
+
+function TrendTooltip({ active, payload, coordinate, container }: TrendTooltipProps) {
+  if (!active || !payload?.length || !coordinate || !container || typeof document === "undefined") {
+    return null;
+  }
+
+  const rect = container.getBoundingClientRect();
+  const pointX = rect.left + coordinate.x;
+  const pointY = rect.top + coordinate.y;
+  const placeBelow = pointY < 72;
+  const left = Math.min(Math.max(pointX, 108), window.innerWidth - 108);
+  const date = payload[0]?.payload?.date;
+  const value = Number(payload[0]?.value ?? 0);
+
+  return createPortal(
+    <div
+      className="pointer-events-none fixed z-[100] min-w-[148px] rounded-[12px] border border-[var(--border)] bg-[var(--tooltip-surface)] px-3 py-2 text-[12px] text-[var(--foreground)] shadow-[0_10px_24px_rgba(63,44,20,0.12)]"
+      style={{
+        left,
+        top: pointY + (placeBelow ? 12 : -12),
+        transform: `translate(-50%, ${placeBelow ? "0" : "-100%"})`,
+      }}
+    >
+      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
+        {date ? formatDateLabel(date) : "Unknown date"}
+      </div>
+      <div className="mt-1.5 flex items-center justify-between gap-3">
+        <span className="text-[11px] text-[var(--muted-foreground)]">Spend</span>
+        <span className="text-sm font-semibold text-[var(--foreground)]">
+          {formatCurrency(value)}
+        </span>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 function buildSummary(providers: ProviderInsight[]) {
@@ -32,24 +76,21 @@ function buildSummary(providers: ProviderInsight[]) {
 }
 
 function ProviderTrend({ provider }: { provider: ProviderInsight }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
   if (provider.trend.length === 0) {
     return <div className="ml-auto h-8 w-44 rounded-full bg-black/5" />;
   }
 
   return (
-    <div className="ml-auto h-8 w-44">
+    <div ref={containerRef} className="relative ml-auto h-8 w-44 overflow-visible">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={provider.trend}>
+        <LineChart data={provider.trend} margin={{ top: 6, right: 6, bottom: 6, left: 6 }}>
           <Tooltip
+            allowEscapeViewBox={{ x: true, y: true }}
             cursor={{ stroke: "rgba(174, 85, 43, 0.18)", strokeWidth: 1 }}
-            contentStyle={{
-              borderRadius: 14,
-              border: "1px solid var(--border)",
-              background: "var(--panel)",
-              color: "var(--foreground)",
-            }}
-            formatter={(value) => [formatCurrency(Number(value ?? 0)), "Spend"]}
-            labelFormatter={(label) => formatDateLabel(String(label))}
+            content={(props) => <TrendTooltip {...props} container={containerRef.current} />}
+            wrapperStyle={{ visibility: "hidden" }}
           />
           <Line
             type="monotone"
@@ -73,6 +114,8 @@ export function ProviderInsightsPage({
   emptyDescription = "OpenCode may have cleaned older sessions. Try a wider preset or adjust the custom date range.",
   emptyActionLabel,
   onEmptyAction,
+  selectedProviderId,
+  onSelectProvider,
 }: {
   providers: ProviderInsight[];
   loading?: boolean;
@@ -81,6 +124,8 @@ export function ProviderInsightsPage({
   emptyDescription?: string;
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
+  selectedProviderId?: string | null;
+  onSelectProvider?: (providerId: string) => void;
 }) {
   const summary = buildSummary(providers);
   const hasData = providers.length > 0;
@@ -169,8 +214,9 @@ export function ProviderInsightsPage({
                 ) : null}
               </div>
             ) : (
-              <ScrollArea className="mt-5 w-full whitespace-nowrap">
-                <table className="min-w-full border-collapse text-left">
+              <div className="mt-5 overflow-visible pb-2">
+                <div className="w-full overflow-x-auto whitespace-nowrap">
+                  <table className="min-w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-[var(--border)]">
                       <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Provider</th>
@@ -186,12 +232,24 @@ export function ProviderInsightsPage({
                   </thead>
                   <tbody>
                     {providers.map((provider) => (
-                      <tr key={provider.providerId} className="border-b border-[var(--border)]/70 last:border-b-0">
+                      <tr key={provider.providerId} className={`border-b border-[var(--border)]/70 transition last:border-b-0 ${selectedProviderId === provider.providerId ? "bg-[var(--panel-strong)]/75" : ""}`}>
                         <td className="px-3 py-3">
-                          <div className="inline-flex max-w-[12rem] items-center gap-2">
-                            <ProviderIcon providerId={provider.providerId} className="size-4" />
-                            <span className="truncate text-sm font-semibold text-[var(--foreground)]">{provider.providerId}</span>
-                          </div>
+                          {onSelectProvider ? (
+                            <button
+                              type="button"
+                              className="inline-flex max-w-[14rem] cursor-pointer items-center gap-2 rounded-full px-2 py-1 text-left transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)] outline-none"
+                              onClick={() => onSelectProvider(provider.providerId)}
+                            >
+                              <ProviderIcon providerId={provider.providerId} className="size-4" />
+                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">{provider.providerId}</span>
+                              <ChevronRight className="size-4 shrink-0 text-[var(--muted-foreground)]" />
+                            </button>
+                          ) : (
+                            <div className="inline-flex max-w-[14rem] items-center gap-2">
+                              <ProviderIcon providerId={provider.providerId} className="size-4" />
+                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">{provider.providerId}</span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-3 py-3">
                           <ProviderTrend provider={provider} />
@@ -215,8 +273,9 @@ export function ProviderInsightsPage({
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </ScrollArea>
+                  </table>
+                </div>
+              </div>
             )}
         </CardContent>
       </Card>
