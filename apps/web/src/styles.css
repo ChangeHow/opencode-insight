@@ -74,6 +74,7 @@
   --metric-amber: oklch(0.74 0.18 75);
   --metric-gold: oklch(0.78 0.17 92);
   --chart-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(246, 239, 229, 0.72));
+  --tooltip-surface: oklch(0.985 0.008 75);
   --scrollbar-thumb: rgba(126, 118, 108, 0.38);
   --scrollbar-thumb-active: rgba(112, 104, 95, 0.52);
   --pill-surface: rgba(255, 255, 255, 0.42);
@@ -105,6 +106,7 @@
   --heat-empty-fg: oklch(0.44 0.018 45);
   --heat-empty-date: oklch(0.74 0.018 58);
   --chart: oklch(0.76 0.15 52);
+  --tooltip-surface: oklch(0.3 0.02 40);
   --metric-violet: oklch(0.74 0.18 305);
   --metric-green: oklch(0.76 0.16 155);
   --metric-orange: oklch(0.79 0.15 58);

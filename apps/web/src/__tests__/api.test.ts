@@ -7,6 +7,7 @@ import {
   fetchDay,
   fetchSession,
   fetchSeries,
+  fetchProviderDashboard,
   fetchProviders,
   refreshSnapshot,
 } from "../lib/api.js";
@@ -62,7 +63,15 @@ describe("API Client Functions", () => {
     it("should use correct endpoint for providers", async () => {
       await fetchProviders("month");
 
-       expect(mockFetch).toHaveBeenCalledWith(`/api/providers?timeZone=${encodeURIComponent(timeZone)}&range=month`);
+        expect(mockFetch).toHaveBeenCalledWith(`/api/providers?timeZone=${encodeURIComponent(timeZone)}&range=month`);
+    });
+  });
+
+  describe("fetchProviderDashboard", () => {
+    it("should use correct endpoint for provider detail", async () => {
+      await fetchProviderDashboard("zai-coding-plan", "month");
+
+      expect(mockFetch).toHaveBeenCalledWith(`/api/provider/zai-coding-plan?timeZone=${encodeURIComponent(timeZone)}&range=month`);
     });
   });
 
