@@ -127,4 +127,74 @@ describe("Pricing Module", () => {
       expect(result.estimatedCost).toBeCloseTo(0.0875, 5);
     });
   });
+
+  describe("Given fallback-only models (not in litellm)", () => {
+    it("should price glm-5-turbo via fallback dataset", () => {
+      const dataset = makePricingDataset({
+        "glm-5-turbo": {
+          input_cost_per_token: 0.0000012,
+          output_cost_per_token: 0.000004,
+          cache_read_input_token_cost: 0.00000024,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000, cacheRead: 20000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "glm-5-turbo",
+        "zai",
+        usage
+      );
+
+      expect(result.priced).toBe(true);
+      // input: 10000 * 0.0000012 = 0.012
+      // output: 5000 * 0.000004 = 0.02
+      // cacheRead: 20000 * 0.00000024 = 0.0048
+      // Total: 0.012 + 0.02 + 0.0048 = 0.0368
+      expect(result.estimatedCost).toBeCloseTo(0.0368, 5);
+    });
+
+    it("should price gpt-5.3-codex via fallback dataset", () => {
+      const dataset = makePricingDataset({
+        "gpt-5.3-codex": {
+          input_cost_per_token: 0.00000175,
+          output_cost_per_token: 0.000014,
+          cache_read_input_token_cost: 0.000000175,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "gpt-5.3-codex",
+        "cursor",
+        usage
+      );
+
+      expect(result.priced).toBe(true);
+      expect(result.estimatedCost).toBeCloseTo(0.0875, 5);
+    });
+
+    it("should price composer-1.5 via fallback dataset", () => {
+      const dataset = makePricingDataset({
+        "composer-1.5": {
+          input_cost_per_token: 0.0000035,
+          output_cost_per_token: 0.0000175,
+          cache_read_input_token_cost: 0.00000035,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "composer-1.5",
+        "cursor",
+        usage
+      );
+
+      expect(result.priced).toBe(true);
+      // 10000 * 0.0000035 + 5000 * 0.0000175 = 0.035 + 0.0875 = 0.1225
+      expect(result.estimatedCost).toBeCloseTo(0.1225, 5);
+    });
+  });
 });

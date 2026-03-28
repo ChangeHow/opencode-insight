@@ -35,33 +35,9 @@ const MODEL_ALIASES: Record<string, string> = {
   "kimi-k2-instruct-0905": "kimi-k2.5",
 };
 
-const CURSOR_OVERRIDES: PricingDataset = {
-  "gpt-5.3": {
-    input_cost_per_token: 0.00000175,
-    output_cost_per_token: 0.000014,
-    cache_read_input_token_cost: 0.000000175,
-  },
-  "gpt-5.3-codex": {
-    input_cost_per_token: 0.00000175,
-    output_cost_per_token: 0.000014,
-    cache_read_input_token_cost: 0.000000175,
-  },
-  "gpt-5.3-codex-spark": {
-    input_cost_per_token: 0.00000175,
-    output_cost_per_token: 0.000014,
-    cache_read_input_token_cost: 0.000000175,
-  },
-  "composer 1.5": {
-    input_cost_per_token: 0.0000035,
-    output_cost_per_token: 0.0000175,
-    cache_read_input_token_cost: 0.00000035,
-  },
-  "composer-1.5": {
-    input_cost_per_token: 0.0000035,
-    output_cost_per_token: 0.0000175,
-    cache_read_input_token_cost: 0.00000035,
-  },
-};
+const FALLBACK_PRICING: PricingDataset = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "fallback-pricing.json"), "utf8"),
+);
 
 function safeNumber(value?: number) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
@@ -333,7 +309,7 @@ export async function getPricingDataset() {
   if (!pricingDatasetPromise) {
     pricingDatasetPromise = fetchPricingDataset()
       .catch(() => loadCachedDataset())
-      .then((dataset) => mergeDatasets(filterLitellmData(dataset), CURSOR_OVERRIDES));
+      .then((dataset) => mergeDatasets(filterLitellmData(dataset), FALLBACK_PRICING));
   }
 
   return pricingDatasetPromise;

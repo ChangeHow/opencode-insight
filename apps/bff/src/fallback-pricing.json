@@ -1,0 +1,32 @@
+{
+  "gpt-5.3": {
+    "input_cost_per_token": 0.00000175,
+    "output_cost_per_token": 0.000014,
+    "cache_read_input_token_cost": 0.000000175
+  },
+  "gpt-5.3-codex": {
+    "input_cost_per_token": 0.00000175,
+    "output_cost_per_token": 0.000014,
+    "cache_read_input_token_cost": 0.000000175
+  },
+  "gpt-5.3-codex-spark": {
+    "input_cost_per_token": 0.00000175,
+    "output_cost_per_token": 0.000014,
+    "cache_read_input_token_cost": 0.000000175
+  },
+  "composer 1.5": {
+    "input_cost_per_token": 0.0000035,
+    "output_cost_per_token": 0.0000175,
+    "cache_read_input_token_cost": 0.00000035
+  },
+  "composer-1.5": {
+    "input_cost_per_token": 0.0000035,
+    "output_cost_per_token": 0.0000175,
+    "cache_read_input_token_cost": 0.00000035
+  },
+  "glm-5-turbo": {
+    "input_cost_per_token": 0.0000012,
+    "output_cost_per_token": 0.000004,
+    "cache_read_input_token_cost": 0.00000024
+  }
+}
