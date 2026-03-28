@@ -101,6 +101,34 @@ describe("Usage Module", () => {
       expect(result.seriesOptions.length).toBeGreaterThanOrEqual(2);
       expect(result.seriesLines.length).toBeGreaterThanOrEqual(2);
     });
+
+    test("should filter usage to the requested provider when providerId is provided", () => {
+      const today = getTodayDate();
+
+      const snapshot = makeUsageSnapshot({
+        messages: [
+          makeRawMessage(today, {
+            modelId: "glm-4.5",
+            providerId: "zhipu",
+            estimatedCost: 3.25,
+          }),
+          makeRawMessage(today, {
+            id: "msg_openai",
+            modelId: "gpt-4o",
+            providerId: "openai",
+            estimatedCost: 1.5,
+          }),
+        ],
+      });
+
+      const result = getRangeData(snapshot, "month", [], DEFAULT_TIME_ZONE, "zhipu");
+
+      expect(result.summary.totalCost).toBe(3.25);
+      expect(result.providers).toHaveLength(1);
+      expect(result.providers[0].providerId).toBe("zhipu");
+      expect(result.seriesOptions).toHaveLength(1);
+      expect(result.seriesOptions[0].providerId).toBe("zhipu");
+    });
   });
 
   describe("Given empty snapshot", () => {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import https from "node:https";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { TokenBreakdown } from "@opencode-dashboard/shared";
 
 const PRICING_URL =
@@ -27,6 +28,7 @@ const MODEL_ALIASES: Record<string, string> = {
   "big-pickle": "glm-4.7",
   "big pickle": "glm-4.7",
   bigpickle: "glm-4.7",
+  "glm-5.1": "glm-5",
   k2p5: "kimi-k2-thinking",
   "k2-p5": "kimi-k2-thinking",
   "kimi-k2.5-thinking": "kimi-k2-thinking",
@@ -35,8 +37,26 @@ const MODEL_ALIASES: Record<string, string> = {
   "kimi-k2-instruct-0905": "kimi-k2.5",
 };
 
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+function resolveFallbackPricingPath() {
+  const candidates = [
+    path.join(MODULE_DIR, "fallback-pricing.json"),
+    path.join(MODULE_DIR, "src", "fallback-pricing.json"),
+    path.join(MODULE_DIR, "..", "src", "fallback-pricing.json"),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`Missing fallback pricing dataset. Checked: ${candidates.join(", ")}`);
+}
+
 const FALLBACK_PRICING: PricingDataset = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "fallback-pricing.json"), "utf8"),
+  fs.readFileSync(resolveFallbackPricingPath(), "utf8"),
 );
 
 function safeNumber(value?: number) {
@@ -55,6 +75,8 @@ function canonicalizeProviderSegment(segment: string) {
       return "xai";
     case "z_ai":
     case "zai":
+    case "zai_coding_plan":
+    case "bigmodel":
       return "zai";
     case "moonshot":
     case "moonshotai":
@@ -142,6 +164,11 @@ function keyProviderTags(datasetKey: string) {
   return tags;
 }
 
+function primaryProviderTag(datasetKey: string) {
+  const [firstSegment] = datasetKey.split("/");
+  return providerTags(firstSegment)[0];
+}
+
 function matchesProviderHint(datasetKey: string, providerId?: string) {
   const hints = providerTags(providerId);
   if (hints.length === 0) {
@@ -208,6 +235,7 @@ function mergeDatasets(base: PricingDataset, overrides: PricingDataset) {
 
 function findPricing(dataset: PricingDataset, modelId: string, providerId?: string): ModelPricing | undefined {
   const raw = resolveAlias(modelId).toLowerCase();
+  const hints = providerTags(providerId);
   const variants = [
     raw,
     normalizeVersionSeparator(raw),
@@ -217,6 +245,13 @@ function findPricing(dataset: PricingDataset, modelId: string, providerId?: stri
   ].filter(Boolean) as string[];
 
   for (const variant of variants) {
+    for (const [key, pricing] of Object.entries(dataset)) {
+      const lowerKey = key.toLowerCase();
+      if (hints.includes(primaryProviderTag(lowerKey) ?? "") && lowerKey.endsWith(`/${variant}`)) {
+        return pricing;
+      }
+    }
+
     for (const [key, pricing] of Object.entries(dataset)) {
       const lowerKey = key.toLowerCase();
       if (lowerKey === variant) {
