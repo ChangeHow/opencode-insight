@@ -1,10 +1,28 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThemeToggleButton } from "./shared";
+
+function useStuck(): [React.RefObject<HTMLDivElement | null>, boolean] {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([e]) => setStuck(e.intersectionRatio < 1),
+      { threshold: [1], rootMargin: "0px 0px -1px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return [sentinelRef, stuck];
+}
 
 export function DashboardPageLayout({
   header,
@@ -17,8 +35,8 @@ export function DashboardPageLayout({
 }) {
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      {header}
       <section className={variant === "wide" ? "w-full space-y-8 pb-10 lg:pb-14" : "mx-auto max-w-7xl space-y-6 pb-8 lg:pb-10"}>
-        {header}
         {children}
       </section>
     </main>
@@ -26,10 +44,15 @@ export function DashboardPageLayout({
 }
 
 export function StickyHeaderShell({ children }: { children: ReactNode }) {
+  const [sentinelRef, stuck] = useStuck();
   return (
-    <div className="sticky top-0 z-30 w-full overflow-x-clip">
-      <div className="w-full bg-[color-mix(in_oklch,var(--background)_82%,transparent)]/90 px-6 pt-2.5 pb-2 shadow-[0_12px_30px_rgba(30,22,16,0.06)] backdrop-blur-xl supports-[backdrop-filter]:bg-[color-mix(in_oklch,var(--background)_72%,transparent)] sm:px-8 lg:px-10">
-        {children}
+    <div ref={sentinelRef} className="sticky top-0 z-30 w-full overflow-x-clip">
+      <div
+        className={`w-full bg-[color-mix(in_oklch,var(--background)_82%,transparent)]/90 backdrop-blur-xl transition-shadow duration-200 supports-[backdrop-filter]:bg-[color-mix(in_oklch,var(--background)_72%,transparent)]${stuck ? " shadow-[0_1px_3px_var(--header-shadow-color),0_8px_24px_var(--header-shadow-color)]" : ""}`}
+      >
+        <div className="mx-auto max-w-7xl px-6 pt-2.5 pb-2 sm:px-8 lg:px-10">
+          {children}
+        </div>
       </div>
     </div>
   );
