@@ -1,26 +1,24 @@
 # OpenCode Token Dashboard
 
+[![Node](https://img.shields.io/badge/node-%E2%89%A524-026E00?logo=node.js&logoColor=white)](https://nodejs.org)
+[![pnpm](https://img.shields.io/badge/pnpm-%E2%89%A510-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
+[![glibc](https://img.shields.io/badge/glibc-%E2%89%A52.31-4A90D9?logo=linux&logoColor=white)](https://www.gnu.org/software/libc/)
+[![better-sqlite3](https://img.shields.io/badge/better--sqlite3-12.8-003B57?logo=sqlite&logoColor=white)](https://github.com/WiseLibs/better-sqlite3)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Local-first token usage dashboard for OpenCode sessions.
-
-Built with:
-
-- React
-- TanStack Router
-- shadcn/ui-style components
-- Jotai
-- Hono
-- pnpm workspace
-- Node 24
 
 ## Requirements
 
-- Node 24
-- pnpm 10+
-- `sqlite3` CLI available in `PATH`
-- Local OpenCode data
+| Dependency  | Minimum | Notes                                                               |
+| ----------- | ------- | ------------------------------------------------------------------- |
+| **Node.js** | 24.x    |                                                                     |
+| **pnpm**    | 10+     |                                                                     |
+| **glibc**   | ≥ 2.31  | Debian 11+, Ubuntu 20.04+. Alpine (musl) not supported              |
+| **GCC**     | ≥ 10    | Required by `better-sqlite3` (C++20). No prebuild for older distros |
 
 The BFF reads OpenCode usage from the directory configured in `.env.local`.
-It queries `opencode.db` through the system `sqlite3` binary, so there is no Node native SQLite rebuild step.
+It queries `opencode.db` via the `better-sqlite3` native binding, which compiles against the system toolchain at install time. Older distributions (e.g. Debian 10, Ubuntu 18.04) ship glibc and GCC versions that are too old for this dependency.
 
 Expected files inside that directory:
 
@@ -56,6 +54,12 @@ pnpm daemon:start
 Open the dashboard at:
 
 - Dashboard: `http://127.0.0.1:8787`
+
+To listen on all interfaces (e.g. for LAN access):
+
+```bash
+pnpm daemon:start -- --host 0.0.0.0
+```
 
 The daemon command prints:
 
@@ -109,6 +113,14 @@ Default local addresses:
 
 - Web: `http://127.0.0.1:3000`
 - BFF: `http://localhost:8787`
+
+To listen on all interfaces, pass `--host`:
+
+```bash
+pnpm dev:bff -- --host 0.0.0.0
+```
+
+Both `--host` and `--port` are supported by the BFF server and daemon (CLI args take priority over env vars).
 
 Process titles for local debugging:
 

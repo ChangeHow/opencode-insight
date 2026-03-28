@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { ChevronDown, LineChart as LineChartIcon } from "lucide-react";
 import type { CostSeriesLine, CostSeriesOption, TrendPoint } from "@opencode-dashboard/shared";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,16 +48,33 @@ export function TrendChart({
             <LineChartIcon className="size-3.5" />
             Spend curves
           </p>
-          <h2 className="text-xl font-semibold text-[var(--foreground)]">Model and provider lines</h2>
-          <p className="text-xs leading-5 text-[var(--muted-foreground)]">Toggle up to four model and provider pairs. The chart rescales to emphasize the selected spend patterns.</p>
+          <h2 className="text-xl font-semibold text-[var(--foreground)]">
+            Model and provider lines
+          </h2>
+          <p className="text-xs leading-5 text-[var(--muted-foreground)]">
+            Toggle up to four model and provider pairs. The chart rescales to emphasize the selected
+            spend patterns.
+          </p>
         </div>
       </div>
       <div className="h-84 min-w-0 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <CartesianGrid vertical={false} stroke="rgba(77, 61, 44, 0.08)" />
-            <XAxis dataKey="date" tickFormatter={(value) => value.slice(5)} tickLine={false} axisLine={false} />
-            <YAxis domain={[0, yAxisMax]} tickCount={5} tickFormatter={formatCurrencyCompact} tickLine={false} axisLine={false} width={52} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={(value) => value.slice(5)}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              domain={[0, yAxisMax]}
+              tickCount={5}
+              tickFormatter={formatCurrencyCompact}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+            />
             <Tooltip
               cursor={{ stroke: "rgba(174, 85, 43, 0.2)", strokeWidth: 1 }}
               contentStyle={{
@@ -96,7 +121,9 @@ export function TrendChart({
             </span>
             <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
               {open ? "Close" : "Select"}
-              <ChevronDown className={cn("size-4 transition-transform", open ? "rotate-180" : "")} />
+              <ChevronDown
+                className={cn("size-4 transition-transform", open ? "rotate-180" : "")}
+              />
             </span>
           </button>
         </PopoverTrigger>
@@ -111,16 +138,25 @@ export function TrendChart({
                     key={option.key}
                     className={cn(
                       "flex cursor-pointer items-start justify-between gap-3 rounded-[16px] border px-3 py-2.5 transition",
-                      active ? "border-transparent bg-[var(--accent-soft)]" : "border-[var(--border)] bg-white/40 hover:bg-black/5",
+                      active
+                        ? "border-transparent bg-[var(--accent-soft)]"
+                        : "border-[var(--border)] bg-white/40 hover:bg-black/5",
                     )}
                   >
                     <span className="min-w-0 space-y-1">
                       <span className="flex items-center gap-2">
-                        <ProviderIcon providerId={option.providerId} className="size-3.5" withTooltip />
-                        <span className="block truncate text-sm font-semibold text-[var(--foreground)]">{option.modelId}</span>
+                        <ProviderIcon
+                          providerId={option.providerId}
+                          className="size-3.5"
+                          withTooltip
+                        />
+                        <span className="block truncate text-sm font-semibold text-[var(--foreground)]">
+                          {option.modelId}
+                        </span>
                       </span>
                       <span className="block text-xs text-[var(--muted-foreground)]">
-                        {formatCurrency(option.totalCost)} • {formatCompactNumber(option.totalTokens)} tokens
+                        {formatCurrency(option.totalCost)} •{" "}
+                        {formatCompactNumber(option.totalTokens)} tokens
                       </span>
                     </span>
                     <input
@@ -163,7 +199,10 @@ function formatCurrencyCompact(value: number) {
 }
 
 function computeYAxisMax(data: TrendPoint[], lines: CostSeriesLine[]) {
-  const primaryValues = lines.length > 0 ? lines.flatMap((line) => line.points.map((point) => point.cost)) : data.map((point) => point.cost);
+  const primaryValues =
+    lines.length > 0
+      ? lines.flatMap((line) => line.points.map((point) => point.cost))
+      : data.map((point) => point.cost);
 
   const values = primaryValues.filter((value) => Number.isFinite(value) && value >= 0);
 
@@ -173,7 +212,8 @@ function computeYAxisMax(data: TrendPoint[], lines: CostSeriesLine[]) {
     return 1;
   }
 
-  const paddedMax = maxValue * (maxValue <= 1 ? 1.5 : maxValue <= 5 ? 1.35 : maxValue <= 20 ? 1.22 : 1.14);
+  const paddedMax =
+    maxValue * (maxValue <= 1 ? 1.5 : maxValue <= 5 ? 1.35 : maxValue <= 20 ? 1.22 : 1.14);
   return roundUpToNiceStep(paddedMax);
 }
 

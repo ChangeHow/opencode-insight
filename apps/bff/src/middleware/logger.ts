@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { logger as baseLogger } from "../logger.js";
+import { logger as baseLogger } from "../logger";
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;

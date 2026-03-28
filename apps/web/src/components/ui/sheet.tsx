@@ -50,7 +50,13 @@ const SheetContent = React.forwardRef<
 SheetContent.displayName = Dialog.Content.displayName;
 
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col gap-2 border-b border-[var(--border)] px-6 py-5 sm:px-7", className)} {...props} />
+  <div
+    className={cn(
+      "flex flex-col gap-2 border-b border-[var(--border)] px-6 py-5 sm:px-7",
+      className,
+    )}
+    {...props}
+  />
 );
 
 const SheetBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -61,7 +67,11 @@ const SheetTitle = React.forwardRef<
   React.ElementRef<typeof Dialog.Title>,
   React.ComponentPropsWithoutRef<typeof Dialog.Title>
 >(({ className, ...props }, ref) => (
-  <Dialog.Title ref={ref} className={cn("text-2xl font-semibold tracking-[-0.03em]", className)} {...props} />
+  <Dialog.Title
+    ref={ref}
+    className={cn("text-2xl font-semibold tracking-[-0.03em]", className)}
+    {...props}
+  />
 ));
 SheetTitle.displayName = Dialog.Title.displayName;
 
@@ -69,8 +79,21 @@ const SheetDescription = React.forwardRef<
   React.ElementRef<typeof Dialog.Description>,
   React.ComponentPropsWithoutRef<typeof Dialog.Description>
 >(({ className, ...props }, ref) => (
-  <Dialog.Description ref={ref} className={cn("text-sm leading-6 text-[var(--muted-foreground)]", className)} {...props} />
+  <Dialog.Description
+    ref={ref}
+    className={cn("text-sm leading-6 text-[var(--muted-foreground)]", className)}
+    {...props}
+  />
 ));
 SheetDescription.displayName = Dialog.Description.displayName;
 
-export { Sheet, SheetBody, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger };
+export {
+  Sheet,
+  SheetBody,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+};

@@ -48,11 +48,17 @@ export function CostByModelPanel({
                     <ProviderIcon providerId={model.providerId} className="size-3" withTooltip />
                     {model.providerId}
                   </p>
-                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">{model.modelId}</p>
+                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    {model.modelId}
+                  </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-sm font-semibold text-[var(--foreground)]">{formatCurrency(model.cost)}</p>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">{formatCompactNumber(model.tokens)} tokens</p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                    {formatCurrency(model.cost)}
+                  </p>
+                  <p className="text-[11px] text-[var(--muted-foreground)]">
+                    {formatCompactNumber(model.tokens)} tokens
+                  </p>
                 </div>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-black/6">
@@ -82,13 +88,13 @@ export function ModelTokenSharePanel({
       eyebrow={eyebrow}
       title="Model token share"
       separator
-      footer={(
+      footer={
         <>
           <LegendPill label="Input" color={TOKEN_COLORS.input} />
           <LegendPill label="Output" color={TOKEN_COLORS.output} />
           <LegendPill label="Cache" color={TOKEN_COLORS.cache} />
         </>
-      )}
+      }
     >
       <ScrollArea className="mt-4 min-h-0 flex-1 pr-3">
         <div className="grid content-start gap-4 pb-1">
@@ -99,12 +105,23 @@ export function ModelTokenSharePanel({
                   <ProviderIcon providerId={model.providerId} className="size-3" withTooltip />
                   {model.providerId}
                 </p>
-                <p className="truncate text-sm font-semibold text-[var(--foreground)]">{model.modelId}</p>
+                <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                  {model.modelId}
+                </p>
               </div>
               <div className="flex h-4 overflow-hidden rounded-full bg-black/6">
-                <div style={{ width: `${model.inputShare}%`, background: TOKEN_COLORS.input }} title={`Input ${model.inputShare.toFixed(1)}%`} />
-                <div style={{ width: `${model.outputShare}%`, background: TOKEN_COLORS.output }} title={`Output ${model.outputShare.toFixed(1)}%`} />
-                <div style={{ width: `${model.cacheShare}%`, background: TOKEN_COLORS.cache }} title={`Cache ${model.cacheShare.toFixed(1)}%`} />
+                <div
+                  style={{ width: `${model.inputShare}%`, background: TOKEN_COLORS.input }}
+                  title={`Input ${model.inputShare.toFixed(1)}%`}
+                />
+                <div
+                  style={{ width: `${model.outputShare}%`, background: TOKEN_COLORS.output }}
+                  title={`Output ${model.outputShare.toFixed(1)}%`}
+                />
+                <div
+                  style={{ width: `${model.cacheShare}%`, background: TOKEN_COLORS.cache }}
+                  title={`Cache ${model.cacheShare.toFixed(1)}%`}
+                />
               </div>
             </div>
           ))}

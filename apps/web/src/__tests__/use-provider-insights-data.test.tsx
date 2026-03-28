@@ -8,17 +8,17 @@ import {
   loadingAtom,
   providerInsightsAtom,
   summaryAtom,
-} from "../lib/atoms.js";
-import { makeDashboardSummary, makeProviderInsightsPayload } from "./factories.js";
+} from "../lib/atoms/index";
+import { makeDashboardSummary, makeProviderInsightsPayload } from "./factories";
 
 vi.mock("../lib/api.js", () => ({
   fetchProviders: vi.fn(),
   fetchSummary: vi.fn(),
-  refreshSnapshot: vi.fn(),
+  refreshSnapshot: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { fetchProviders, fetchSummary } from "../lib/api.js";
-import { useProviderInsightsData } from "../lib/use-provider-insights-data.js";
+import { fetchProviders, fetchSummary } from "../lib/api";
+import { useProviderInsightsData } from "../lib/use-provider-insights-data";
 
 const mockFetchProviders = vi.mocked(fetchProviders);
 const mockFetchSummary = vi.mocked(fetchSummary);

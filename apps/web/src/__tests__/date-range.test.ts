@@ -1,12 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { formatDateInTimeZone, getCurrentTimeZone, getPresetDateRange as getSharedPresetDateRange, shiftDateKey } from "@opencode-dashboard/shared";
+import {
+  formatDateInTimeZone,
+  getCurrentTimeZone,
+  getPresetDateRange as getSharedPresetDateRange,
+  shiftDateKey,
+} from "@opencode-dashboard/shared";
 import {
   canRefreshDetailDate,
   toInputDate,
   getPresetDateRange,
   parseInputDate,
   isTodayInputDate,
-} from "../lib/date-range.js";
+} from "../lib/date-range";
 
 describe("Date Range Functions", () => {
   describe("toInputDate", () => {
@@ -50,7 +55,7 @@ describe("Date Range Functions", () => {
   describe("parseInputDate", () => {
     it("should return Date object for valid date string", () => {
       const result = parseInputDate("2025-01-15");
-      
+
       expect(result).toBeInstanceOf(Date);
       expect(result?.getFullYear()).toBe(2025);
       expect(result?.getMonth()).toBe(0); // January is 0

@@ -8,7 +8,7 @@
     "dev": "PROCESS_TITLE=opencode-telescope-client NODE_OPTIONS='--require=../../scripts/set-process-title.cjs' vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "lint": "tsc -p tsconfig.app.json --noEmit",
+    "lint": "oxlint src/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

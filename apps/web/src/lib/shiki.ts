@@ -31,7 +31,11 @@ export function getHighlighter(): Promise<Highlighter> {
   return highlighterPromise;
 }
 
-export async function highlight(code: string, lang: string, theme: "github-dark" | "github-light"): Promise<string> {
+export async function highlight(
+  code: string,
+  lang: string,
+  theme: "github-dark" | "github-light",
+): Promise<string> {
   const hl = await getHighlighter();
   const supportedLangs = hl.getLoadedLanguages();
   const safeLang = supportedLangs.includes(lang as never) ? lang : "text";

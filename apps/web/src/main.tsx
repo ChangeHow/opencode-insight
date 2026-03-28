@@ -1,7 +1,14 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { useAtomValue } from "jotai";
-import { Navigate, Outlet, RouterProvider, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import {
+  Navigate,
+  Outlet,
+  RouterProvider,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import { themeAtom } from "@/lib/atoms";
 import { DashboardPage, DetailPage, ProvidersPage, SessionDetailPage } from "@/routes/dashboard";
 import "./styles.css";
@@ -66,7 +73,13 @@ const sessionDetailRoute = createRoute({
   component: SessionDetailPage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, overviewRoute, providersRoute, detailRoute, sessionDetailRoute]);
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  overviewRoute,
+  providersRoute,
+  detailRoute,
+  sessionDetailRoute,
+]);
 
 const router = createRouter({
   routeTree,

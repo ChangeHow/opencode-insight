@@ -62,7 +62,7 @@ test.beforeEach(async ({ page }) => {
     const url = route.request().url();
     const match = url.match(/\/api\/day\/([^?]+)/);
     const date = match ? match[1] : new Date().toISOString().split("T")[0];
-    
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",

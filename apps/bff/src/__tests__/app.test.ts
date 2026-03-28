@@ -1,27 +1,33 @@
 import { vi, describe, test, expect, beforeEach } from "vitest";
 import type { TimeRange } from "@opencode-dashboard/shared";
-import { makeUsageSnapshot, makeRangeData, makeDayBreakdown, makeSessionBreakdown, makeProviderInsight } from "./factories.js";
+import {
+  makeUsageSnapshot,
+  makeRangeData,
+  makeDayBreakdown,
+  makeSessionBreakdown,
+  makeProviderInsight,
+} from "./factories";
 
-vi.mock("../usage.js", () => ({
+vi.mock("../services/usage/index.js", () => ({
   loadUsageSnapshot: vi.fn(),
   getRangeData: vi.fn(),
   getDateFilteredData: vi.fn(),
 }));
 
-vi.mock("../pricing.js", () => ({
+vi.mock("../services/pricing.js", () => ({
   invalidatePricingCache: vi.fn(),
 }));
 
-vi.mock("../messages.js", () => ({
+vi.mock("../services/messages.js", () => ({
   buildMessagePayloads: vi.fn(),
   getDbPath: vi.fn(() => "/tmp/opencode.db"),
   invalidateMessagePayloadCache: vi.fn(),
 }));
 
-import app from "../app.js";
-import { loadUsageSnapshot, getRangeData, getDateFilteredData } from "../usage.js";
-import { invalidatePricingCache } from "../pricing.js";
-import { buildMessagePayloads, invalidateMessagePayloadCache } from "../messages.js";
+import app from "../app";
+import { loadUsageSnapshot, getRangeData, getDateFilteredData } from "../services/usage/index";
+import { invalidatePricingCache } from "../services/pricing";
+import { buildMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
 
 const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
 const mockGetRangeData = vi.mocked(getRangeData);
@@ -46,253 +52,269 @@ describe("BFF API Routes", () => {
   });
 
   test("GET /api/summary returns summary JSON when requested", async () => {
-      const rangeData = makeRangeData();
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request(`/api/summary?range=month&timeZone=${timeZone}`);
+    const res = await app.request(`/api/summary?range=month&timeZone=${timeZone}`);
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual(rangeData.summary);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual(rangeData.summary);
   });
 
   test("GET /api/summary uses range parameter to filter data", async () => {
-      const rangeData = makeRangeData();
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      await app.request(`/api/summary?range=3mo&timeZone=${timeZone}`);
+    await app.request(`/api/summary?range=3mo&timeZone=${timeZone}`);
 
-      // Verify the function was called with the correct range parameter (second argument)
-      expect(mockGetRangeData).toHaveBeenCalled();
-      const callArgs = mockGetRangeData.mock.calls[0];
-      expect(callArgs[1]).toBe("3mo");
-      expect(callArgs[3]).toBe(timeZone);
+    // Verify the function was called with the correct range parameter (second argument)
+    expect(mockGetRangeData).toHaveBeenCalled();
+    const callArgs = mockGetRangeData.mock.calls[0];
+    expect(callArgs[1]).toBe("3mo");
+    expect(callArgs[3]).toBe(timeZone);
   });
 
   test("GET /api/summary uses custom date range when start and end are provided", async () => {
-      const rangeData = makeRangeData();
-      mockGetDateFilteredData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetDateFilteredData.mockReturnValue(rangeData);
 
-      await app.request(`/api/summary?start=2025-01-01&end=2025-01-31&timeZone=${timeZone}`);
+    await app.request(`/api/summary?start=2025-01-01&end=2025-01-31&timeZone=${timeZone}`);
 
-      // Verify getDateFilteredData was called with start and end
-      expect(mockGetDateFilteredData).toHaveBeenCalled();
-      const callArgs = mockGetDateFilteredData.mock.calls[0];
-      expect(callArgs[1]).toBe("2025-01-01");
-      expect(callArgs[2]).toBe("2025-01-31");
-      expect(callArgs[4]).toBe(timeZone);
-      expect(mockGetRangeData).not.toHaveBeenCalled();
+    // Verify getDateFilteredData was called with start and end
+    expect(mockGetDateFilteredData).toHaveBeenCalled();
+    const callArgs = mockGetDateFilteredData.mock.calls[0];
+    expect(callArgs[1]).toBe("2025-01-01");
+    expect(callArgs[2]).toBe("2025-01-31");
+    expect(callArgs[4]).toBe(timeZone);
+    expect(mockGetRangeData).not.toHaveBeenCalled();
   });
 
   test("GET /api/heatmap returns heatmap array", async () => {
-      const rangeData = makeRangeData();
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/heatmap?range=month");
+    const res = await app.request("/api/heatmap?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual(rangeData.heatmap);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual(rangeData.heatmap);
   });
 
   test("GET /api/trend returns trend array", async () => {
-      const rangeData = makeRangeData();
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/trend?range=month");
+    const res = await app.request("/api/trend?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual(rangeData.trend);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual(rangeData.trend);
   });
 
   test("GET /api/series returns all series by default", async () => {
-      const rangeData = makeRangeData();
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/series?range=month");
+    const res = await app.request("/api/series?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual({
-        options: rangeData.seriesOptions,
-        lines: rangeData.seriesLines,
-      });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({
+      options: rangeData.seriesOptions,
+      lines: rangeData.seriesLines,
+    });
   });
 
   test("GET /api/series filters series when params are provided", async () => {
-      const rangeData = makeRangeData({
-        seriesLines: [
-          { key: "anthropic/claude-3-5-sonnet", label: "Claude", providerId: "anthropic", modelId: "claude-3-5-sonnet", points: [] },
-          { key: "openai/gpt-4o", label: "GPT-4o", providerId: "openai", modelId: "gpt-4o", points: [] },
-        ],
-      });
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData({
+      seriesLines: [
+        {
+          key: "anthropic/claude-3-5-sonnet",
+          label: "Claude",
+          providerId: "anthropic",
+          modelId: "claude-3-5-sonnet",
+          points: [],
+        },
+        {
+          key: "openai/gpt-4o",
+          label: "GPT-4o",
+          providerId: "openai",
+          modelId: "gpt-4o",
+          points: [],
+        },
+      ],
+    });
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/series?range=month&series=anthropic/claude-3-5-sonnet");
+    const res = await app.request("/api/series?range=month&series=anthropic/claude-3-5-sonnet");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json.lines).toHaveLength(1);
-      expect(json.lines[0].key).toBe("anthropic/claude-3-5-sonnet");
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.lines).toHaveLength(1);
+    expect(json.lines[0].key).toBe("anthropic/claude-3-5-sonnet");
   });
 
   test("GET /api/providers returns providers payload", async () => {
-      const rangeData = makeRangeData();
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/providers?range=month");
+    const res = await app.request("/api/providers?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual({
-        providers: rangeData.providers,
-      });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({
+      providers: rangeData.providers,
+    });
   });
 
   test("GET /api/provider/:providerId returns provider-filtered dashboard payload", async () => {
-      const provider = makeProviderInsight({ providerId: "zhipu", totalCost: 12.34 });
-      const rangeData = makeRangeData({
-        providers: [provider],
-      });
-      mockGetRangeData.mockReturnValue(rangeData);
+    const provider = makeProviderInsight({ providerId: "zhipu", totalCost: 12.34 });
+    const rangeData = makeRangeData({
+      providers: [provider],
+    });
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/provider/zhipu?range=month");
+    const res = await app.request("/api/provider/zhipu?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual({
-        provider,
-        summary: rangeData.summary,
-        heatmap: rangeData.heatmap,
-        trend: rangeData.trend,
-        series: {
-          options: rangeData.seriesOptions,
-          lines: rangeData.seriesLines,
-        },
-        providers: rangeData.providers,
-        selectedDay: null,
-      });
-      expect(mockGetRangeData).toHaveBeenCalledWith(undefined, "month", [], "UTC", "zhipu");
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({
+      provider,
+      summary: rangeData.summary,
+      heatmap: rangeData.heatmap,
+      trend: rangeData.trend,
+      series: {
+        options: rangeData.seriesOptions,
+        lines: rangeData.seriesLines,
+      },
+      providers: rangeData.providers,
+      selectedDay: null,
+    });
+    expect(mockGetRangeData).toHaveBeenCalledWith(undefined, "month", [], "UTC", "zhipu");
   });
 
   test("GET /api/provider/:providerId returns 404 when provider is not found", async () => {
-      const rangeData = makeRangeData({ providers: [] });
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData({ providers: [] });
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/provider/missing?range=month");
+    const res = await app.request("/api/provider/missing?range=month");
 
-      expect(res.status).toBe(404);
-      const json = await res.json();
-      expect(json).toEqual({
-        error: "No usage found for that provider.",
-      });
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json).toEqual({
+      error: "No usage found for that provider.",
+    });
   });
 
   test("GET /api/dashboard returns consolidated dashboard payload", async () => {
-      const rangeData = makeRangeData();
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData();
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/dashboard?range=month");
+    const res = await app.request("/api/dashboard?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual({
-        summary: rangeData.summary,
-        heatmap: rangeData.heatmap,
-        trend: rangeData.trend,
-        series: {
-          options: rangeData.seriesOptions,
-          lines: rangeData.seriesLines,
-        },
-        providers: rangeData.providers,
-        selectedDay: null,
-      });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({
+      summary: rangeData.summary,
+      heatmap: rangeData.heatmap,
+      trend: rangeData.trend,
+      series: {
+        options: rangeData.seriesOptions,
+        lines: rangeData.seriesLines,
+      },
+      providers: rangeData.providers,
+      selectedDay: null,
+    });
   });
 
   test("GET /api/day/:date returns day breakdown when date exists", async () => {
-      const dayData = makeDayBreakdown("2025-01-15");
-      const rangeData = makeRangeData({
-        byDate: new Map([["2025-01-15", dayData]]),
-      });
-      mockGetRangeData.mockReturnValue(rangeData);
+    const dayData = makeDayBreakdown("2025-01-15");
+    const rangeData = makeRangeData({
+      byDate: new Map([["2025-01-15", dayData]]),
+    });
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/day/2025-01-15?range=month");
+    const res = await app.request("/api/day/2025-01-15?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual(dayData);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual(dayData);
   });
 
   test("GET /api/day/:date returns 404 when date is not found", async () => {
-      const rangeData = makeRangeData({
-        byDate: new Map(),
-      });
-      mockGetRangeData.mockReturnValue(rangeData);
+    const rangeData = makeRangeData({
+      byDate: new Map(),
+    });
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/day/2025-01-15?range=month");
+    const res = await app.request("/api/day/2025-01-15?range=month");
 
-      expect(res.status).toBe(404);
-      const json = await res.json();
-      expect(json).toEqual({
-        error: "No usage found for that date.",
-      });
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json).toEqual({
+      error: "No usage found for that date.",
+    });
   });
 
   test("GET /api/day/:date/session/:sessionId returns session breakdown when session exists", async () => {
-      const session = makeSessionBreakdown("ses_abc");
-      const dayData = makeDayBreakdown("2025-01-15", { sessions: [session] });
-      const rangeData = makeRangeData({
-        byDate: new Map([["2025-01-15", dayData]]),
-      });
-      mockGetRangeData.mockReturnValue(rangeData);
+    const session = makeSessionBreakdown("ses_abc");
+    const dayData = makeDayBreakdown("2025-01-15", { sessions: [session] });
+    const rangeData = makeRangeData({
+      byDate: new Map([["2025-01-15", dayData]]),
+    });
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/day/2025-01-15/session/ses_abc?range=month");
+    const res = await app.request("/api/day/2025-01-15/session/ses_abc?range=month");
 
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json).toEqual(session);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual(session);
   });
 
   test("GET /api/day/:date/session/:sessionId returns 404 when session is not found", async () => {
-      const dayData = makeDayBreakdown("2025-01-15", { sessions: [] });
-      const rangeData = makeRangeData({
-        byDate: new Map([["2025-01-15", dayData]]),
-      });
-      mockGetRangeData.mockReturnValue(rangeData);
+    const dayData = makeDayBreakdown("2025-01-15", { sessions: [] });
+    const rangeData = makeRangeData({
+      byDate: new Map([["2025-01-15", dayData]]),
+    });
+    mockGetRangeData.mockReturnValue(rangeData);
 
-      const res = await app.request("/api/day/2025-01-15/session/ses_missing?range=month");
+    const res = await app.request("/api/day/2025-01-15/session/ses_missing?range=month");
 
-      expect(res.status).toBe(404);
-      const json = await res.json();
-      expect(json).toEqual({
-        error: "No session found for that date.",
-      });
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json).toEqual({
+      error: "No session found for that date.",
+    });
   });
 
   test("POST /api/refresh invalidates cache and returns new scannedAt", async () => {
-      const newSnapshot = makeUsageSnapshot({
-        summary: { scannedAt: "2025-01-20T12:00:00.000Z" },
-      });
-      mockLoadUsageSnapshot.mockResolvedValue(newSnapshot);
+    const newSnapshot = makeUsageSnapshot({
+      summary: { scannedAt: "2025-01-20T12:00:00.000Z" },
+    });
+    mockLoadUsageSnapshot.mockResolvedValue(newSnapshot);
 
-      const res = await app.request("/api/refresh", { method: "POST" });
+    const res = await app.request("/api/refresh", { method: "POST" });
 
-      expect(res.status).toBe(200);
-      expect(mockInvalidatePricingCache).toHaveBeenCalled();
-      expect(mockInvalidateMessagePayloadCache).toHaveBeenCalled();
-      expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
-      
-      const json = await res.json();
-      expect(json).toEqual({
-        ok: true,
-        scannedAt: "2025-01-20T12:00:00.000Z",
-      });
+    expect(res.status).toBe(200);
+    expect(mockInvalidatePricingCache).toHaveBeenCalled();
+    expect(mockInvalidateMessagePayloadCache).toHaveBeenCalled();
+    expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
+
+    const json = await res.json();
+    expect(json).toEqual({
+      ok: true,
+      scannedAt: "2025-01-20T12:00:00.000Z",
+    });
   });
 
   test("message analytics endpoints return payloads per request", async () => {
     mockBuildMessagePayloads.mockReturnValue({
-      overview: { timeline: [], toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }], totalMessages: 3 },
+      overview: {
+        timeline: [],
+        toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }],
+        totalMessages: 3,
+      },
       distribution: { points: [], totalMessages: 3 },
       listFn: (page, pageSize) => ({
         messages: [],
@@ -304,8 +326,12 @@ describe("BFF API Routes", () => {
 
     const analyticsRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/analytics");
     const overviewRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/overview");
-    const distributionRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/distribution");
-    const listRes = await app.request("/api/day/2025-01-15/session/ses_abc/message?page=1&pageSize=25");
+    const distributionRes = await app.request(
+      "/api/day/2025-01-15/session/ses_abc/message/distribution",
+    );
+    const listRes = await app.request(
+      "/api/day/2025-01-15/session/ses_abc/message?page=1&pageSize=25",
+    );
 
     expect(analyticsRes.status).toBe(200);
     expect(overviewRes.status).toBe(200);
@@ -315,7 +341,11 @@ describe("BFF API Routes", () => {
 
     const analyticsJson = await analyticsRes.json();
     expect(analyticsJson).toEqual({
-      overview: { timeline: [], toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }], totalMessages: 3 },
+      overview: {
+        timeline: [],
+        toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }],
+        totalMessages: 3,
+      },
       distribution: { points: [], totalMessages: 3 },
     });
 

@@ -31,7 +31,9 @@ export function MessageItem({ message, cumulativeTokens }: MessageItemProps) {
         ) : (
           <User className="size-4 shrink-0 text-[var(--muted-foreground)]" />
         )}
-        <span className="text-xs font-semibold capitalize text-[var(--foreground)]">{message.role}</span>
+        <span className="text-xs font-semibold capitalize text-[var(--foreground)]">
+          {message.role}
+        </span>
         {message.modelId ? (
           <span className="text-[10px] text-[var(--muted-foreground)]">{message.modelId}</span>
         ) : null}
@@ -43,7 +45,9 @@ export function MessageItem({ message, cumulativeTokens }: MessageItemProps) {
           </span>
         ) : null}
         {message.cost > 0 ? (
-          <span className="text-[10px] text-[var(--muted-foreground)]">{formatCurrency(message.cost)}</span>
+          <span className="text-[10px] text-[var(--muted-foreground)]">
+            {formatCurrency(message.cost)}
+          </span>
         ) : null}
         {toolCount > 0 ? (
           <span className="rounded-full bg-[var(--metric-violet)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--metric-violet)]">
@@ -56,11 +60,9 @@ export function MessageItem({ message, cumulativeTokens }: MessageItemProps) {
       <div className="mt-2 space-y-2 pl-6">
         {message.parts.map((part, i) => {
           if (part.type === "text") {
-            // eslint-disable-next-line react/no-array-index-key
             return <MarkdownRenderer key={i} content={part.text} />;
           }
           if (part.type === "reasoning") {
-            // eslint-disable-next-line react/no-array-index-key
             return <ReasoningSection key={i} content={part.text} />;
           }
           if (part.type === "tool") {
@@ -78,8 +80,8 @@ function ReasoningSection({ content }: { content: string }) {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="-ml-6 flex w-[calc(100%+1.5rem)] items-center gap-1.5 pl-6 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-        {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-        🧠 Reasoning
+        {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}🧠
+        Reasoning
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="ui-collapsible-panel text-xs text-[var(--muted-foreground)] italic">

@@ -5,7 +5,13 @@ import { cn } from "@/lib/utils";
 
 export type CalendarProps = ComponentProps<typeof DayPicker>;
 
-export function Calendar({ className, classNames, showOutsideDays = true, fixedWeeks = true, ...props }: CalendarProps) {
+export function Calendar({
+  className,
+  classNames,
+  showOutsideDays = true,
+  fixedWeeks = true,
+  ...props
+}: CalendarProps) {
   return (
     <DayPicker
       fixedWeeks={fixedWeeks}
@@ -18,15 +24,19 @@ export function Calendar({ className, classNames, showOutsideDays = true, fixedW
         month_caption: "relative flex h-9 items-center justify-center",
         caption_label: "text-sm font-semibold text-[var(--foreground)]",
         nav: "absolute inset-x-0 top-0 flex items-center justify-between px-3",
-        button_previous: "inline-flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-black/5",
-        button_next: "inline-flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-black/5",
+        button_previous:
+          "inline-flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-black/5",
+        button_next:
+          "inline-flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-black/5",
         month_grid: "w-full border-collapse",
         weekdays: "flex w-full",
-        weekday: "w-9 rounded-md text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]",
+        weekday:
+          "w-9 rounded-md text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]",
         weeks: "mt-2 flex flex-col gap-1",
         week: "flex w-full",
         day: "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected].rdp-range_end)]:rounded-r-xl [&:has([aria-selected].rdp-range_start)]:rounded-l-xl [&:has([aria-selected].rdp-range_middle)]:rounded-none",
-        day_button: "inline-flex size-9 items-center justify-center rounded-xl text-sm text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+        day_button:
+          "inline-flex size-9 items-center justify-center rounded-xl text-sm text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         selected: "bg-[var(--accent)] text-[var(--accent-foreground)]",
         today: "",
         outside: "text-[var(--muted-foreground)] opacity-45",
@@ -39,7 +49,11 @@ export function Calendar({ className, classNames, showOutsideDays = true, fixedW
       }}
       components={{
         Chevron: ({ orientation, className: iconClassName }) =>
-          orientation === "left" ? <ChevronLeft className={cn("size-4", iconClassName)} /> : <ChevronRight className={cn("size-4", iconClassName)} />,
+          orientation === "left" ? (
+            <ChevronLeft className={cn("size-4", iconClassName)} />
+          ) : (
+            <ChevronRight className={cn("size-4", iconClassName)} />
+          ),
       }}
       {...props}
     />

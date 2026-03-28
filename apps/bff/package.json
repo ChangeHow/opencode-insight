@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "predev": "node ../../scripts/check-port.mjs 8787 'BFF'",
-    "dev": "PROCESS_TITLE=opencode-telescope-bff NODE_OPTIONS='--require=../../scripts/set-process-title.cjs' vite --config vite.config.ts",
-    "build": "tsc -p tsconfig.json",
+    "dev": "bun --watch src/index.ts",
+    "build": "echo 'No build needed — daemon uses bun to run TS directly'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint src/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

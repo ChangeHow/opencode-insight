@@ -35,12 +35,73 @@
 
 ## Verification
 
-- For shared type changes, rebuild `@opencode-dashboard/shared` before validating dependents.
-- Prefer these checks when relevant:
-  - `pnpm --filter @opencode-dashboard/shared build`
-  - `pnpm --filter @opencode-dashboard/web typecheck`
-  - `pnpm --filter @opencode-dashboard/bff typecheck`
-  - `pnpm --filter @opencode-dashboard/web build`
+After any non-trivial change (refactor, feature, dependency update), run the full verification pipeline in order. Do not claim completion until all steps pass.
+
+### 1. Build all packages
+
+Ensure every package compiles without errors:
+
+```bash
+pnpm build
+```
+
+For shared type changes, rebuild `@opencode-dashboard/shared` first:
+
+```bash
+pnpm --filter @opencode-dashboard/shared build
+```
+
+### 2. Typecheck
+
+```bash
+pnpm typecheck
+```
+
+Or individually:
+
+```bash
+pnpm --filter @opencode-dashboard/web typecheck
+pnpm --filter @opencode-dashboard/bff typecheck
+```
+
+### 3. Lint & Format
+
+```bash
+pnpm lint
+pnpm format:check
+```
+
+### 4. Tests
+
+```bash
+pnpm test
+```
+
+### 5. Daemon smoke test
+
+The daemon runs the production build (BFF serves the static web dist). After `pnpm build` succeeds, verify the daemon starts and responds correctly:
+
+```bash
+pnpm daemon:restart
+curl -sf http://127.0.0.1:8787 -o /dev/null
+```
+
+If the daemon fails to start, check `logs/bff-error.log` for the root cause. Clean up after verification:
+
+```bash
+pnpm daemon:stop
+```
+
+### Quick checklist
+
+For every non-trivial change, confirm all of the following before reporting done:
+
+- [ ] `pnpm build` — all packages compile
+- [ ] `pnpm typecheck` — no type errors
+- [ ] `pnpm lint` — no lint errors
+- [ ] `pnpm format:check` — formatting is consistent
+- [ ] `pnpm test` — all tests pass
+- [ ] `pnpm daemon:start` + health check — daemon runs and serves the app
 
 ---
 

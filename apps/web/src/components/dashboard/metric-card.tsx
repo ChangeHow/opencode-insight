@@ -16,7 +16,9 @@ export function MetricCard({ eyebrow, value, detail }: MetricCardProps) {
           <ArrowUpRight className="size-4" />
         </div>
         <div className="space-y-2">
-          <p className="font-[Newsreader_Variable] text-4xl leading-none text-[var(--foreground)] sm:text-5xl">{value}</p>
+          <p className="font-[Newsreader_Variable] text-4xl leading-none text-[var(--foreground)] sm:text-5xl">
+            {value}
+          </p>
           <p className="max-w-[18rem] text-sm leading-6 text-[var(--muted-foreground)]">{detail}</p>
         </div>
       </CardContent>

@@ -53,7 +53,11 @@ export function formatDateKey(year: number, month: number, day: number) {
 export function formatDateInTimeZone(value: Date | number, timeZone: string) {
   const date = value instanceof Date ? value : new Date(value);
   const parts = getFormatter(timeZone).formatToParts(date);
-  return formatDateKey(Number(getPart(parts, "year")), Number(getPart(parts, "month")), Number(getPart(parts, "day")));
+  return formatDateKey(
+    Number(getPart(parts, "year")),
+    Number(getPart(parts, "month")),
+    Number(getPart(parts, "day")),
+  );
 }
 
 export function formatCalendarDate(value: Date) {
@@ -71,7 +75,11 @@ export function parseDateKey(value: string) {
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day, 12));
 
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
     return null;
   }
 
@@ -125,7 +133,10 @@ export function startOfDateKeyYear(value: string) {
   return formatDateKey(parts.year, 1, 1);
 }
 
-export function getPresetDateRange(range: TimeRange, options?: { now?: Date | number; timeZone?: string }) {
+export function getPresetDateRange(
+  range: TimeRange,
+  options?: { now?: Date | number; timeZone?: string },
+) {
   const now = options?.now ?? new Date();
   const timeZone = options?.timeZone ?? getCurrentTimeZone();
   const end = formatDateInTimeZone(now, timeZone);
@@ -150,7 +161,11 @@ export function getDateKeyWeekday(value: string) {
   return date ? date.getUTCDay() : 0;
 }
 
-export function formatDateLabelInTimeZone(value: string, options: Intl.DateTimeFormatOptions, timeZone?: string) {
+export function formatDateLabelInTimeZone(
+  value: string,
+  options: Intl.DateTimeFormatOptions,
+  timeZone?: string,
+) {
   const date = dateKeyToUtcNoon(value);
   if (!date) {
     return null;

@@ -5,9 +5,9 @@ vi.mock("../components/dashboard/provider-icon.js", () => ({
   ProviderIcon: ({ providerId }: { providerId: string }) => <span>{providerId}</span>,
 }));
 
-import { ProviderDetailSheet } from "../components/dashboard/provider-detail-sheet.js";
-import { ProviderInsightsPage } from "../components/dashboard/provider-insights-page.js";
-import { makeProviderDashboardPayload, makeProviderInsight } from "./factories.js";
+import { ProviderDetailSheet } from "../components/dashboard/provider-detail-sheet";
+import { ProviderInsightsPage } from "../components/dashboard/provider-insights-page";
+import { makeProviderDashboardPayload, makeProviderInsight } from "./factories";
 
 describe("Provider detail surfaces", () => {
   test("renders provider detail content inside the sheet", () => {

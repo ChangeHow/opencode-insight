@@ -13,10 +13,10 @@ function useStuck(): [React.RefObject<HTMLDivElement | null>, boolean] {
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
-      ([e]) => setStuck(e.intersectionRatio < 1),
-      { threshold: [1], rootMargin: "0px 0px -1px 0px" },
-    );
+    const observer = new IntersectionObserver(([e]) => setStuck(e.intersectionRatio < 1), {
+      threshold: [1],
+      rootMargin: "0px 0px -1px 0px",
+    });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
@@ -36,7 +36,13 @@ export function DashboardPageLayout({
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       {header}
-      <section className={variant === "wide" ? "w-full space-y-8 pb-10 lg:pb-14" : "mx-auto max-w-7xl space-y-6 pb-8 lg:pb-10"}>
+      <section
+        className={
+          variant === "wide"
+            ? "w-full space-y-8 pb-10 lg:pb-14"
+            : "mx-auto max-w-7xl space-y-6 pb-8 lg:pb-10"
+        }
+      >
         {children}
       </section>
     </main>
@@ -50,9 +56,7 @@ export function StickyHeaderShell({ children }: { children: ReactNode }) {
       <div
         className={`w-full bg-[color-mix(in_oklch,var(--background)_82%,transparent)]/90 backdrop-blur-xl transition-shadow duration-200 supports-[backdrop-filter]:bg-[color-mix(in_oklch,var(--background)_72%,transparent)]${stuck ? " shadow-[0_1px_3px_var(--header-shadow-color),0_8px_24px_var(--header-shadow-color)]" : ""}`}
       >
-        <div className="mx-auto max-w-7xl px-6 pt-2.5 pb-2 sm:px-8 lg:px-10">
-          {children}
-        </div>
+        <div className="mx-auto max-w-7xl px-6 pt-2.5 pb-2 sm:px-8 lg:px-10">{children}</div>
       </div>
     </div>
   );
@@ -108,7 +112,12 @@ export function DetailStickyHeader({
           {title}
         </p>
         <div className="relative z-10 flex shrink-0 items-center gap-2">
-          <HeaderRefreshButton canRefresh={canRefresh} refreshing={refreshing} disabledReason={refreshDisabledReason} onRefresh={handleRefreshClick} />
+          <HeaderRefreshButton
+            canRefresh={canRefresh}
+            refreshing={refreshing}
+            disabledReason={refreshDisabledReason}
+            onRefresh={handleRefreshClick}
+          />
           <ThemeToggleButton theme={theme} onChange={onThemeChange} />
         </div>
       </div>

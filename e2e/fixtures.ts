@@ -61,19 +61,21 @@ export function makeMockSummary(): DashboardSummary {
 
 export function makeMockHeatmap(): HeatmapDay[] {
   const days: HeatmapDay[] = [];
-  
+
   for (let i = 6; i >= 0; i--) {
     const date = getRelativeDate(-i);
     const dateObj = new Date(date);
     const weekday = dateObj.getDay();
     const firstDayOfYear = new Date(dateObj.getFullYear(), 0, 1);
-    const daysSinceStart = Math.floor((dateObj.getTime() - firstDayOfYear.getTime()) / (1000 * 60 * 60 * 24));
+    const daysSinceStart = Math.floor(
+      (dateObj.getTime() - firstDayOfYear.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const weekIndex = Math.floor(daysSinceStart / 7);
-    
+
     const tokens = 8000 + Math.floor(Math.random() * 12000);
     const cost = tokens * 0.00003;
     const messages = Math.floor(tokens / 800);
-    
+
     days.push({
       date,
       weekday,
@@ -88,22 +90,22 @@ export function makeMockHeatmap(): HeatmapDay[] {
         cacheWrite: Math.floor(tokens * 0.02),
         reasoning: 0,
       },
-      intensity: (Math.min(4, Math.floor(tokens / 5000)) as 0 | 1 | 2 | 3 | 4),
+      intensity: Math.min(4, Math.floor(tokens / 5000)) as 0 | 1 | 2 | 3 | 4,
     });
   }
-  
+
   return days;
 }
 
 export function makeMockTrend(): TrendPoint[] {
   const points: TrendPoint[] = [];
-  
+
   for (let i = 6; i >= 0; i--) {
     const date = getRelativeDate(-i);
     const tokens = 8000 + Math.floor(Math.random() * 12000);
     const cost = tokens * 0.00003;
     const messages = Math.floor(tokens / 800);
-    
+
     points.push({
       date,
       tokens,
@@ -111,13 +113,13 @@ export function makeMockTrend(): TrendPoint[] {
       messages,
     });
   }
-  
+
   return points;
 }
 
 export function makeMockSeries(): CostSeriesPayload {
   const trendPoints = makeMockTrend();
-  
+
   const options: CostSeriesOption[] = [
     {
       key: "anthropic/claude-3-5-sonnet-20241022",
@@ -133,7 +135,7 @@ export function makeMockSeries(): CostSeriesPayload {
       label: "GPT-4o",
       providerId: "openai",
       modelId: "gpt-4o",
-      totalCost: 2.50,
+      totalCost: 2.5,
       totalTokens: 80000,
       totalMessages: 100,
     },
@@ -142,30 +144,30 @@ export function makeMockSeries(): CostSeriesPayload {
       label: "Claude 3.5 Haiku",
       providerId: "anthropic",
       modelId: "claude-3-5-haiku-20241022",
-      totalCost: 1.00,
+      totalCost: 1.0,
       totalTokens: 20000,
       totalMessages: 40,
     },
   ];
-  
-  const lines: CostSeriesLine[] = options.map(option => ({
+
+  const lines: CostSeriesLine[] = options.map((option) => ({
     key: option.key,
     label: option.label,
     providerId: option.providerId,
     modelId: option.modelId,
-    points: trendPoints.map(point => ({
+    points: trendPoints.map((point) => ({
       ...point,
       cost: point.cost * (option.totalCost / 8.75),
       tokens: Math.floor(point.tokens * (option.totalTokens / 250000)),
     })),
   }));
-  
+
   return { options, lines };
 }
 
 export function makeMockProviders(): ProviderInsightsPayload {
   const trendPoints = makeMockTrend();
-  
+
   return {
     providers: [
       {
@@ -182,7 +184,7 @@ export function makeMockProviders(): ProviderInsightsPayload {
           tokens: 150000,
           cost: 5.25,
         },
-        trend: trendPoints.map(point => ({
+        trend: trendPoints.map((point) => ({
           ...point,
           cost: point.cost * 0.7,
           tokens: Math.floor(point.tokens * 0.68),
@@ -190,7 +192,7 @@ export function makeMockProviders(): ProviderInsightsPayload {
       },
       {
         providerId: "openai",
-        totalCost: 2.50,
+        totalCost: 2.5,
         totalTokens: 80000,
         pricedTokens: 80000,
         pricingCoverage: 1.0,
@@ -200,9 +202,9 @@ export function makeMockProviders(): ProviderInsightsPayload {
         topModel: {
           modelId: "gpt-4o",
           tokens: 80000,
-          cost: 2.50,
+          cost: 2.5,
         },
-        trend: trendPoints.map(point => ({
+        trend: trendPoints.map((point) => ({
           ...point,
           cost: point.cost * 0.3,
           tokens: Math.floor(point.tokens * 0.32),
@@ -237,7 +239,7 @@ export function makeMockDayBreakdown(date: string): DayBreakdown {
     cacheWrite: 200,
     reasoning: 0,
   };
-  
+
   const models: ModelBreakdown[] = [
     {
       modelId: "claude-3-5-sonnet-20241022",
@@ -270,7 +272,7 @@ export function makeMockDayBreakdown(date: string): DayBreakdown {
       },
     },
   ];
-  
+
   return {
     date,
     tokens,

@@ -27,8 +27,13 @@ export function makeTokenBreakdown(overrides?: Partial<TokenBreakdown>): TokenBr
 
 export function makeModelBreakdown(overrides?: Partial<ModelBreakdown>): ModelBreakdown {
   const breakdown = makeTokenBreakdown();
-  const tokens = breakdown.input + breakdown.output + breakdown.cacheRead + breakdown.cacheWrite + breakdown.reasoning;
-  
+  const tokens =
+    breakdown.input +
+    breakdown.output +
+    breakdown.cacheRead +
+    breakdown.cacheWrite +
+    breakdown.reasoning;
+
   return {
     modelId: "claude-3-5-sonnet-20241022",
     providerId: "anthropic",
@@ -44,7 +49,7 @@ export function makeModelBreakdown(overrides?: Partial<ModelBreakdown>): ModelBr
 export function makeDayBreakdown(date?: string, overrides?: Partial<DayBreakdown>): DayBreakdown {
   const defaultDate = date ?? "2025-01-15";
   const model = makeModelBreakdown();
-  
+
   return {
     date: defaultDate,
     tokens: model.tokens,
@@ -58,7 +63,10 @@ export function makeDayBreakdown(date?: string, overrides?: Partial<DayBreakdown
   };
 }
 
-export function makeSessionBreakdown(sessionId?: string, overrides?: Partial<SessionBreakdown>): SessionBreakdown {
+export function makeSessionBreakdown(
+  sessionId?: string,
+  overrides?: Partial<SessionBreakdown>,
+): SessionBreakdown {
   const id = sessionId ?? "ses_123";
   const model = makeModelBreakdown();
 
@@ -80,14 +88,21 @@ export function makeSessionBreakdown(sessionId?: string, overrides?: Partial<Ses
 export function makeHeatmapDay(date?: string, overrides?: Partial<HeatmapDay>): HeatmapDay {
   const defaultDate = date ?? "2025-01-15";
   const breakdown = makeTokenBreakdown();
-  const tokens = breakdown.input + breakdown.output + breakdown.cacheRead + breakdown.cacheWrite + breakdown.reasoning;
-  
+  const tokens =
+    breakdown.input +
+    breakdown.output +
+    breakdown.cacheRead +
+    breakdown.cacheWrite +
+    breakdown.reasoning;
+
   const dateObj = new Date(`${defaultDate}T00:00:00.000Z`);
   const weekday = dateObj.getUTCDay();
   const firstDayOfYear = new Date(dateObj.getUTCFullYear(), 0, 1);
-  const daysSinceStart = Math.floor((dateObj.getTime() - firstDayOfYear.getTime()) / (1000 * 60 * 60 * 24));
+  const daysSinceStart = Math.floor(
+    (dateObj.getTime() - firstDayOfYear.getTime()) / (1000 * 60 * 60 * 24),
+  );
   const weekIndex = Math.floor(daysSinceStart / 7);
-  
+
   return {
     date: defaultDate,
     weekday,
@@ -103,7 +118,7 @@ export function makeHeatmapDay(date?: string, overrides?: Partial<HeatmapDay>): 
 
 export function makeTrendPoint(date?: string, overrides?: Partial<TrendPoint>): TrendPoint {
   const defaultDate = date ?? "2025-01-15";
-  
+
   return {
     date: defaultDate,
     tokens: 6500,
@@ -163,10 +178,7 @@ export function makeCostSeriesLine(overrides?: Partial<CostSeriesLine>): CostSer
     label: "Claude 3.5 Sonnet",
     providerId: "anthropic",
     modelId: "claude-3-5-sonnet-20241022",
-    points: [
-      makeTrendPoint("2025-01-15"),
-      makeTrendPoint("2025-01-16"),
-    ],
+    points: [makeTrendPoint("2025-01-15"), makeTrendPoint("2025-01-16")],
     ...overrides,
   };
 }
@@ -186,10 +198,7 @@ export function makeProviderInsight(overrides?: Partial<ProviderInsight>): Provi
       tokens: 50000,
       cost: 1.2,
     },
-    trend: [
-      makeTrendPoint("2025-01-15"),
-      makeTrendPoint("2025-01-16"),
-    ],
+    trend: [makeTrendPoint("2025-01-15"), makeTrendPoint("2025-01-16")],
     ...overrides,
   };
 }
@@ -202,16 +211,24 @@ export function makeCostSeriesPayload(overrides?: Partial<CostSeriesPayload>): C
   };
 }
 
-export function makeProviderInsightsPayload(overrides?: Partial<ProviderInsightsPayload>): ProviderInsightsPayload {
+export function makeProviderInsightsPayload(
+  overrides?: Partial<ProviderInsightsPayload>,
+): ProviderInsightsPayload {
   return {
     providers: [makeProviderInsight()],
     ...overrides,
   };
 }
 
-export function makeProviderDashboardPayload(overrides?: Partial<ProviderDashboardPayload>): ProviderDashboardPayload {
+export function makeProviderDashboardPayload(
+  overrides?: Partial<ProviderDashboardPayload>,
+): ProviderDashboardPayload {
   const provider = makeProviderInsight();
-  const summary = makeDashboardSummary({ totalCost: provider.totalCost, totalTokens: provider.totalTokens, totalMessages: provider.totalMessages });
+  const summary = makeDashboardSummary({
+    totalCost: provider.totalCost,
+    totalTokens: provider.totalTokens,
+    totalMessages: provider.totalMessages,
+  });
   const series = makeCostSeriesPayload({
     options: [makeCostSeriesOption({ providerId: provider.providerId })],
     lines: [makeCostSeriesLine({ providerId: provider.providerId })],

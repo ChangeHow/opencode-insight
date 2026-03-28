@@ -4,8 +4,9 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("../pricing.js", async () => {
-  const actual = await vi.importActual<typeof import("../pricing.js")>("../pricing.js");
+vi.mock("../services/pricing.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("../services/pricing.js")>("../services/pricing.js");
   return {
     ...actual,
     getPricingDataset: vi.fn(async () => ({
@@ -17,7 +18,7 @@ vi.mock("../pricing.js", async () => {
   };
 });
 
-import { loadUsageSnapshot } from "../usage.js";
+import { loadUsageSnapshot } from "../services/usage/index";
 
 const SNAPSHOT_CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const originalOpencodeDataDir = process.env.OPENCODE_DATA_DIR;

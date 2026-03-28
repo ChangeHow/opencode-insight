@@ -15,7 +15,11 @@ function buildTokenBreakdown(breakdown: TokenBreakdown) {
     { label: "Input", value: breakdown.input, color: TOKEN_COLORS.input },
     { label: "Output", value: breakdown.output, color: TOKEN_COLORS.output },
     { label: "Reasoning", value: breakdown.reasoning, color: TOKEN_COLORS.reasoning },
-    { label: "Cache", value: breakdown.cacheRead + breakdown.cacheWrite, color: TOKEN_COLORS.cache },
+    {
+      label: "Cache",
+      value: breakdown.cacheRead + breakdown.cacheWrite,
+      color: TOKEN_COLORS.cache,
+    },
   ].filter((item) => item.value > 0);
 }
 
@@ -43,7 +47,14 @@ export function TokenBreakdownPanel({
         <div className="h-52 min-w-0 flex-1">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={tokenBreakdown} dataKey="value" nameKey="label" innerRadius={52} outerRadius={92} paddingAngle={2}>
+              <Pie
+                data={tokenBreakdown}
+                dataKey="value"
+                nameKey="label"
+                innerRadius={52}
+                outerRadius={92}
+                paddingAngle={2}
+              >
                 {tokenBreakdown.map((entry) => (
                   <Cell key={entry.label} fill={entry.color} />
                 ))}
@@ -65,9 +76,13 @@ export function TokenBreakdownPanel({
             <div key={entry.label} className="ui-pill-card">
               <div className="flex items-center gap-2">
                 <span className="size-2.5 rounded-full" style={{ background: entry.color }} />
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">{entry.label}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                  {entry.label}
+                </span>
               </div>
-              <p className="mt-1.5 text-base font-semibold text-[var(--foreground)]">{formatCompactNumber(entry.value)}</p>
+              <p className="mt-1.5 text-base font-semibold text-[var(--foreground)]">
+                {formatCompactNumber(entry.value)}
+              </p>
             </div>
           ))}
         </div>

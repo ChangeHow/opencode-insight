@@ -1,7 +1,10 @@
 import { Layers3, Pin } from "lucide-react";
 import type { DayBreakdown } from "@opencode-dashboard/shared";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
-import { CostByModelPanel, ModelTokenSharePanel } from "@/components/dashboard/model-breakdown-panels";
+import {
+  CostByModelPanel,
+  ModelTokenSharePanel,
+} from "@/components/dashboard/model-breakdown-panels";
 import { PinnedPlaceholderPanel } from "@/components/dashboard/pinned-placeholder-panel";
 import { HorizontalPanelRail } from "@/components/dashboard/horizontal-panel-rail";
 import { TokenBreakdownPanel } from "@/components/dashboard/token-breakdown-panel";
@@ -9,17 +12,33 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatCompactNumber, formatCurrency, formatLongDateLabel } from "@/lib/format";
 
-export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; loading: boolean }) {
+export function DayBreakdownPanel({
+  day,
+  loading,
+}: {
+  day: DayBreakdown | null;
+  loading: boolean;
+}) {
   if (loading) {
-    return <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10"><div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">Loading day detail...</div></div>;
+    return (
+      <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10">
+        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">
+          Loading day detail...
+        </div>
+      </div>
+    );
   }
 
   if (!day) {
-    return <div className="mx-6 rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)] sm:mx-8 lg:mx-10">Select a day to inspect model mix, message count, and token split.</div>;
+    return (
+      <div className="mx-6 rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)] sm:mx-8 lg:mx-10">
+        Select a day to inspect model mix, message count, and token split.
+      </div>
+    );
   }
 
   const costByModel = [...day.models]
-    .sort((left, right) => right.cost - left.cost)
+    .toSorted((left, right) => right.cost - left.cost)
     .slice(0, 6)
     .map((model) => ({
       label: `${model.providerId} / ${model.modelId}`,
@@ -30,7 +49,7 @@ export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; 
     }));
 
   const modelTokenMix = [...day.models]
-    .sort((left, right) => right.cost - left.cost)
+    .toSorted((left, right) => right.cost - left.cost)
     .slice(0, 6)
     .map((model) => {
       const cache = model.breakdown.cacheRead + model.breakdown.cacheWrite;
@@ -60,9 +79,12 @@ export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; 
                 <Badge variant="muted">Detail view</Badge>
               </div>
               <div>
-                <h2 className="text-3xl font-bold tracking-[-0.02em] text-[var(--foreground)]">{formatLongDateLabel(day.date)}</h2>
+                <h2 className="text-3xl font-bold tracking-[-0.02em] text-[var(--foreground)]">
+                  {formatLongDateLabel(day.date)}
+                </h2>
                 <p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">
-                  {formatCompactNumber(day.tokens)} tokens across {day.messages} assistant messages, with {formatCurrency(day.cost)} in estimated spend.
+                  {formatCompactNumber(day.tokens)} tokens across {day.messages} assistant messages,
+                  with {formatCurrency(day.cost)} in estimated spend.
                 </p>
               </div>
             </div>
@@ -77,12 +99,12 @@ export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; 
       </div>
 
       <HorizontalPanelRail contentClassName="h-[26rem] gap-6 px-6 sm:px-8 lg:px-10">
-          <TokenBreakdownPanel breakdown={day.breakdown} />
+        <TokenBreakdownPanel breakdown={day.breakdown} />
 
-          <CostByModelPanel eyebrow="Pinned spend" entries={costByModel} />
+        <CostByModelPanel eyebrow="Pinned spend" entries={costByModel} />
 
-          <ModelTokenSharePanel eyebrow="Pinned share" entries={modelTokenMix} />
-          <PinnedPlaceholderPanel />
+        <ModelTokenSharePanel eyebrow="Pinned share" entries={modelTokenMix} />
+        <PinnedPlaceholderPanel />
       </HorizontalPanelRail>
 
       <div className="px-6 sm:px-8 lg:px-10">
@@ -92,12 +114,17 @@ export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; 
               <Layers3 className="size-3.5" />
               Model ledger
             </p>
-            <h3 className="text-xl font-semibold text-[var(--foreground)]">Provider and model detail</h3>
+            <h3 className="text-xl font-semibold text-[var(--foreground)]">
+              Provider and model detail
+            </h3>
           </div>
           <Separator className="mt-4" />
           <div className="mt-5 space-y-3">
             {day.models.map((model) => (
-              <div key={`${model.providerId}-${model.modelId}`} className="grid gap-3 rounded-[22px] border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+              <div
+                key={`${model.providerId}-${model.modelId}`}
+                className="grid gap-3 rounded-[22px] border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:grid-cols-[1.4fr_1fr_1fr_1fr]"
+              >
                 <div>
                   <p className="font-semibold text-[var(--foreground)]">{model.modelId}</p>
                   <p className="mt-1">
@@ -119,7 +146,9 @@ export function DayBreakdownPanel({ day, loading }: { day: DayBreakdown | null; 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+        {label}
+      </p>
       <p className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">{value}</p>
     </div>
   );
