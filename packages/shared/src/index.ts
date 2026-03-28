@@ -141,6 +141,10 @@ export interface DashboardPayload {
   selectedDay: DayBreakdown | null;
 }
 
+export interface ProviderDashboardPayload extends DashboardPayload {
+  provider: ProviderInsight | null;
+}
+
 export interface ApiErrorPayload {
   error: string;
 }
