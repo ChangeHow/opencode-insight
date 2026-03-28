@@ -2,6 +2,7 @@ import fs from "node:fs";
 import type { TokenBreakdown } from "@opencode-dashboard/shared";
 import { formatDateInTimeZone, DEFAULT_TIME_ZONE } from "@opencode-dashboard/shared";
 import { logger } from "../../logger";
+import { querySqliteRows } from "../sqlite";
 import type { RawMessage } from "./types";
 
 const SQLITE_USAGE_QUERY = `
@@ -23,15 +24,6 @@ interface SqliteUsageRow {
   session_title: string;
   session_slug: string | null;
   session_directory: string;
-}
-
-interface NodeSqliteDatabase {
-  prepare: <BindParameters extends unknown[], Result>(
-    sql: string,
-  ) => {
-    all: (...params: BindParameters) => Result[];
-  };
-  close: () => void;
 }
 
 export function emptyBreakdown(): TokenBreakdown {
@@ -133,63 +125,21 @@ function parseUsageRows(rows: SqliteUsageRow[]) {
     .filter((item): item is RawMessage => item !== null);
 }
 
-function isBunRuntime() {
-  return "Bun" in globalThis;
-}
-
-async function readSqliteMessagesWithBun(dbPath: string) {
-  let db: {
-    query: (sql: string) => { all: () => SqliteUsageRow[] };
-    close: () => void;
-  } | null = null;
-
-  try {
-    const { Database: BunDatabase } = (await new Function("return import('bun:sqlite')")()) as {
-      Database: new (path: string) => {
-        query: (sql: string) => { all: () => SqliteUsageRow[] };
-        close: () => void;
-      };
-    };
-
-    db = new BunDatabase(dbPath);
-    return parseUsageRows(db.query(SQLITE_USAGE_QUERY).all());
-  } catch (err) {
-    logger.error({ err, dbPath }, "Failed to read sqlite usage messages");
-    return [] as RawMessage[];
-  } finally {
-    db?.close();
-  }
-}
-
-async function readSqliteMessagesWithNode(dbPath: string) {
-  let db: NodeSqliteDatabase | null = null;
-  try {
-    const { default: BetterSqlite3 } = (await import("better-sqlite3")) as {
-      default: new (
-        path: string,
-        options: { readonly: boolean; fileMustExist: boolean },
-      ) => NodeSqliteDatabase;
-    };
-
-    db = new BetterSqlite3(dbPath, { readonly: true, fileMustExist: true });
-    const rows = db.prepare<[], SqliteUsageRow>(SQLITE_USAGE_QUERY).all();
-    return parseUsageRows(rows);
-  } catch (err) {
-    logger.error({ err, dbPath }, "Failed to read sqlite usage messages");
-    return [] as RawMessage[];
-  } finally {
-    db?.close();
-  }
-}
-
 export async function readSqliteMessages(dbPath: string) {
   if (!fs.existsSync(dbPath)) {
     return [] as RawMessage[];
   }
 
-  if (isBunRuntime()) {
-    return readSqliteMessagesWithBun(dbPath);
+  try {
+    const rows = await querySqliteRows<SqliteUsageRow>(
+      dbPath,
+      SQLITE_USAGE_QUERY,
+      [],
+      "Failed to read sqlite usage messages",
+    );
+    return parseUsageRows(rows);
+  } catch (err) {
+    logger.error({ err, dbPath }, "Failed to read sqlite usage messages");
+    return [] as RawMessage[];
   }
-
-  return readSqliteMessagesWithNode(dbPath);
 }

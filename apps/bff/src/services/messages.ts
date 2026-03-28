@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
 import type {
   MessageDetail,
   MessageDistributionPayload,
@@ -10,12 +9,38 @@ import type {
   MessagePartReasoning,
   MessagePartText,
   MessagePartTool,
-  MessageTokenPoint,
   TimelinePoint,
   TokenBreakdown,
   ToolUsageStat,
 } from "@opencode-dashboard/shared";
-import { logger } from "../logger";
+import { querySqliteRows } from "./sqlite";
+
+export interface RawMessageRow {
+  id: string;
+  data: string;
+  session_id: string;
+}
+
+export interface RawPartRow {
+  id: string;
+  message_id: string;
+  data: string;
+}
+
+const MESSAGE_QUERY = `
+  SELECT m.id, m.data, m.session_id
+  FROM message m
+  WHERE m.session_id = ?
+  ORDER BY m.time_created ASC
+`;
+
+const PART_QUERY = `
+  SELECT p.id, p.message_id, p.data
+  FROM part p
+  WHERE p.session_id = ?
+    AND json_extract(p.data, '$.type') IN ('text', 'tool', 'reasoning')
+  ORDER BY p.time_created ASC
+`;
 
 // ---------- path helper (mirrors usage.ts) ----------
 
@@ -28,18 +53,6 @@ export function getDbPath(): string {
 }
 
 // ---------- internal raw types from sqlite ----------
-
-interface RawMessageRow {
-  id: string;
-  data: string;
-  session_id: string;
-}
-
-interface RawPartRow {
-  id: string;
-  message_id: string;
-  data: string;
-}
 
 interface ParsedMessageData {
   role?: string;
@@ -146,49 +159,6 @@ export function invalidateMessagePayloadCache() {
   messagePayloadCache.clear();
 }
 
-// ---------- sqlite queries ----------
-
-function queryMessages(dbPath: string, sessionId: string): RawMessageRow[] {
-  if (!fs.existsSync(dbPath)) return [];
-  let db: Database.Database | null = null;
-  try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    const stmt = db.prepare<[string], RawMessageRow>(`
-      SELECT m.id, m.data, m.session_id
-      FROM message m
-      WHERE m.session_id = ?
-      ORDER BY m.time_created ASC
-    `);
-    return stmt.all(sessionId);
-  } catch (err) {
-    logger.error({ err, dbPath, sessionId }, "Failed to query messages");
-    return [];
-  } finally {
-    db?.close();
-  }
-}
-
-function queryParts(dbPath: string, sessionId: string): RawPartRow[] {
-  if (!fs.existsSync(dbPath)) return [];
-  let db: Database.Database | null = null;
-  try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true });
-    const stmt = db.prepare<[string], RawPartRow>(`
-      SELECT p.id, p.message_id, p.data
-      FROM part p
-      WHERE p.session_id = ?
-        AND json_extract(p.data, '$.type') IN ('text', 'tool', 'reasoning')
-      ORDER BY p.time_created ASC
-    `);
-    return stmt.all(sessionId);
-  } catch (err) {
-    logger.error({ err, dbPath, sessionId }, "Failed to query parts");
-    return [];
-  } finally {
-    db?.close();
-  }
-}
-
 // ---------- parsers ----------
 
 function parsePart(row: RawPartRow): MessagePart | null {
@@ -267,14 +237,18 @@ function parseMessage(row: RawMessageRow, parts: MessagePart[]): MessageDetail |
 
 // ---------- public payload builders ----------
 
-export function buildMessagePayloads(
+export async function buildMessagePayloads(
   dbPath: string,
   sessionId: string,
-): {
+  source?: {
+    queryMessages?: (dbPath: string, sessionId: string) => Promise<RawMessageRow[]>;
+    queryParts?: (dbPath: string, sessionId: string) => Promise<RawPartRow[]>;
+  },
+): Promise<{
   overview: MessageOverviewPayload;
   distribution: MessageDistributionPayload;
   listFn: (page: number, pageSize: number) => MessageListPayload;
-} {
+}> {
   const now = Date.now();
   pruneMessagePayloadCache(now);
 
@@ -288,10 +262,30 @@ export function buildMessagePayloads(
     };
   }
 
-  const rawMessages = queryMessages(dbPath, sessionId);
-  const rawParts = queryParts(dbPath, sessionId);
+  const messageQuery =
+    source?.queryMessages ??
+    ((databasePath: string, currentSessionId: string) =>
+      querySqliteRows<RawMessageRow>(
+        databasePath,
+        MESSAGE_QUERY,
+        [currentSessionId],
+        "Failed to query messages",
+      ));
+  const partQuery =
+    source?.queryParts ??
+    ((databasePath: string, currentSessionId: string) =>
+      querySqliteRows<RawPartRow>(
+        databasePath,
+        PART_QUERY,
+        [currentSessionId],
+        "Failed to query parts",
+      ));
 
-  // group parts by message id
+  const [rawMessages, rawParts] = await Promise.all([
+    messageQuery(dbPath, sessionId),
+    partQuery(dbPath, sessionId),
+  ]);
+
   const partsByMessage = new Map<string, MessagePart[]>();
   for (const row of rawParts) {
     const part = parsePart(row);
@@ -301,7 +295,6 @@ export function buildMessagePayloads(
     partsByMessage.set(row.message_id, list);
   }
 
-  // parse messages (all roles, for timeline/distribution we need user too)
   const allMessages: MessageDetail[] = [];
   for (const row of rawMessages) {
     const parts = partsByMessage.get(row.id) ?? [];
@@ -310,8 +303,6 @@ export function buildMessagePayloads(
   }
 
   const total = allMessages.length;
-
-  // ---------- overview ----------
   const timeline: TimelinePoint[] = [];
   const toolCountMap = new Map<string, { count: number; totalTokens: number }>();
   let cumulativeTokens = 0;
@@ -333,7 +324,6 @@ export function buildMessagePayloads(
       cumulativeCost,
     });
 
-    // count tool calls in this message's parts
     for (const part of msg.parts) {
       if (part.type !== "tool") continue;
       const entry = toolCountMap.get(part.toolName) ?? { count: 0, totalTokens: 0 };
@@ -348,25 +338,23 @@ export function buildMessagePayloads(
     .toSorted((a, b) => b.count - a.count || b.totalTokens - a.totalTokens);
 
   const overview: MessageOverviewPayload = { timeline, toolUsage, totalMessages: total };
+  const distribution: MessageDistributionPayload = {
+    points: allMessages.map((msg, i) => ({
+      messageIndex: i,
+      messageId: msg.id,
+      role: msg.role,
+      modelId: msg.modelId,
+      providerId: msg.providerId,
+      tokens: msg.tokens,
+    })),
+    totalMessages: total,
+  };
 
-  // ---------- distribution ----------
-  const points: MessageTokenPoint[] = allMessages.map((msg, i) => ({
-    messageIndex: i,
-    messageId: msg.id,
-    role: msg.role,
-    modelId: msg.modelId,
-    providerId: msg.providerId,
-    tokens: msg.tokens,
-  }));
-
-  const distribution: MessageDistributionPayload = { points, totalMessages: total };
-
-  // ---------- list (closure, lazy) ----------
-  function listFn(page: number, pageSize: number): MessageListPayload {
+  const listFn = (page: number, pageSize: number): MessageListPayload => {
     const start = page * pageSize;
     const slice = allMessages.slice(start, start + pageSize);
     return { messages: slice, total, page, pageSize };
-  }
+  };
 
   messagePayloadCache.set(cacheKey, {
     overview,

@@ -71,6 +71,8 @@ pnpm lint
 pnpm format:check
 ```
 
+Only lint errors block completion. Lint warnings may be reported separately and do not need to be fixed unless the current task touches them or the user asks for warning cleanup.
+
 ### 4. Tests
 
 ```bash

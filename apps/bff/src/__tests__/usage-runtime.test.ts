@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("../services/pricing.js", async () => {
@@ -19,6 +18,18 @@ vi.mock("../services/pricing.js", async () => {
 });
 
 import { loadUsageSnapshot } from "../services/usage/index";
+
+async function createTestDatabase(dbPath: string) {
+  const { DatabaseSync } = (await import("node:sqlite")) as {
+    DatabaseSync: new (path: string) => {
+      exec: (sql: string) => void;
+      prepare: (sql: string) => { run: (...params: unknown[]) => unknown };
+      close: () => void;
+    };
+  };
+
+  return new DatabaseSync(dbPath);
+}
 
 const SNAPSHOT_CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const originalOpencodeDataDir = process.env.OPENCODE_DATA_DIR;
@@ -44,9 +55,9 @@ describe("Usage runtime integration", () => {
     vi.clearAllMocks();
   });
 
-  test("loads assistant usage from sqlite through better-sqlite3 runtime bindings", async () => {
+  test("loads assistant usage from sqlite through runtime-native bindings", async () => {
     const dbPath = path.join(tempRoot, "opencode.db");
-    const db = new Database(dbPath);
+    const db = await createTestDatabase(dbPath);
     const createdAt = Date.UTC(2026, 2, 27, 12, 0, 0);
 
     db.exec(`

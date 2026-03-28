@@ -44,7 +44,7 @@ describe("BFF API Routes", () => {
     mockLoadUsageSnapshot.mockResolvedValue(snapshot);
     mockGetRangeData.mockReturnValue(makeRangeData());
     mockGetDateFilteredData.mockReturnValue(makeRangeData());
-    mockBuildMessagePayloads.mockReturnValue({
+    mockBuildMessagePayloads.mockResolvedValue({
       overview: { timeline: [], toolUsage: [], totalMessages: 0 },
       distribution: { points: [], totalMessages: 0 },
       listFn: (page, pageSize) => ({ messages: [], total: 0, page, pageSize }),
@@ -309,7 +309,7 @@ describe("BFF API Routes", () => {
   });
 
   test("message analytics endpoints return payloads per request", async () => {
-    mockBuildMessagePayloads.mockReturnValue({
+    mockBuildMessagePayloads.mockResolvedValue({
       overview: {
         timeline: [],
         toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }],
