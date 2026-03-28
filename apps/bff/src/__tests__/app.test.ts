@@ -1,6 +1,6 @@
 import { vi, describe, test, expect, beforeEach } from "vitest";
 import type { TimeRange } from "@opencode-dashboard/shared";
-import { makeUsageSnapshot, makeRangeData, makeDayBreakdown, makeSessionBreakdown } from "./factories.js";
+import { makeUsageSnapshot, makeRangeData, makeDayBreakdown, makeSessionBreakdown, makeProviderInsight } from "./factories.js";
 
 vi.mock("../usage.js", () => ({
   loadUsageSnapshot: vi.fn(),
@@ -147,6 +147,45 @@ describe("BFF API Routes", () => {
       const json = await res.json();
       expect(json).toEqual({
         providers: rangeData.providers,
+      });
+  });
+
+  test("GET /api/provider/:providerId returns provider-filtered dashboard payload", async () => {
+      const provider = makeProviderInsight({ providerId: "zhipu", totalCost: 12.34 });
+      const rangeData = makeRangeData({
+        providers: [provider],
+      });
+      mockGetRangeData.mockReturnValue(rangeData);
+
+      const res = await app.request("/api/provider/zhipu?range=month");
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json).toEqual({
+        provider,
+        summary: rangeData.summary,
+        heatmap: rangeData.heatmap,
+        trend: rangeData.trend,
+        series: {
+          options: rangeData.seriesOptions,
+          lines: rangeData.seriesLines,
+        },
+        providers: rangeData.providers,
+        selectedDay: null,
+      });
+      expect(mockGetRangeData).toHaveBeenCalledWith(undefined, "month", [], "UTC", "zhipu");
+  });
+
+  test("GET /api/provider/:providerId returns 404 when provider is not found", async () => {
+      const rangeData = makeRangeData({ providers: [] });
+      mockGetRangeData.mockReturnValue(rangeData);
+
+      const res = await app.request("/api/provider/missing?range=month");
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json).toEqual({
+        error: "No usage found for that provider.",
       });
   });
 

@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { resolveTimeZone } from "@opencode-dashboard/shared";
-import type { ApiErrorPayload, CostSeriesPayload, DashboardPayload, MessageAnalyticsPayload, ProviderInsightsPayload, TimeRange } from "@opencode-dashboard/shared";
+import type { ApiErrorPayload, CostSeriesPayload, DashboardPayload, MessageAnalyticsPayload, ProviderDashboardPayload, ProviderInsightsPayload, TimeRange } from "@opencode-dashboard/shared";
 import { logger, requestLogger } from "./middleware/logger.js";
 import { getMemoryLogs, getMemoryLogsStats } from "./logger.js";
 import { invalidatePricingCache } from "./pricing.js";
@@ -21,15 +21,15 @@ function parseRange(value: string | undefined): TimeRange {
   return "7d";
 }
 
-async function readData(c: Context) {
+async function readData(c: Context, providerId?: string) {
   const snapshot = await snapshotPromise;
   const start = c.req.query("start");
   const end = c.req.query("end");
   const timeZone = resolveTimeZone(c.req.query("timeZone"));
   if (start || end) {
-    return getDateFilteredData(snapshot, start, end, [], timeZone);
+    return getDateFilteredData(snapshot, start, end, [], timeZone, providerId);
   }
-  return getRangeData(snapshot, parseRange(c.req.query("range")), [], timeZone);
+  return getRangeData(snapshot, parseRange(c.req.query("range")), [], timeZone, providerId);
 }
 
 app.use("/api/*", cors());
@@ -72,6 +72,28 @@ app.get("/api/providers", async (c) => {
   const data = await readData(c);
   return c.json<ProviderInsightsPayload>({
     providers: data.providers,
+  });
+});
+
+app.get("/api/provider/:providerId", async (c) => {
+  const data = await readData(c, c.req.param("providerId"));
+  const provider = data.providers[0] ?? null;
+
+  if (!provider) {
+    return c.json<ApiErrorPayload>({ error: "No usage found for that provider." }, 404);
+  }
+
+  return c.json<ProviderDashboardPayload>({
+    provider,
+    summary: data.summary,
+    heatmap: data.heatmap,
+    trend: data.trend,
+    series: {
+      options: data.seriesOptions,
+      lines: data.seriesLines,
+    },
+    providers: data.providers,
+    selectedDay: null,
   });
 });
 

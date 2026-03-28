@@ -196,5 +196,52 @@ describe("Pricing Module", () => {
       // 10000 * 0.0000035 + 5000 * 0.0000175 = 0.035 + 0.0875 = 0.1225
       expect(result.estimatedCost).toBeCloseTo(0.1225, 5);
     });
+
+    it("should prefer zai pricing for zai-coding-plan over openrouter matches", () => {
+      const dataset = makePricingDataset({
+        "openrouter/z-ai/glm-5": {
+          input_cost_per_token: 0.0000008,
+          output_cost_per_token: 0.00000256,
+          cache_read_input_token_cost: 0,
+        },
+        "zai/glm-5": {
+          input_cost_per_token: 0.000001,
+          output_cost_per_token: 0.0000032,
+          cache_read_input_token_cost: 0.0000002,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 100000, output: 10000, cacheRead: 500000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "glm-5",
+        "zai-coding-plan",
+        usage
+      );
+
+      expect(result.priced).toBe(true);
+      expect(result.estimatedCost).toBeCloseTo(0.232, 5);
+    });
+
+    it("should price glm-5.1 using glm-5 alias for zai providers", () => {
+      const dataset = makePricingDataset({
+        "zai/glm-5": {
+          input_cost_per_token: 0.000001,
+          output_cost_per_token: 0.0000032,
+          cache_read_input_token_cost: 0.0000002,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000, cacheRead: 20000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "glm-5.1",
+        "zai-coding-plan",
+        usage
+      );
+
+      expect(result.priced).toBe(true);
+      expect(result.estimatedCost).toBeCloseTo(0.03, 5);
+    });
   });
 });

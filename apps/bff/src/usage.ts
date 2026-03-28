@@ -65,6 +65,18 @@ interface SerializedUsageSnapshot {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const SNAPSHOT_CACHE_FILE = path.join(CACHE_DIR, "usage-snapshot.json");
+const PROVIDER_ALIASES: Record<string, string> = {
+  zhipu: "zai-coding-plan",
+  glm: "zai-coding-plan",
+  zai: "zai-coding-plan",
+  "z.ai": "zai-coding-plan",
+  bigmodel: "zai-coding-plan",
+};
+
+function normalizeProviderId(providerId: string) {
+  const normalized = providerId.trim().toLowerCase();
+  return PROVIDER_ALIASES[normalized] ?? normalized;
+}
 
 function computeDataFingerprint(dbPath: string, legacyDir: string): string {
   const parts: string[] = [];
@@ -266,6 +278,15 @@ function dedupeMessages(messages: RawMessage[]) {
     }
   }
   return [...map.values()].sort((a, b) => a.timestampMs - b.timestampMs);
+}
+
+function filterMessagesByProvider(messages: RawMessage[], providerId?: string) {
+  if (!providerId) {
+    return messages;
+  }
+
+  const normalized = normalizeProviderId(providerId);
+  return messages.filter((message) => normalizeProviderId(message.providerId) === normalized);
 }
 
 async function enrichMessages(messages: RawMessage[]) {
@@ -986,9 +1007,15 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
   return snapshot;
 }
 
-export function getRangeData(snapshot: UsageSnapshot, range: TimeRange, modelKeys: string[] = [], timeZone = DEFAULT_TIME_ZONE): RangeData {
+export function getRangeData(
+  snapshot: UsageSnapshot,
+  range: TimeRange,
+  modelKeys: string[] = [],
+  timeZone = DEFAULT_TIME_ZONE,
+  providerId?: string,
+): RangeData {
   const { start, end } = getPresetBounds(range, timeZone);
-  const sourceByDate = buildDayMap(snapshot.messages, timeZone);
+  const sourceByDate = buildDayMap(filterMessagesByProvider(snapshot.messages, providerId), timeZone);
   const byDate = new Map<string, DayBreakdown>();
 
   for (const [date, breakdown] of sourceByDate.entries()) {
@@ -1014,8 +1041,15 @@ export function getRangeData(snapshot: UsageSnapshot, range: TimeRange, modelKey
   };
 }
 
-export function getDateFilteredData(snapshot: UsageSnapshot, start?: string, end?: string, modelKeys: string[] = [], timeZone = DEFAULT_TIME_ZONE): RangeData {
-  const sourceByDate = buildDayMap(snapshot.messages, timeZone);
+export function getDateFilteredData(
+  snapshot: UsageSnapshot,
+  start?: string,
+  end?: string,
+  modelKeys: string[] = [],
+  timeZone = DEFAULT_TIME_ZONE,
+  providerId?: string,
+): RangeData {
+  const sourceByDate = buildDayMap(filterMessagesByProvider(snapshot.messages, providerId), timeZone);
   const byDate = new Map<string, DayBreakdown>();
   for (const [date, breakdown] of sourceByDate.entries()) {
     if ((!start || date >= start) && (!end || date <= end)) {
