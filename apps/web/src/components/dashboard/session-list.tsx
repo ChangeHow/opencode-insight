@@ -66,7 +66,7 @@ export function SessionListPanel({
           </p>
         )}
       </div>
-      <div className="mt-5 space-y-3">
+      <div className="mt-5 max-h-[450px] overflow-y-auto space-y-3">
         {sessions.map((session) => (
           <SessionCard key={session.sessionId} date={date} session={session} />
         ))}
