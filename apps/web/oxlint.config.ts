@@ -9,6 +9,7 @@ export default defineConfig({
   rules: {
     "eq-eq-eq": "warn",
     "no-console": "off",
+    "react-in-jsx-scope": "off",
     "react/exhaustive-deps": "warn",
     "react/no-array-index-key": "off",
     "react/no-danger": "off",

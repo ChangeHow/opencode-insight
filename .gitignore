@@ -30,6 +30,7 @@ skills-lock.json
 .env.local
 .env.*.local
 .telescope-daemon.pid
+docs/plans/finished/
 
 # macOS
 .DS_Store
