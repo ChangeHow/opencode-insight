@@ -46,10 +46,17 @@ export function DateRangePicker({
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Selected range</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                Selected range
+              </p>
               <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{label}</p>
             </div>
-            <Button variant="ghost" size="sm" className="h-8 rounded-[14px] px-2.5 text-[11px]" onClick={() => onChange(getPresetDateRange(range))}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 rounded-[14px] px-2.5 text-[11px]"
+              onClick={() => onChange(getPresetDateRange(range))}
+            >
               Reset preset
             </Button>
           </div>
@@ -60,7 +67,11 @@ export function DateRangePicker({
             onSelect={(next) => {
               onChange({
                 start: next?.from ? formatCalendarDate(next.from) : "",
-                end: next?.to ? formatCalendarDate(next.to) : next?.from ? formatCalendarDate(next.from) : "",
+                end: next?.to
+                  ? formatCalendarDate(next.to)
+                  : next?.from
+                    ? formatCalendarDate(next.from)
+                    : "",
               });
             }}
             numberOfMonths={2}

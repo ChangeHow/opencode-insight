@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn } from "../lib/utils.js";
+import { cn } from "../lib/utils";
 
 describe("cn (className utility)", () => {
   it("combines class names into a single string", () => {

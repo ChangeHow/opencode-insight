@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "predev": "node ../../scripts/check-port.mjs 8787 'BFF'",
-    "dev": "PROCESS_TITLE=opencode-telescope-bff NODE_OPTIONS='--require=../../scripts/set-process-title.cjs' vite --config vite.config.ts",
-    "build": "tsc -p tsconfig.json",
+    "dev": "bun --watch src/index.ts",
+    "build": "echo 'No build needed — daemon uses bun to run TS directly'",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint src/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -17,7 +17,6 @@
     "@clack/prompts": "1.1.0",
     "@hono/node-server": "^1.14.4",
     "@opencode-dashboard/shared": "workspace:*",
-    "better-sqlite3": "^12.8.0",
     "dotenv": "^17.2.2",
     "hono": "^4.7.2",
     "pino": "^10.3.1",
@@ -26,7 +25,6 @@
   },
   "devDependencies": {
     "@hono/vite-dev-server": "^0.25.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.5.2",
     "@vitest/coverage-v8": "^4.1.1",
     "tsx": "^4.20.5",

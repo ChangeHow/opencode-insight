@@ -1,0 +1,47 @@
+import { Hono } from "hono";
+import type {
+  ApiErrorPayload,
+  CostSeriesPayload,
+  DashboardPayload,
+  ProviderInsightsPayload,
+} from "@opencode-dashboard/shared";
+import { readData } from "./shared";
+
+const dashboard = new Hono();
+
+dashboard.get("/api/summary", async (c) => c.json((await readData(c)).summary));
+dashboard.get("/api/heatmap", async (c) => c.json((await readData(c)).heatmap));
+dashboard.get("/api/trend", async (c) => c.json((await readData(c)).trend));
+
+dashboard.get("/api/series", async (c) => {
+  const data = await readData(c);
+  const requested = c.req.queries("series") ?? [];
+  const lines =
+    requested.length > 0
+      ? data.seriesLines.filter((line) => requested.includes(line.key))
+      : data.seriesLines;
+
+  return c.json<CostSeriesPayload>({
+    options: data.seriesOptions,
+    lines,
+  });
+});
+
+dashboard.get("/api/providers", async (c) => {
+  const data = await readData(c);
+  return c.json<ProviderInsightsPayload>({ providers: data.providers });
+});
+
+dashboard.get("/api/dashboard", async (c) => {
+  const data = await readData(c);
+  return c.json<DashboardPayload>({
+    summary: data.summary,
+    heatmap: data.heatmap,
+    trend: data.trend,
+    series: { options: data.seriesOptions, lines: data.seriesLines },
+    providers: data.providers,
+    selectedDay: null,
+  });
+});
+
+export { dashboard };

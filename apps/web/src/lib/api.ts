@@ -1,5 +1,20 @@
 import { getCurrentTimeZone } from "@opencode-dashboard/shared";
-import type { CostSeriesPayload, DashboardPayload, DashboardSummary, DayBreakdown, HeatmapDay, MessageAnalyticsPayload, MessageDistributionPayload, MessageListPayload, MessageOverviewPayload, ProviderDashboardPayload, ProviderInsightsPayload, SessionBreakdown, TimeRange, TrendPoint } from "@opencode-dashboard/shared";
+import type {
+  CostSeriesPayload,
+  DashboardPayload,
+  DashboardSummary,
+  DayBreakdown,
+  HeatmapDay,
+  MessageAnalyticsPayload,
+  MessageDistributionPayload,
+  MessageListPayload,
+  MessageOverviewPayload,
+  ProviderDashboardPayload,
+  ProviderInsightsPayload,
+  SessionBreakdown,
+  TimeRange,
+  TrendPoint,
+} from "@opencode-dashboard/shared";
 
 async function getJson<T>(url: string) {
   const cached = inflightJsonRequests.get(url) as Promise<T> | undefined;
@@ -65,15 +80,30 @@ export function fetchTrend(range: TimeRange, customRange?: { start: string; end:
   return getJson<TrendPoint[]>(`/api/trend${buildQuery(range, customRange)}`);
 }
 
-export function fetchDay(range: TimeRange, date: string, customRange?: { start: string; end: string }) {
+export function fetchDay(
+  range: TimeRange,
+  date: string,
+  customRange?: { start: string; end: string },
+) {
   return getJson<DayBreakdown>(`/api/day/${date}${buildQuery(range, customRange)}`);
 }
 
-export function fetchSession(range: TimeRange, date: string, sessionId: string, customRange?: { start: string; end: string }) {
-  return getJson<SessionBreakdown>(`/api/day/${date}/session/${sessionId}${buildQuery(range, customRange)}`);
+export function fetchSession(
+  range: TimeRange,
+  date: string,
+  sessionId: string,
+  customRange?: { start: string; end: string },
+) {
+  return getJson<SessionBreakdown>(
+    `/api/day/${date}/session/${sessionId}${buildQuery(range, customRange)}`,
+  );
 }
 
-export function fetchSeries(range: TimeRange, series: string[], customRange?: { start: string; end: string }) {
+export function fetchSeries(
+  range: TimeRange,
+  series: string[],
+  customRange?: { start: string; end: string },
+) {
   return getJson<CostSeriesPayload>(`/api/series${buildQuery(range, customRange, { series })}`);
 }
 
@@ -81,8 +111,14 @@ export function fetchProviders(range: TimeRange, customRange?: { start: string; 
   return getJson<ProviderInsightsPayload>(`/api/providers${buildQuery(range, customRange)}`);
 }
 
-export function fetchProviderDashboard(providerId: string, range: TimeRange, customRange?: { start: string; end: string }) {
-  return getJson<ProviderDashboardPayload>(`/api/provider/${encodeURIComponent(providerId)}${buildQuery(range, customRange)}`);
+export function fetchProviderDashboard(
+  providerId: string,
+  range: TimeRange,
+  customRange?: { start: string; end: string },
+) {
+  return getJson<ProviderDashboardPayload>(
+    `/api/provider/${encodeURIComponent(providerId)}${buildQuery(range, customRange)}`,
+  );
 }
 
 export function fetchDashboard(range: TimeRange, customRange?: { start: string; end: string }) {
@@ -101,11 +137,15 @@ export function fetchMessageOverview(date: string, sessionId: string) {
 }
 
 export function fetchMessageDistribution(date: string, sessionId: string) {
-  return getJson<MessageDistributionPayload>(`/api/day/${date}/session/${sessionId}/message/distribution`);
+  return getJson<MessageDistributionPayload>(
+    `/api/day/${date}/session/${sessionId}/message/distribution`,
+  );
 }
 
 export function fetchMessageAnalytics(date: string, sessionId: string) {
-  return getJson<MessageAnalyticsPayload>(`/api/day/${date}/session/${sessionId}/message/analytics`);
+  return getJson<MessageAnalyticsPayload>(
+    `/api/day/${date}/session/${sessionId}/message/analytics`,
+  );
 }
 
 export function fetchMessages(date: string, sessionId: string, page = 0, pageSize = 50) {

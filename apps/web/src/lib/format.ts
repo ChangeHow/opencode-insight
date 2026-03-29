@@ -21,10 +21,16 @@ export function formatDateLabel(value: string) {
     return value || "—";
   }
 
-  return formatDateLabelInTimeZone(value, {
-    month: "short",
-    day: "numeric",
-  }, getCurrentTimeZone()) ?? value;
+  return (
+    formatDateLabelInTimeZone(
+      value,
+      {
+        month: "short",
+        day: "numeric",
+      },
+      getCurrentTimeZone(),
+    ) ?? value
+  );
 }
 
 export function formatLongDateLabel(value: string) {
@@ -32,12 +38,18 @@ export function formatLongDateLabel(value: string) {
     return value || "—";
   }
 
-  return formatDateLabelInTimeZone(value, {
-    weekday: "short",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }, getCurrentTimeZone()) ?? value;
+  return (
+    formatDateLabelInTimeZone(
+      value,
+      {
+        weekday: "short",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      },
+      getCurrentTimeZone(),
+    ) ?? value
+  );
 }
 
 export function formatDateWithYearLabel(value: string) {
@@ -45,9 +57,15 @@ export function formatDateWithYearLabel(value: string) {
     return value || "—";
   }
 
-  return formatDateLabelInTimeZone(value, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }, getCurrentTimeZone()) ?? value;
+  return (
+    formatDateLabelInTimeZone(
+      value,
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      },
+      getCurrentTimeZone(),
+    ) ?? value
+  );
 }

@@ -61,9 +61,14 @@ function buildSummary(providers: ProviderInsight[]) {
   const totalTokens = providers.reduce((sum, provider) => sum + provider.totalTokens, 0);
   const totalMessages = providers.reduce((sum, provider) => sum + provider.totalMessages, 0);
   const totalPricedTokens = providers.reduce((sum, provider) => sum + provider.pricedTokens, 0);
-  const activeProviders = providers.filter((provider) => provider.totalTokens > 0 || provider.totalMessages > 0).length;
+  const activeProviders = providers.filter(
+    (provider) => provider.totalTokens > 0 || provider.totalMessages > 0,
+  ).length;
   const averageCoverage = totalTokens === 0 ? 0 : totalPricedTokens / totalTokens;
-  const topProvider = [...providers].sort((left, right) => right.totalCost - left.totalCost || right.totalTokens - left.totalTokens)[0] ?? null;
+  const topProvider =
+    [...providers].toSorted(
+      (left, right) => right.totalCost - left.totalCost || right.totalTokens - left.totalTokens,
+    )[0] ?? null;
 
   return {
     totalCost,
@@ -133,8 +138,12 @@ export function ProviderInsightsPage({
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Provider insights</p>
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--foreground)]">Provider usage summary</h1>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+          Provider insights
+        </p>
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--foreground)]">
+          Provider usage summary
+        </h1>
         <p className="text-xs text-[var(--muted-foreground)]">{rangeLabel}</p>
       </div>
 
@@ -145,9 +154,13 @@ export function ProviderInsightsPage({
               <Wallet className="size-3.5" />
               Total spend
             </p>
-            <p className="text-3xl font-semibold tracking-[-0.03em]">{formatCurrency(summary.totalCost)}</p>
+            <p className="text-3xl font-semibold tracking-[-0.03em]">
+              {formatCurrency(summary.totalCost)}
+            </p>
             <p className="text-xs text-[var(--muted-foreground)]">
-              {summary.topProvider ? `Top ${summary.topProvider.providerId}` : "No top provider yet"}
+              {summary.topProvider
+                ? `Top ${summary.topProvider.providerId}`
+                : "No top provider yet"}
             </p>
           </CardContent>
         </Card>
@@ -159,7 +172,9 @@ export function ProviderInsightsPage({
               Active providers
             </p>
             <p className="text-3xl font-semibold tracking-[-0.03em]">{summary.activeProviders}</p>
-            <p className="text-xs text-[var(--muted-foreground)]">{formatCompactNumber(summary.totalMessages)} messages in scope</p>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              {formatCompactNumber(summary.totalMessages)} messages in scope
+            </p>
           </CardContent>
         </Card>
 
@@ -169,8 +184,12 @@ export function ProviderInsightsPage({
               <Activity className="size-3.5" />
               Total tokens
             </p>
-            <p className="text-3xl font-semibold tracking-[-0.03em]">{formatCompactNumber(summary.totalTokens)}</p>
-            <p className="text-xs text-[var(--muted-foreground)]">Coverage {formatPercent(summary.averageCoverage)}</p>
+            <p className="text-3xl font-semibold tracking-[-0.03em]">
+              {formatCompactNumber(summary.totalTokens)}
+            </p>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Coverage {formatPercent(summary.averageCoverage)}
+            </p>
           </CardContent>
         </Card>
 
@@ -181,7 +200,9 @@ export function ProviderInsightsPage({
               Provider count
             </p>
             <p className="text-3xl font-semibold tracking-[-0.03em]">{providers.length}</p>
-            <p className="text-xs text-[var(--muted-foreground)]">Distinct providers in selected range</p>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Distinct providers in selected range
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -189,50 +210,77 @@ export function ProviderInsightsPage({
       <Card>
         <CardContent className="p-5 sm:p-6">
           <div className="space-y-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Provider ledger</p>
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">Cost, token, and message footprint</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+              Provider ledger
+            </p>
+            <h2 className="text-xl font-semibold text-[var(--foreground)]">
+              Cost, token, and message footprint
+            </h2>
             <p className="text-xs leading-5 text-[var(--muted-foreground)]">
               Compare each provider under the same period. Trend sparkline reflects daily spend.
             </p>
           </div>
           <Separator className="mt-4" />
 
-            {loading ? (
-              <div className="mt-5 space-y-2">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="h-12 animate-pulse rounded-[14px] bg-black/5" />
-                ))}
-              </div>
-            ) : !hasData ? (
-              <div className="mt-6 rounded-[20px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-5 py-7">
-                <p className="text-lg font-semibold text-[var(--foreground)]">{emptyTitle}</p>
-                <p className="mt-2 max-w-2xl text-sm text-[var(--muted-foreground)]">{emptyDescription}</p>
-                {emptyActionLabel && onEmptyAction ? (
-                  <Button variant="outline" size="sm" className="mt-4" onClick={onEmptyAction}>
-                    {emptyActionLabel}
-                  </Button>
-                ) : null}
-              </div>
-            ) : (
-              <div className="mt-5 overflow-visible pb-2">
-                <div className="w-full overflow-x-auto whitespace-nowrap">
-                  <table className="min-w-full border-collapse text-left">
+          {loading ? (
+            <div className="mt-5 space-y-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="h-12 animate-pulse rounded-[14px] bg-black/5" />
+              ))}
+            </div>
+          ) : !hasData ? (
+            <div className="mt-6 rounded-[20px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-5 py-7">
+              <p className="text-lg font-semibold text-[var(--foreground)]">{emptyTitle}</p>
+              <p className="mt-2 max-w-2xl text-sm text-[var(--muted-foreground)]">
+                {emptyDescription}
+              </p>
+              {emptyActionLabel && onEmptyAction ? (
+                <Button variant="outline" size="sm" className="mt-4" onClick={onEmptyAction}>
+                  {emptyActionLabel}
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-5 overflow-visible pb-2">
+              <div className="w-full overflow-x-auto whitespace-nowrap">
+                <table className="min-w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-[var(--border)]">
-                      <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Provider</th>
-                      <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Trend</th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Spend</th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Tokens</th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Messages</th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Coverage</th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Active days</th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Models</th>
-                      <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Top model</th>
+                      <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Provider
+                      </th>
+                      <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Trend
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Spend
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Tokens
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Messages
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Coverage
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Active days
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Models
+                      </th>
+                      <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Top model
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {providers.map((provider) => (
-                      <tr key={provider.providerId} className={`border-b border-[var(--border)]/70 transition last:border-b-0 ${selectedProviderId === provider.providerId ? "bg-[var(--panel-strong)]/75" : ""}`}>
+                      <tr
+                        key={provider.providerId}
+                        className={`border-b border-[var(--border)]/70 transition last:border-b-0 ${selectedProviderId === provider.providerId ? "bg-[var(--panel-strong)]/75" : ""}`}
+                      >
                         <td className="px-3 py-3">
                           {onSelectProvider ? (
                             <button
@@ -241,30 +289,48 @@ export function ProviderInsightsPage({
                               onClick={() => onSelectProvider(provider.providerId)}
                             >
                               <ProviderIcon providerId={provider.providerId} className="size-4" />
-                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">{provider.providerId}</span>
+                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                                {provider.providerId}
+                              </span>
                               <ChevronRight className="size-4 shrink-0 text-[var(--muted-foreground)]" />
                             </button>
                           ) : (
                             <div className="inline-flex max-w-[14rem] items-center gap-2">
                               <ProviderIcon providerId={provider.providerId} className="size-4" />
-                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">{provider.providerId}</span>
+                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                                {provider.providerId}
+                              </span>
                             </div>
                           )}
                         </td>
                         <td className="px-3 py-3">
                           <ProviderTrend provider={provider} />
                         </td>
-                        <td className="px-3 py-3 text-right text-sm font-semibold text-[var(--foreground)]">{formatCurrency(provider.totalCost)}</td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">{formatCompactNumber(provider.totalTokens)}</td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">{provider.totalMessages}</td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">{formatPercent(provider.pricingCoverage)}</td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">{provider.activeDays}</td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">{provider.modelCount}</td>
+                        <td className="px-3 py-3 text-right text-sm font-semibold text-[var(--foreground)]">
+                          {formatCurrency(provider.totalCost)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                          {formatCompactNumber(provider.totalTokens)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                          {provider.totalMessages}
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                          {formatPercent(provider.pricingCoverage)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                          {provider.activeDays}
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                          {provider.modelCount}
+                        </td>
                         <td className="px-3 py-3 text-sm text-[var(--muted-foreground)]">
                           {provider.topModel ? (
                             <span className="inline-flex items-center gap-2">
                               <span className="truncate">{provider.topModel.modelId}</span>
-                              <span className="text-[11px] opacity-75">{formatCurrency(provider.topModel.cost)}</span>
+                              <span className="text-[11px] opacity-75">
+                                {formatCurrency(provider.topModel.cost)}
+                              </span>
                             </span>
                           ) : (
                             "—"
@@ -273,10 +339,10 @@ export function ProviderInsightsPage({
                       </tr>
                     ))}
                   </tbody>
-                  </table>
-                </div>
+                </table>
               </div>
-            )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -65,23 +65,28 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
     setMessagesTotal(0);
     setMessagesPage(0);
 
-    void fetchMessageAnalytics(date, sessionId).then(({ overview: ov, distribution: dist }) => {
-      if (!canceled) {
-        setOverview(ov);
-        setDistribution(dist);
-        setMessageSessionCache(sessionId, ov, dist);
-      }
-    }).catch(() => { /* silently ignore */ });
+    void fetchMessageAnalytics(date, sessionId)
+      .then(({ overview: ov, distribution: dist }) => {
+        if (!canceled) {
+          setOverview(ov);
+          setDistribution(dist);
+          setMessageSessionCache(sessionId, ov, dist);
+        }
+      })
+      .catch(() => {
+        /* silently ignore */
+      });
 
-    return () => { canceled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      canceled = true;
+    };
   }, [date, sessionId]);
 
   async function loadMessages(page: number) {
     setMessagesLoading(true);
     try {
       const result = await fetchMessages(date, sessionId, page);
-      setMessages((prev) => page === 0 ? result.messages : [...prev, ...result.messages]);
+      setMessages((prev) => (page === 0 ? result.messages : [...prev, ...result.messages]));
       setMessagesTotal(result.total);
       setMessagesPage(page);
     } catch {
@@ -172,7 +177,9 @@ function OverviewTab() {
     <div className="space-y-6">
       {/* Timeline chart */}
       <div>
-        <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">Cumulative tokens over messages</p>
+        <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">
+          Cumulative tokens over messages
+        </p>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={timelineData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
@@ -180,15 +187,29 @@ function OverviewTab() {
               <XAxis
                 dataKey="idx"
                 tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                label={{ value: "Message #", position: "insideBottom", offset: -2, fontSize: 10, fill: "var(--muted-foreground)" }}
+                label={{
+                  value: "Message #",
+                  position: "insideBottom",
+                  offset: -2,
+                  fontSize: 10,
+                  fill: "var(--muted-foreground)",
+                }}
               />
-              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(v: number) => formatCompactNumber(v)} />
+              <YAxis
+                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                tickFormatter={(v: number) => formatCompactNumber(v)}
+              />
               <Tooltip
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={((value: number) => [formatCompactNumber(value), "Cumulative tokens"]) as any}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={
+                  ((value: number) => [formatCompactNumber(value), "Cumulative tokens"]) as any
+                }
                 labelFormatter={((label: number) => `Message #${label}`) as any}
-                contentStyle={{ fontSize: 12, borderRadius: 12, background: "var(--panel)", border: "1px solid var(--border)" }}
+                contentStyle={{
+                  fontSize: 12,
+                  borderRadius: 12,
+                  background: "var(--panel)",
+                  border: "1px solid var(--border)",
+                }}
               />
               <Line
                 type="monotone"
@@ -212,7 +233,12 @@ function OverviewTab() {
           <div className="space-y-2">
             {topTools.map((t) => (
               <div key={t.tool} className="flex items-center gap-3">
-                <p className="w-44 shrink-0 truncate text-xs text-[var(--foreground)]" title={t.tool}>{t.tool}</p>
+                <p
+                  className="w-44 shrink-0 truncate text-xs text-[var(--foreground)]"
+                  title={t.tool}
+                >
+                  {t.tool}
+                </p>
                 <div className="flex-1 h-2.5 overflow-hidden rounded-full bg-black/6">
                   <div
                     className="h-full rounded-full"
@@ -222,7 +248,9 @@ function OverviewTab() {
                     }}
                   />
                 </div>
-                <p className="w-10 shrink-0 text-right text-xs font-semibold text-[var(--foreground)]">{t.count}</p>
+                <p className="w-10 shrink-0 text-right text-xs font-semibold text-[var(--foreground)]">
+                  {t.count}
+                </p>
               </div>
             ))}
           </div>
@@ -251,25 +279,41 @@ function DistributionTab() {
 
   return (
     <div>
-      <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">Token breakdown per message</p>
+      <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">
+        Token breakdown per message
+      </p>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="idx" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
-            <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(v: number) => formatCompactNumber(v)} />
+            <YAxis
+              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+              tickFormatter={(v: number) => formatCompactNumber(v)}
+            />
             <Tooltip
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={((value: number, name: string) => [formatCompactNumber(value), name]) as any}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              formatter={
+                ((value: number, name: string) => [formatCompactNumber(value), name]) as any
+              }
               labelFormatter={((label: number) => `Message #${label}`) as any}
-              contentStyle={{ fontSize: 12, borderRadius: 12, background: "var(--panel)", border: "1px solid var(--border)" }}
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: 12,
+                background: "var(--panel)",
+                border: "1px solid var(--border)",
+              }}
             />
             <Bar dataKey="input" stackId="a" fill={TOKEN_COLORS.input} name="Input" />
             <Bar dataKey="output" stackId="a" fill={TOKEN_COLORS.output} name="Output" />
             <Bar dataKey="reasoning" stackId="a" fill={TOKEN_COLORS.reasoning} name="Reasoning" />
             <Bar dataKey="cacheRead" stackId="a" fill={TOKEN_COLORS.cacheRead} name="Cache Read" />
-            <Bar dataKey="cacheWrite" stackId="a" fill={TOKEN_COLORS.cacheWrite} name="Cache Write" radius={[3, 3, 0, 0]} />
+            <Bar
+              dataKey="cacheWrite"
+              stackId="a"
+              fill={TOKEN_COLORS.cacheWrite}
+              name="Cache Write"
+              radius={[3, 3, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -278,7 +322,9 @@ function DistributionTab() {
         {(["input", "output", "reasoning", "cacheRead", "cacheWrite"] as const).map((key) => (
           <div key={key} className="ui-pill-chip py-1.5">
             <span className="size-2.5 rounded-full" style={{ background: TOKEN_COLORS[key] }} />
-            <span className="capitalize">{key === "cacheRead" ? "Cache Read" : key === "cacheWrite" ? "Cache Write" : key}</span>
+            <span className="capitalize">
+              {key === "cacheRead" ? "Cache Read" : key === "cacheWrite" ? "Cache Write" : key}
+            </span>
           </div>
         ))}
       </div>
@@ -287,7 +333,5 @@ function DistributionTab() {
 }
 
 function LoadingPlaceholder() {
-  return (
-    <div className="h-40 animate-pulse rounded-[18px] bg-[var(--panel-strong)]" />
-  );
+  return <div className="h-40 animate-pulse rounded-[18px] bg-[var(--panel-strong)]" />;
 }

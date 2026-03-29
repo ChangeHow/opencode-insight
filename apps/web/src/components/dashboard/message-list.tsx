@@ -10,7 +10,13 @@ interface MessageListProps {
 }
 
 function totalTokenCount(msg: MessageDetail): number {
-  return msg.tokens.input + msg.tokens.output + msg.tokens.reasoning + msg.tokens.cacheRead + msg.tokens.cacheWrite;
+  return (
+    msg.tokens.input +
+    msg.tokens.output +
+    msg.tokens.reasoning +
+    msg.tokens.cacheRead +
+    msg.tokens.cacheWrite
+  );
 }
 
 export function MessageList({ messages, total, loading, onLoadMore }: MessageListProps) {

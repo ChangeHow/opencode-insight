@@ -1,0 +1,84 @@
+import { useEffect } from "react";
+import { useAtom, useAtomValue } from "jotai";
+import { useParams } from "@tanstack/react-router";
+import { DayBreakdownPanel } from "@/components/dashboard/day-breakdown";
+import { DetailLayoutShell } from "@/components/dashboard/detail-layout-shell";
+import { SessionListPanel } from "@/components/dashboard/session-list";
+import { customDateRangeAtom, dayAtom, detailLoadingAtom, errorAtom, rangeAtom } from "@/lib/atoms";
+import { fetchDay, refreshSnapshot } from "@/lib/api";
+
+const TOKEN_THRESHOLD = 1_000_000;
+
+export function DetailPage() {
+  const { date } = useParams({ from: "/dashboard/detail/$date" });
+  const range = useAtomValue(rangeAtom);
+  const customDateRange = useAtomValue(customDateRangeAtom);
+  const [day, setDay] = useAtom(dayAtom);
+  const [detailLoading, setDetailLoading] = useAtom(detailLoadingAtom);
+  const [, setError] = useAtom(errorAtom);
+
+  useEffect(() => {
+    let canceled = false;
+    setDetailLoading(true);
+
+    async function loadDetail() {
+      try {
+        const detail = await fetchDay(range, date, customDateRange);
+        if (!canceled) {
+          setDay(detail);
+          setError(null);
+        }
+      } catch (loadError) {
+        if (!canceled) {
+          setDay(null);
+          setError(loadError instanceof Error ? loadError.message : "Failed to load day detail.");
+        }
+      } finally {
+        if (!canceled) {
+          setDetailLoading(false);
+        }
+      }
+    }
+
+    void loadDetail();
+
+    return () => {
+      canceled = true;
+    };
+  }, [customDateRange, date, range, setDay, setDetailLoading, setError]);
+
+  const sessions = day?.sessions ?? [];
+  const highTokenSessions = sessions.filter((s) => s.tokens >= TOKEN_THRESHOLD);
+  const totalSessions = sessions.length;
+  const filteredCount = totalSessions - highTokenSessions.length;
+
+  async function handleRefresh() {
+    await refreshSnapshot();
+    const detail = await fetchDay(range, date, customDateRange);
+    setDay(detail);
+    setError(null);
+  }
+
+  return (
+    <DetailLayoutShell
+      backTo="/overview"
+      backLabel="Back to overview"
+      title={`Daily spend detail for ${date}`}
+      date={date}
+      onRefresh={handleRefresh}
+    >
+      <DayBreakdownPanel day={day} loading={detailLoading} />
+
+      <div className="px-6 sm:px-8 lg:px-10">
+        {!detailLoading && (
+          <SessionListPanel
+            date={date}
+            sessions={highTokenSessions}
+            totalSessions={totalSessions}
+            filteredCount={filteredCount}
+          />
+        )}
+      </div>
+    </DetailLayoutShell>
+  );
+}

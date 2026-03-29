@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Heatmap } from "../components/dashboard/heatmap.js";
-import { makeHeatmapDay } from "./factories.js";
+import { Heatmap } from "../components/dashboard/heatmap";
+import { makeHeatmapDay } from "./factories";
 
 describe("Heatmap", () => {
   it("should disable selection for days without messages", async () => {

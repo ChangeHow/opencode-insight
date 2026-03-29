@@ -9,6 +9,7 @@ coverage
 .turbo
 .vite
 .cache
+.oxlint-cache
 *.tsbuildinfo
 
 # logs
@@ -29,6 +30,7 @@ skills-lock.json
 .env.local
 .env.*.local
 .telescope-daemon.pid
+docs/plans/finished/
 
 # macOS
 .DS_Store

@@ -15,7 +15,12 @@ import { TrendChart } from "@/components/dashboard/trend-chart";
 import { RangePicker } from "@/components/dashboard/range-picker";
 import { themeAtom } from "@/lib/atoms";
 import { getPresetDateRange } from "@/lib/date-range";
-import { formatCompactNumber, formatCurrency, formatDateLabel, formatDateWithYearLabel } from "@/lib/format";
+import {
+  formatCompactNumber,
+  formatCurrency,
+  formatDateLabel,
+  formatDateWithYearLabel,
+} from "@/lib/format";
 import { HeaderRefreshButton } from "./layout";
 export function formatDateSpan(start?: string, end?: string) {
   if (!start || !end) {
@@ -43,7 +48,11 @@ export function ControlBar({
   range: "7d" | "month" | "3mo" | "year";
   setRange: (nextRange: "7d" | "month" | "3mo" | "year") => void;
   customDateRange: { start: string; end: string };
-  setCustomDateRange: (value: { start: string; end: string } | ((current: { start: string; end: string }) => { start: string; end: string })) => void;
+  setCustomDateRange: (
+    value:
+      | { start: string; end: string }
+      | ((current: { start: string; end: string }) => { start: string; end: string }),
+  ) => void;
   scannedAt?: string;
   onRefresh: () => Promise<void>;
   canRefresh?: boolean;
@@ -97,7 +106,12 @@ export function ControlBar({
           </div>
           <Separator orientation="vertical" className="h-6" />
           <ThemeToggleButton theme={theme} onChange={setTheme} />
-          <HeaderRefreshButton canRefresh={canRefresh} refreshing={refreshing} disabledReason={refreshDisabledReason} onRefresh={handleRefreshClick} />
+          <HeaderRefreshButton
+            canRefresh={canRefresh}
+            refreshing={refreshing}
+            disabledReason={refreshDisabledReason}
+            onRefresh={handleRefreshClick}
+          />
         </div>
       </div>
 
@@ -142,7 +156,9 @@ export function MetricPanel({
             <Icon className="size-3.5" />
             {title}
           </p>
-          <p className="text-[2rem] font-semibold tracking-[-0.04em] text-[var(--foreground)] sm:text-[2.35rem]">{value}</p>
+          <p className="text-[2rem] font-semibold tracking-[-0.04em] text-[var(--foreground)] sm:text-[2.35rem]">
+            {value}
+          </p>
           <p className="text-xs leading-5 text-[var(--muted-foreground)]">{subline}</p>
         </div>
         <div className="rounded-[18px] border border-[var(--border)] bg-[var(--chart-surface)] p-3">
@@ -180,7 +196,9 @@ export function CompactMetric({
             <Icon className="size-3.5" />
             {title}
           </p>
-          <p className="text-[1.75rem] font-semibold tracking-[-0.03em] text-[var(--foreground)]">{value}</p>
+          <p className="text-[1.75rem] font-semibold tracking-[-0.03em] text-[var(--foreground)]">
+            {value}
+          </p>
           <p className="text-xs text-[var(--muted-foreground)]">{detail}</p>
         </div>
         <div className="rounded-[16px] border border-[var(--border)] bg-[var(--chart-surface)] p-3">
@@ -214,12 +232,21 @@ function MiniSparkline({
               color: "var(--foreground)",
             }}
             formatter={(value) => [
-              dataKey === "cost" ? formatCurrency(Number(value ?? 0)) : formatCompactNumber(Number(value ?? 0)),
+              dataKey === "cost"
+                ? formatCurrency(Number(value ?? 0))
+                : formatCompactNumber(Number(value ?? 0)),
               dataKey === "cost" ? "Spend" : dataKey === "tokens" ? "Tokens" : "Messages",
             ]}
             labelFormatter={(label) => formatDateLabel(String(label))}
           />
-          <Line type="monotone" dataKey={dataKey} stroke={accent} strokeWidth={2.5} dot={false} activeDot={false} />
+          <Line
+            type="monotone"
+            dataKey={dataKey}
+            stroke={accent}
+            strokeWidth={2.5}
+            dot={false}
+            activeDot={false}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -240,7 +267,9 @@ export function LedgerSparkline({ line }: { line: CostSeriesLine | null }) {
     return { x, y };
   });
 
-  const path = points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+  const path = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+    .join(" ");
 
   return (
     <div className="ml-auto w-44">
@@ -249,7 +278,14 @@ export function LedgerSparkline({ line }: { line: CostSeriesLine | null }) {
           d={`${path} L ${width},${height} L 0,${height} Z`}
           fill="color-mix(in oklch, var(--accent) 16%, transparent)"
         />
-        <path d={path} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d={path}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     </div>
   );
@@ -268,9 +304,13 @@ export function OverviewEmptyState({
 }) {
   return (
     <div className="flex min-h-72 flex-col items-start justify-center rounded-[22px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-6 py-8 text-left">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">{kicker}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+        {kicker}
+      </p>
       <h3 className="mt-3 text-xl font-semibold text-[var(--foreground)]">{title}</h3>
-      <p className="mt-3 max-w-xl text-xs leading-5 text-[var(--muted-foreground)]">{description}</p>
+      <p className="mt-3 max-w-xl text-xs leading-5 text-[var(--muted-foreground)]">
+        {description}
+      </p>
     </div>
   );
 }
@@ -314,7 +354,9 @@ export function ThemeToggleButton({
                   setOpen(false);
                 }}
                 className={`flex h-9 w-full items-center gap-2 rounded-[14px] px-3 text-sm outline-none transition ${
-                  selected ? "bg-[var(--accent-soft)] font-semibold text-[var(--foreground)]" : "text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[var(--foreground)]"
+                  selected
+                    ? "bg-[var(--accent-soft)] font-semibold text-[var(--foreground)]"
+                    : "text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[var(--foreground)]"
                 }`}
               >
                 <ItemIcon className="size-4" />

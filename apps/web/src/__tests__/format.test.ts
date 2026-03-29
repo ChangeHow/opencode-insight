@@ -4,7 +4,7 @@ import {
   formatCurrency,
   formatDateLabel,
   formatLongDateLabel,
-} from "../lib/format.js";
+} from "../lib/format";
 
 describe("Format Functions", () => {
   describe("formatCompactNumber", () => {

@@ -17,19 +17,22 @@ function CodeBlock({ lang, code, shikiTheme }: CodeBlockProps) {
 
   useEffect(() => {
     let canceled = false;
-    highlight(code, lang, shikiTheme).then((result) => {
-      if (!canceled) setHtml(result);
-    }).catch(() => {
-      if (!canceled) setHtml(null);
-    });
-    return () => { canceled = true; };
+    highlight(code, lang, shikiTheme)
+      .then((result) => {
+        if (!canceled) setHtml(result);
+      })
+      .catch(() => {
+        if (!canceled) setHtml(null);
+      });
+    return () => {
+      canceled = true;
+    };
   }, [code, lang, shikiTheme]);
 
   if (html) {
     return (
       <div
         className="overflow-x-auto rounded-[14px] text-xs [&>pre]:p-4"
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );
@@ -50,11 +53,13 @@ interface MarkdownRendererProps {
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   const theme = useAtomValue(themeAtom);
   const resolvedTheme =
-    theme === "dark" ? "github-dark" : theme === "light" ? "github-light" : (
-      typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "github-dark"
-        : "github-light"
-    );
+    theme === "dark"
+      ? "github-dark"
+      : theme === "light"
+        ? "github-light"
+        : typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "github-dark"
+          : "github-light";
 
   const proseClass = cn(
     "prose prose-sm max-w-none break-words text-[var(--foreground)]",
@@ -69,24 +74,27 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
 
   return (
     <div className={proseClass}>
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        code({ className: cls, children, ...rest }: any) {
-          const match = /language-(\w+)/.exec(cls ?? "");
-          const lang = match?.[1] ?? "text";
-          const code = String(children).replace(/\n$/, "");
-          const isBlock = /\n/.test(code) || match;
-          if (!isBlock) {
-            return <code className={cls} {...rest}>{children}</code>;
-          }
-          return <CodeBlock lang={lang} code={code} shikiTheme={resolvedTheme} />;
-        },
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ className: cls, children, ...rest }: any) {
+            const match = /language-(\w+)/.exec(cls ?? "");
+            const lang = match?.[1] ?? "text";
+            const code = String(children).replace(/\n$/, "");
+            const isBlock = /\n/.test(code) || match;
+            if (!isBlock) {
+              return (
+                <code className={cls} {...rest}>
+                  {children}
+                </code>
+              );
+            }
+            return <CodeBlock lang={lang} code={code} shikiTheme={resolvedTheme} />;
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

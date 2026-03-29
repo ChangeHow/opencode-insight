@@ -50,9 +50,13 @@ for (const pid of pids) {
   const command = getCommand(pid);
   try {
     process.kill(Number(pid), "SIGTERM");
-    console.log(`Stopped ${label} listener on port ${port}: PID ${pid}${command ? ` (${command})` : ""}.`);
+    console.log(
+      `Stopped ${label} listener on port ${port}: PID ${pid}${command ? ` (${command})` : ""}.`,
+    );
   } catch (error) {
-    console.error(`Failed to stop PID ${pid}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Failed to stop PID ${pid}: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   }
 }

@@ -1,13 +1,18 @@
 import { describe, test, expect } from "vitest";
-import { DEFAULT_TIME_ZONE, formatDateInTimeZone, getPresetDateRange, shiftDateKey } from "@opencode-dashboard/shared";
-import { getRangeData, getDateFilteredData } from "../usage.js";
+import {
+  DEFAULT_TIME_ZONE,
+  formatDateInTimeZone,
+  getPresetDateRange,
+  shiftDateKey,
+} from "@opencode-dashboard/shared";
+import { getRangeData, getDateFilteredData } from "../services/usage/index";
 import {
   makeUsageSnapshot,
   makeHeatmapDay,
   makeDayBreakdown,
   makeModelBreakdown,
   makeRawMessage,
-} from "./factories.js";
+} from "./factories";
 
 function getTodayDate(): string {
   return formatDateInTimeZone(new Date(), DEFAULT_TIME_ZONE);
@@ -20,12 +25,21 @@ function getRelativeDate(daysOffset: number): string {
 describe("Usage Module", () => {
   describe("shared timezone date helpers", () => {
     test("should format instants using caller time zone boundaries", () => {
-      expect(formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "Asia/Shanghai")).toBe("2026-03-26");
-      expect(formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "America/Los_Angeles")).toBe("2026-03-25");
+      expect(formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "Asia/Shanghai")).toBe(
+        "2026-03-26",
+      );
+      expect(
+        formatDateInTimeZone(new Date("2026-03-25T16:30:00.000Z"), "America/Los_Angeles"),
+      ).toBe("2026-03-25");
     });
 
     test("should build preset ranges from provided time zone", () => {
-      expect(getPresetDateRange("7d", { now: new Date("2026-03-25T16:30:00.000Z"), timeZone: "Asia/Shanghai" })).toEqual({
+      expect(
+        getPresetDateRange("7d", {
+          now: new Date("2026-03-25T16:30:00.000Z"),
+          timeZone: "Asia/Shanghai",
+        }),
+      ).toEqual({
         start: "2026-03-20",
         end: "2026-03-26",
       });
@@ -39,11 +53,7 @@ describe("Usage Module", () => {
       const twoDaysAgo = getRelativeDate(-2);
 
       const snapshot = makeUsageSnapshot({
-        heatmap: [
-          makeHeatmapDay(today),
-          makeHeatmapDay(yesterday),
-          makeHeatmapDay(twoDaysAgo),
-        ],
+        heatmap: [makeHeatmapDay(today), makeHeatmapDay(yesterday), makeHeatmapDay(twoDaysAgo)],
         breakdownByDate: new Map([
           [today, makeDayBreakdown(today)],
           [yesterday, makeDayBreakdown(yesterday)],
@@ -176,7 +186,11 @@ describe("Usage Module", () => {
 
       const result = getDateFilteredData(snapshot, twoDaysAgo, today);
 
-      expect(result.heatmap.map((day) => day.date)).toEqual([twoDaysAgo, getRelativeDate(-1), today]);
+      expect(result.heatmap.map((day) => day.date)).toEqual([
+        twoDaysAgo,
+        getRelativeDate(-1),
+        today,
+      ]);
       expect(result.heatmap[1]).toMatchObject({
         date: getRelativeDate(-1),
         tokens: 0,
@@ -200,11 +214,7 @@ describe("Usage Module", () => {
       const twoDaysAgo = getRelativeDate(-2);
 
       const snapshot = makeUsageSnapshot({
-        heatmap: [
-          makeHeatmapDay(today),
-          makeHeatmapDay(yesterday),
-          makeHeatmapDay(twoDaysAgo),
-        ],
+        heatmap: [makeHeatmapDay(today), makeHeatmapDay(yesterday), makeHeatmapDay(twoDaysAgo)],
         breakdownByDate: new Map([
           [today, makeDayBreakdown(today)],
           [yesterday, makeDayBreakdown(yesterday)],
@@ -228,11 +238,7 @@ describe("Usage Module", () => {
       const twoDaysAgo = getRelativeDate(-2);
 
       const snapshot = makeUsageSnapshot({
-        heatmap: [
-          makeHeatmapDay(today),
-          makeHeatmapDay(yesterday),
-          makeHeatmapDay(twoDaysAgo),
-        ],
+        heatmap: [makeHeatmapDay(today), makeHeatmapDay(yesterday), makeHeatmapDay(twoDaysAgo)],
         breakdownByDate: new Map([
           [today, makeDayBreakdown(today)],
           [yesterday, makeDayBreakdown(yesterday)],

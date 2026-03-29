@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { estimateUsageCostFromDataset } from "../pricing.js";
-import { makeTokenBreakdown, makePricingDataset } from "./factories.js";
+import { estimateUsageCostFromDataset } from "../services/pricing";
+import { makeTokenBreakdown, makePricingDataset } from "./factories";
 
 describe("Pricing Module", () => {
   describe("Given a model in the dataset", () => {
@@ -12,7 +12,7 @@ describe("Pricing Module", () => {
         dataset,
         "claude-3-5-sonnet-20241022",
         "anthropic",
-        usage
+        usage,
       );
 
       expect(result.priced).toBe(true);
@@ -29,7 +29,7 @@ describe("Pricing Module", () => {
         dataset,
         "unknown-model-xyz",
         "unknown-provider",
-        usage
+        usage,
       );
 
       expect(result.priced).toBe(false);
@@ -46,7 +46,7 @@ describe("Pricing Module", () => {
         dataset,
         "claude-3-5-sonnet-20241022",
         "anthropic",
-        usage
+        usage,
       );
 
       expect(result.priced).toBe(true);
@@ -64,7 +64,7 @@ describe("Pricing Module", () => {
         dataset,
         "claude-3-5-sonnet-20241022",
         "anthropic",
-        usage
+        usage,
       );
 
       expect(result.priced).toBe(true);
@@ -90,7 +90,7 @@ describe("Pricing Module", () => {
         dataset,
         "claude-3-5-sonnet-20241022",
         "anthropic",
-        usage
+        usage,
       );
 
       expect(result.priced).toBe(true);
@@ -114,12 +114,7 @@ describe("Pricing Module", () => {
       });
       const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
 
-      const result = await estimateUsageCostFromDataset(
-        dataset,
-        "gpt-5.3",
-        "cursor",
-        usage
-      );
+      const result = await estimateUsageCostFromDataset(dataset, "gpt-5.3", "cursor", usage);
 
       expect(result.priced).toBe(true);
       // Cursor override rates: input 0.00000175, output 0.000014
@@ -139,12 +134,7 @@ describe("Pricing Module", () => {
       });
       const usage = makeTokenBreakdown({ input: 10000, output: 5000, cacheRead: 20000 });
 
-      const result = estimateUsageCostFromDataset(
-        dataset,
-        "glm-5-turbo",
-        "zai",
-        usage
-      );
+      const result = estimateUsageCostFromDataset(dataset, "glm-5-turbo", "zai", usage);
 
       expect(result.priced).toBe(true);
       // input: 10000 * 0.0000012 = 0.012
@@ -164,12 +154,7 @@ describe("Pricing Module", () => {
       });
       const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
 
-      const result = estimateUsageCostFromDataset(
-        dataset,
-        "gpt-5.3-codex",
-        "cursor",
-        usage
-      );
+      const result = estimateUsageCostFromDataset(dataset, "gpt-5.3-codex", "cursor", usage);
 
       expect(result.priced).toBe(true);
       expect(result.estimatedCost).toBeCloseTo(0.0875, 5);
@@ -185,12 +170,7 @@ describe("Pricing Module", () => {
       });
       const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
 
-      const result = estimateUsageCostFromDataset(
-        dataset,
-        "composer-1.5",
-        "cursor",
-        usage
-      );
+      const result = estimateUsageCostFromDataset(dataset, "composer-1.5", "cursor", usage);
 
       expect(result.priced).toBe(true);
       // 10000 * 0.0000035 + 5000 * 0.0000175 = 0.035 + 0.0875 = 0.1225
@@ -212,12 +192,7 @@ describe("Pricing Module", () => {
       });
       const usage = makeTokenBreakdown({ input: 100000, output: 10000, cacheRead: 500000 });
 
-      const result = estimateUsageCostFromDataset(
-        dataset,
-        "glm-5",
-        "zai-coding-plan",
-        usage
-      );
+      const result = estimateUsageCostFromDataset(dataset, "glm-5", "zai-coding-plan", usage);
 
       expect(result.priced).toBe(true);
       expect(result.estimatedCost).toBeCloseTo(0.232, 5);
@@ -233,12 +208,7 @@ describe("Pricing Module", () => {
       });
       const usage = makeTokenBreakdown({ input: 10000, output: 5000, cacheRead: 20000 });
 
-      const result = estimateUsageCostFromDataset(
-        dataset,
-        "glm-5.1",
-        "zai-coding-plan",
-        usage
-      );
+      const result = estimateUsageCostFromDataset(dataset, "glm-5.1", "zai-coding-plan", usage);
 
       expect(result.priced).toBe(true);
       expect(result.estimatedCost).toBeCloseTo(0.03, 5);

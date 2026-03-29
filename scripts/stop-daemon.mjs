@@ -19,7 +19,11 @@ const pid = parseInt(raw, 10);
 
 if (!Number.isInteger(pid) || pid <= 0) {
   console.error("Invalid PID file. Removing it.");
-  try { unlinkSync(PID_FILE); } catch { /* ignore */ }
+  try {
+    unlinkSync(PID_FILE);
+  } catch {
+    /* ignore */
+  }
   process.exit(1);
 }
 
@@ -36,15 +40,25 @@ try {
 
 if (!running) {
   console.log(`Daemon process (PID ${pid}) is not running. Cleaning up PID file.`);
-  try { unlinkSync(PID_FILE); } catch { /* ignore */ }
+  try {
+    unlinkSync(PID_FILE);
+  } catch {
+    /* ignore */
+  }
   process.exit(0);
 }
 
 try {
   process.kill(pid, "SIGTERM");
-  try { unlinkSync(PID_FILE); } catch { /* ignore */ }
+  try {
+    unlinkSync(PID_FILE);
+  } catch {
+    /* ignore */
+  }
   console.log(`✓ Daemon stopped (PID ${pid}).`);
 } catch (err) {
-  console.error(`Failed to stop daemon (PID ${pid}): ${err instanceof Error ? err.message : String(err)}`);
+  console.error(
+    `Failed to stop daemon (PID ${pid}): ${err instanceof Error ? err.message : String(err)}`,
+  );
   process.exitCode = 1;
 }

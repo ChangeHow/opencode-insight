@@ -1,4 +1,10 @@
-import { dateKeyToLocalDate, formatCalendarDate, formatDateInTimeZone, getCurrentTimeZone, getPresetDateRange as getSharedPresetDateRange } from "@opencode-dashboard/shared";
+import {
+  dateKeyToLocalDate,
+  formatCalendarDate,
+  formatDateInTimeZone,
+  getCurrentTimeZone,
+  getPresetDateRange as getSharedPresetDateRange,
+} from "@opencode-dashboard/shared";
 import type { TimeRange } from "@opencode-dashboard/shared";
 
 export function toInputDate(date: Date) {

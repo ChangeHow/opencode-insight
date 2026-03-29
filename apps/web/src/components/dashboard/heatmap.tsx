@@ -30,7 +30,10 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
   const start = parseInputDate(days[0]?.date ?? "");
   const end = parseInputDate(days.at(-1)?.date ?? "");
   const selected = parseInputDate(selectedDate ?? "");
-  const initialMonth = useMemo(() => startOfMonth(selected ?? end ?? start ?? new Date()), [selected, end, start]);
+  const initialMonth = useMemo(
+    () => startOfMonth(selected ?? end ?? start ?? new Date()),
+    [selected, end, start],
+  );
   const [month, setMonth] = useState(() => initialMonth);
   const initialMonthKey = format(initialMonth, "yyyy-MM");
   const previousInitialMonthKeyRef = useRef(initialMonthKey);
@@ -61,7 +64,9 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
             props.modifiers.outside && "opacity-42",
           )}
         >
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--heat-empty-date)]">{dateKey.slice(8)}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--heat-empty-date)]">
+            {dateKey.slice(8)}
+          </span>
         </DayPickerDayButton>
       );
     }
@@ -76,13 +81,21 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
             className={cn(
               "group relative flex size-full flex-col items-start justify-between rounded-[18px] border p-2 text-left outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
               intensityClass[entry.intensity],
-              isDisabled ? "cursor-not-allowed opacity-80 saturate-75" : "cursor-pointer hover:-translate-y-0.5",
-              props.modifiers.selected ? "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]" : "border-transparent",
+              isDisabled
+                ? "cursor-not-allowed opacity-80 saturate-75"
+                : "cursor-pointer hover:-translate-y-0.5",
+              props.modifiers.selected
+                ? "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]"
+                : "border-transparent",
               props.modifiers.outside && "opacity-48 saturate-75",
             )}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">{dateKey.slice(8)}</span>
-            <span className="text-[11px] font-semibold text-[var(--heat-token)]">{entry.tokens > 0 ? formatCompactNumber(entry.tokens) : "0"}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">
+              {dateKey.slice(8)}
+            </span>
+            <span className="text-[11px] font-semibold text-[var(--heat-token)]">
+              {entry.tokens > 0 ? formatCompactNumber(entry.tokens) : "0"}
+            </span>
           </DayPickerDayButton>
         </TooltipTrigger>
         <TooltipContent>
@@ -99,13 +112,23 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
       <div className="flex h-[35rem] min-w-0 flex-col space-y-4">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">Daily ledger</p>
-            <h2 className="mt-2 font-[Newsreader_Variable] text-3xl text-[var(--foreground)]">Calendar</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
+              Daily ledger
+            </p>
+            <h2 className="mt-2 font-[Newsreader_Variable] text-3xl text-[var(--foreground)]">
+              Calendar
+            </h2>
           </div>
           <div className="hidden items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--muted-foreground)] sm:flex">
             <span>Quiet</span>
             {[0, 1, 2, 3, 4].map((intensity) => (
-              <span key={intensity} className={cn("size-3 rounded-full", intensityClass[intensity as keyof typeof intensityClass])} />
+              <span
+                key={intensity}
+                className={cn(
+                  "size-3 rounded-full",
+                  intensityClass[intensity as keyof typeof intensityClass],
+                )}
+              />
             ))}
             <span>Loud</span>
           </div>
@@ -126,7 +149,9 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                 >
                   <ChevronLeft className="size-4" />
                 </Button>
-                <p className="text-lg font-semibold text-[var(--foreground)]">{format(month, "MMMM yyyy")}</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">
+                  {format(month, "MMMM yyyy")}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -166,7 +191,8 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                   caption_label: "hidden",
                   nav: "hidden",
                   weekdays: "grid grid-cols-7 gap-2",
-                  weekday: "flex h-7 w-full items-center justify-center rounded-md text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]",
+                  weekday:
+                    "flex h-7 w-full items-center justify-center rounded-md text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]",
                   weeks: "mt-2 flex flex-col gap-2",
                   week: "grid grid-cols-7 gap-2",
                   day: "aspect-square w-full min-w-0 p-0",
