@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { customDateRangeAtom, detailLoadingAtom, errorAtom, themeAtom } from "@/lib/atoms";
 import { canRefreshDetailDate } from "@/lib/date-range";
-import { DashboardPageLayout, DetailStickyHeader } from "@/routes/dashboard/layout";
+import { DashboardPageLayout, DetailStickyHeader } from "@/routes/layout";
 
 export function DetailLayoutShell({
   backTo,

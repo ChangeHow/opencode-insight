@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, RefreshCcw } from "lucide-react";
@@ -34,7 +34,7 @@ export function DashboardPageLayout({
   variant?: "default" | "wide";
 }) {
   return (
-    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <>
       {header}
       <section
         className={
@@ -45,7 +45,7 @@ export function DashboardPageLayout({
       >
         {children}
       </section>
-    </main>
+    </>
   );
 }
 

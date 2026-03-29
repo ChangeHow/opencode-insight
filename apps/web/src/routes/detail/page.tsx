@@ -10,7 +10,7 @@ import { fetchDay, refreshSnapshot } from "@/lib/api";
 const TOKEN_THRESHOLD = 1_000_000;
 
 export function DetailPage() {
-  const { date } = useParams({ from: "/detail/$date" });
+  const { date } = useParams({ from: "/dashboard/detail/$date" });
   const range = useAtomValue(rangeAtom);
   const customDateRange = useAtomValue(customDateRangeAtom);
   const [day, setDay] = useAtom(dayAtom);

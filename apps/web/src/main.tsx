@@ -10,7 +10,10 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import { themeAtom } from "@/lib/atoms";
-import { DashboardPage, DetailPage, ProvidersPage, SessionDetailPage } from "@/routes/dashboard";
+import { DashboardPage } from "@/routes/overview";
+import { ProvidersPage } from "@/routes/providers";
+import { DetailPage } from "@/routes/detail/page";
+import { SessionDetailPage } from "@/routes/detail/session";
 import "./styles.css";
 
 const rootRoute = createRootRoute({
@@ -35,50 +38,63 @@ const rootRoute = createRootRoute({
       return () => media.removeEventListener("change", applyTheme);
     }, [theme]);
 
-    return (
-      <>
-        <Outlet />
-      </>
-    );
+    return <Outlet />;
   },
 });
 
-const indexRoute = createRoute({
+const dashboardLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
+  id: "dashboard",
+  component: () => (
+    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <Outlet />
+    </main>
+  ),
+});
+
+const indexRoute = createRoute({
+  getParentRoute: () => dashboardLayoutRoute,
   path: "/",
   component: () => <Navigate to="/overview" />,
 });
 
 const overviewRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => dashboardLayoutRoute,
   path: "/overview",
   component: DashboardPage,
 });
 
 const providersRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => dashboardLayoutRoute,
   path: "/providers",
   component: ProvidersPage,
 });
 
-const detailRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/detail/$date",
+const detailLayoutRoute = createRoute({
+  getParentRoute: () => dashboardLayoutRoute,
+  path: "/detail",
+  component: () => <Outlet />,
+});
+
+const dayDetailRoute = createRoute({
+  getParentRoute: () => detailLayoutRoute,
+  path: "/$date",
   component: DetailPage,
 });
 
 const sessionDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/detail/$date/$session",
+  getParentRoute: () => detailLayoutRoute,
+  path: "/$date/$session",
   component: SessionDetailPage,
 });
 
 const routeTree = rootRoute.addChildren([
-  indexRoute,
-  overviewRoute,
-  providersRoute,
-  detailRoute,
-  sessionDetailRoute,
+  dashboardLayoutRoute.addChildren([
+    indexRoute,
+    overviewRoute,
+    providersRoute,
+    detailLayoutRoute.addChildren([dayDetailRoute, sessionDetailRoute]),
+  ]),
 ]);
 
 const router = createRouter({

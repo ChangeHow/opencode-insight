@@ -14,7 +14,7 @@ import {
 import { fetchSession, refreshSnapshot } from "@/lib/api";
 
 export function SessionDetailPage() {
-  const { date, session: sessionId } = useParams({ from: "/detail/$date/$session" });
+  const { date, session: sessionId } = useParams({ from: "/dashboard/detail/$date/$session" });
   const range = useAtomValue(rangeAtom);
   const customDateRange = useAtomValue(customDateRangeAtom);
   const [session, setSession] = useAtom(sessionAtom);

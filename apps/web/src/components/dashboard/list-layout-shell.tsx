@@ -9,8 +9,8 @@ import {
 } from "@/lib/atoms";
 import { refreshSnapshot } from "@/lib/api";
 import { isTodayInputDate } from "@/lib/date-range";
-import { DashboardPageLayout, StickyHeaderShell } from "@/routes/dashboard/layout";
-import { ControlBar } from "@/routes/dashboard/shared";
+import { DashboardPageLayout, StickyHeaderShell } from "@/routes/layout";
+import { ControlBar } from "@/routes/shared";
 
 export function ListLayoutShell({
   currentView,

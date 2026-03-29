@@ -4,7 +4,6 @@ import type {
   CostSeriesOption,
   DashboardSummary,
   HeatmapDay,
-  ProviderInsight,
   TrendPoint,
 } from "@opencode-dashboard/shared";
 
@@ -14,7 +13,6 @@ export const trendAtom = atom<TrendPoint[]>([]);
 export const seriesOptionsAtom = atom<CostSeriesOption[]>([]);
 export const selectedSeriesKeysAtom = atom<string[]>([]);
 export const seriesLinesAtom = atom<CostSeriesLine[]>([]);
-export const providerInsightsAtom = atom<ProviderInsight[]>([]);
 export const dashboardStateAtom = atom<{
   key: string | null;
   refreshTick: number;
