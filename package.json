@@ -2,6 +2,9 @@
   "name": "opencode-token-dashboard",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "opendash": "./scripts/opendash.mjs"
+  },
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "dev:web": "cd apps/web && pnpm dev",
@@ -24,7 +27,8 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@clack/prompts": "1.1.0"
+    "@clack/prompts": "1.1.0",
+    "commander": "^14.0.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
