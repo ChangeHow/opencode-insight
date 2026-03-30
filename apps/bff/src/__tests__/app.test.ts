@@ -1,5 +1,4 @@
 import { vi, describe, test, expect, beforeEach } from "vitest";
-import type { TimeRange } from "@opencode-dashboard/shared";
 import {
   makeUsageSnapshot,
   makeRangeData,

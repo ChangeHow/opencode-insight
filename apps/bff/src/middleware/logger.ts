@@ -7,11 +7,17 @@ function formatDuration(ms: number): string {
   return `${(ms / 60000).toFixed(2)}m`;
 }
 
-function omitUndefined<T extends Record<string, unknown>>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
+interface RequestContext {
+  url: string;
+  query?: Record<string, string>;
+  requestId?: string;
+  ip?: string;
+  userAgent?: string;
+  referer?: string;
+  requestContentLength?: string;
 }
 
-function buildRequestContext(c: Context) {
+function buildRequestContext(c: Context): RequestContext {
   const url = new URL(c.req.url);
   const query = Object.fromEntries(url.searchParams.entries());
   const forwardedFor = c.req.header("x-forwarded-for");
@@ -21,15 +27,38 @@ function buildRequestContext(c: Context) {
     c.req.header("cf-connecting-ip") ??
     c.req.header("x-client-ip");
 
-  return omitUndefined({
+  const requestContext: RequestContext = {
     url: url.pathname + url.search,
-    query: Object.keys(query).length > 0 ? query : undefined,
-    requestId: c.req.header("x-request-id") ?? c.req.header("x-correlation-id"),
-    ip,
-    userAgent: c.req.header("user-agent"),
-    referer: c.req.header("referer"),
-    requestContentLength: c.req.header("content-length"),
-  });
+  };
+
+  if (Object.keys(query).length > 0) {
+    requestContext.query = query;
+  }
+
+  const requestId = c.req.header("x-request-id") ?? c.req.header("x-correlation-id");
+  if (requestId) {
+    requestContext.requestId = requestId;
+  }
+  if (ip) {
+    requestContext.ip = ip;
+  }
+
+  const userAgent = c.req.header("user-agent");
+  if (userAgent) {
+    requestContext.userAgent = userAgent;
+  }
+
+  const referer = c.req.header("referer");
+  if (referer) {
+    requestContext.referer = referer;
+  }
+
+  const requestContentLength = c.req.header("content-length");
+  if (requestContentLength) {
+    requestContext.requestContentLength = requestContentLength;
+  }
+
+  return requestContext;
 }
 
 export function requestLogger(): MiddlewareHandler {
@@ -49,7 +78,9 @@ export function requestLogger(): MiddlewareHandler {
     const duration = Date.now() - start;
     const status = c.res.status;
     const level = status >= 500 ? "error" : status >= 400 ? "warn" : "info";
-    const responseContentLength = c.res.headers.get("content-length") ?? undefined;
+    const responseContentLengthHeader = c.res.headers.get("content-length");
+    const responseContentLength =
+      responseContentLengthHeader === null ? undefined : responseContentLengthHeader;
 
     baseLogger[level](
       {
