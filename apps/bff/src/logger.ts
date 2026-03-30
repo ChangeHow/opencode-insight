@@ -101,8 +101,34 @@ function createDevelopmentStream(): MultiStreamRes {
   ]);
 }
 
+function createDaemonStream(): MultiStreamRes {
+  return pino.multistream([
+    {
+      level: "debug",
+      stream: new MemoryStream(),
+    },
+    {
+      level: "info",
+      stream: pino.transport({
+        target: "pino-pretty",
+        options: {
+          colorize: false,
+          translateTime: "SYS:standard",
+          ignore: "pid,hostname",
+          singleLine: true,
+        },
+      }),
+    },
+  ]);
+}
+
+const isDaemonMode = process.env.DAEMON_MODE === "1";
 const isProduction = process.env.NODE_ENV === "production";
-const stream = isProduction ? createFileStream() : createDevelopmentStream();
+const stream = isDaemonMode
+  ? createDaemonStream()
+  : isProduction
+    ? createFileStream()
+    : createDevelopmentStream();
 
 const logger = stream
   ? pino({ level: process.env.LOG_LEVEL ?? "info" }, stream)

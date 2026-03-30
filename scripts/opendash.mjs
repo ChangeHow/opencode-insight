@@ -62,6 +62,7 @@ function startCommand({ port: portOpt, host: hostOpt }) {
     HOST: host,
     WEB_DIST_DIR: WEB_DIST,
     NODE_ENV: "production",
+    DAEMON_MODE: "1",
   };
 
   mkdirSync(LOG_DIR, { recursive: true });
