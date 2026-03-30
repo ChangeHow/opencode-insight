@@ -1,5 +1,4 @@
 import { vi, describe, test, expect, beforeEach } from "vitest";
-import type { TimeRange } from "@opencode-dashboard/shared";
 import {
   makeUsageSnapshot,
   makeRangeData,
@@ -25,6 +24,7 @@ vi.mock("../services/messages.js", () => ({
 }));
 
 import app from "../app";
+import { clearMemoryLogs, getMemoryLogs } from "../logger";
 import { loadUsageSnapshot, getRangeData, getDateFilteredData } from "../services/usage/index";
 import { invalidatePricingCache } from "../services/pricing";
 import { buildMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
@@ -40,6 +40,7 @@ const timeZone = "Asia/Shanghai";
 describe("BFF API Routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMemoryLogs();
     const snapshot = makeUsageSnapshot();
     mockLoadUsageSnapshot.mockResolvedValue(snapshot);
     mockGetRangeData.mockReturnValue(makeRangeData());
@@ -60,6 +61,51 @@ describe("BFF API Routes", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual(rangeData.summary);
+  });
+
+  test("request logs include rich request context", async () => {
+    const res = await app.request(`/api/summary?range=month&timeZone=${timeZone}`, {
+      headers: {
+        "content-length": "128",
+        referer: "http://localhost:3000/overview",
+        "user-agent": "vitest-agent",
+        "x-forwarded-for": "203.0.113.5, 10.0.0.1",
+        "x-request-id": "req-123",
+      },
+    });
+
+    expect(res.status).toBe(200);
+
+    const logs = getMemoryLogs({ search: "req-123", limit: 10 });
+    const requestLog = logs.find((log) => log.type === "request");
+    const responseLog = logs.find((log) => log.type === "response");
+
+    expect(requestLog).toMatchObject({
+      method: "GET",
+      path: "/api/summary",
+      url: `/api/summary?range=month&timeZone=${timeZone}`,
+      query: { range: "month", timeZone },
+      requestId: "req-123",
+      ip: "203.0.113.5",
+      userAgent: "vitest-agent",
+      referer: "http://localhost:3000/overview",
+      requestContentLength: "128",
+      type: "request",
+    });
+    expect(responseLog).toMatchObject({
+      method: "GET",
+      path: "/api/summary",
+      status: 200,
+      url: `/api/summary?range=month&timeZone=${timeZone}`,
+      query: { range: "month", timeZone },
+      requestId: "req-123",
+      ip: "203.0.113.5",
+      userAgent: "vitest-agent",
+      referer: "http://localhost:3000/overview",
+      requestContentLength: "128",
+      type: "response",
+    });
+    expect(responseLog?.duration).toEqual(expect.any(Number));
   });
 
   test("GET /api/summary uses range parameter to filter data", async () => {
