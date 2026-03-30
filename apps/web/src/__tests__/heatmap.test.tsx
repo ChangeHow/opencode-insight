@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Heatmap } from "../components/dashboard/heatmap";
 import { makeHeatmapDay } from "./factories";
@@ -92,6 +92,34 @@ describe("Heatmap", () => {
 
     await user.click(screen.getByRole("button", { name: /^previous month$/i }));
     expect(screen.getByText(/january 2026/i, { selector: "p" })).toBeInTheDocument();
+  });
+
+  it("should show daily cost in the calendar cell and keep tokens in the tooltip", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Heatmap
+        days={[
+          makeHeatmapDay("2025-01-16", { cost: 0.36, messages: 2, tokens: 1200, intensity: 1 }),
+        ]}
+        selectedDate={null}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const dayCell = screen.getByText("16").closest("button");
+
+    expect(dayCell).not.toBeNull();
+
+    const dayButton = dayCell!;
+
+    expect(within(dayButton).getByText("$0.36")).toBeInTheDocument();
+    expect(within(dayButton).queryByText("1.2K")).not.toBeInTheDocument();
+
+    await user.hover(dayButton);
+
+    expect((await screen.findAllByText("$0.36 estimated spend")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("1.2K tokens")).length).toBeGreaterThan(0);
   });
 
   it("should reset visible month when the range data changes", async () => {

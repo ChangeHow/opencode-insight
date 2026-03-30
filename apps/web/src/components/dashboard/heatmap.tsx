@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { parseInputDate } from "@/lib/date-range";
-import { formatCompactNumber, formatDateLabel } from "@/lib/format";
+import { formatCompactNumber, formatCurrency, formatDateLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const intensityClass = {
@@ -94,12 +94,13 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
               {dateKey.slice(8)}
             </span>
             <span className="text-[11px] font-semibold text-[var(--heat-token)]">
-              {entry.tokens > 0 ? formatCompactNumber(entry.tokens) : "0"}
+              {formatCurrency(entry.cost)}
             </span>
           </DayPickerDayButton>
         </TooltipTrigger>
         <TooltipContent>
           <p className="font-semibold">{formatDateLabel(entry.date)}</p>
+          <p>{formatCurrency(entry.cost)} estimated spend</p>
           <p>{formatCompactNumber(entry.tokens)} tokens</p>
           <p>{entry.messages} assistant messages</p>
         </TooltipContent>

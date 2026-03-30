@@ -2,14 +2,7 @@
 
 import { Command } from "commander";
 import { spawn } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { box } from "@clack/prompts";
@@ -139,13 +132,7 @@ function stopCommand() {
   try {
     process.kill(pid, "SIGTERM");
     removePidFile();
-    box(
-      [
-        `Status : Stopped`,
-        `PID    : ${pid}`,
-      ].join("\n"),
-      "opencode-telescope daemon",
-    );
+    box([`Status : Stopped`, `PID    : ${pid}`].join("\n"), "opencode-telescope daemon");
   } catch (err) {
     console.error(
       `Failed to stop daemon (PID ${pid}): ${err instanceof Error ? err.message : String(err)}`,
@@ -220,19 +207,10 @@ program
   .option("--host <host>", "Host to bind to", process.env.HOST ?? "127.0.0.1")
   .action(startCommand);
 
-program
-  .command("stop")
-  .description("Stop the running dashboard daemon")
-  .action(stopCommand);
+program.command("stop").description("Stop the running dashboard daemon").action(stopCommand);
 
-program
-  .command("status")
-  .description("Show the daemon running status")
-  .action(statusCommand);
+program.command("status").description("Show the daemon running status").action(statusCommand);
 
-program
-  .command("logs")
-  .description("Stream daemon logs (tail -f)")
-  .action(logsCommand);
+program.command("logs").description("Stream daemon logs (tail -f)").action(logsCommand);
 
 program.parse();
