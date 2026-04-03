@@ -4,6 +4,7 @@ import {
   getDateKeyWeekday,
   getPresetDateRange,
 } from "@opencode-dashboard/shared";
+import { roundCost } from "../cost";
 import type { RawMessage, SourceKind, UsageSnapshot } from "./types";
 import { totalTokens } from "./sqlite-reader";
 import { buildDayMap } from "./day-map-builder";
@@ -46,7 +47,7 @@ export function buildSnapshot(
       weekday,
       weekIndex: Math.floor(index / 7),
       tokens: day.tokens,
-      cost: Number(day.cost.toFixed(4)),
+      cost: roundCost(day.cost),
       messages: day.messages,
       breakdown: day.breakdown,
       intensity: day.tokens === 0 ? 0 : intensity,
@@ -63,7 +64,7 @@ export function buildSnapshot(
   return {
     summary: {
       totalTokens: totalTokensAll,
-      totalCost: Number(totalCostAll.toFixed(4)),
+      totalCost: roundCost(totalCostAll),
       pricedTokens: pricedTokensAll,
       pricingCoverage:
         totalTokensAll === 0 ? 0 : Number((pricedTokensAll / totalTokensAll).toFixed(4)),
@@ -74,13 +75,13 @@ export function buildSnapshot(
       currentStreak: streaks.current,
       longestStreak: streaks.longest,
       bestDay: bestDay
-        ? { date: bestDay.date, tokens: bestDay.tokens, cost: Number(bestDay.cost.toFixed(4)) }
+        ? { date: bestDay.date, tokens: bestDay.tokens, cost: roundCost(bestDay.cost) }
         : null,
       topModel: topModel
         ? {
             modelId: topModel.modelId,
             tokens: topModel.tokens,
-            cost: Number(topModel.cost.toFixed(4)),
+            cost: roundCost(topModel.cost),
           }
         : null,
       availableRanges: ["7d", "month", "3mo", "year"],

@@ -11,7 +11,7 @@ import {
 import { getCurrentTimeZone } from "@opencode-dashboard/shared";
 import { refreshSnapshot } from "@/lib/api";
 
-const AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+export const AUTO_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 
 export function useDataFetcher<T>({
   prefix,

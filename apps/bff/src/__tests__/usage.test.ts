@@ -141,6 +141,33 @@ describe("Usage Module", () => {
     });
   });
 
+  describe("Given fractional billing values", () => {
+    test("should round returned cost metrics to two decimal places", () => {
+      const today = getTodayDate();
+      const snapshot = makeUsageSnapshot({
+        breakdownByDate: new Map([
+          [
+            today,
+            makeDayBreakdown(today, {
+              cost: 0.335,
+              models: [makeModelBreakdown({ cost: 0.335 })],
+              sessions: [],
+            }),
+          ],
+        ]),
+      });
+
+      const result = getDateFilteredData(snapshot, today, today);
+
+      expect(result.summary.totalCost).toBe(0.34);
+      expect(result.heatmap[0]?.cost).toBe(0.34);
+      expect(result.trend[0]?.cost).toBe(0.34);
+      expect(result.seriesOptions[0]?.totalCost).toBe(0.34);
+      expect(result.providers[0]?.totalCost).toBe(0.34);
+      expect(result.providers[0]?.topModel?.cost).toBe(0.34);
+    });
+  });
+
   describe("Given empty snapshot", () => {
     test("should return zero totals when getRangeData is called", () => {
       const snapshot = makeUsageSnapshot({

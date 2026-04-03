@@ -5,6 +5,7 @@ import {
   getPresetDateRange,
   shiftDateKey,
 } from "@opencode-dashboard/shared";
+import { roundCost } from "../cost";
 import type { RangeData, UsageSnapshot } from "./types";
 import { emptyBreakdown } from "./sqlite-reader";
 import { filterMessagesByProvider } from "./snapshot";
@@ -110,7 +111,7 @@ function buildHeatmap(days: DayBreakdown[]) {
       weekday,
       weekIndex: Math.floor(index / 7),
       tokens: day.tokens,
-      cost: Number(day.cost.toFixed(4)),
+      cost: roundCost(day.cost),
       messages: day.messages,
       breakdown: day.breakdown,
       intensity,
@@ -122,7 +123,7 @@ function buildTrendFromDays(days: DayBreakdown[]) {
   return days.map((day) => ({
     date: day.date,
     tokens: day.tokens,
-    cost: Number(day.cost.toFixed(4)),
+    cost: roundCost(day.cost),
     messages: day.messages,
   }));
 }

@@ -1,4 +1,4 @@
-import { vi, describe, test, expect, beforeEach } from "vitest";
+import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createStore, Provider } from "jotai";
 import type { ReactNode } from "react";
@@ -33,15 +33,18 @@ vi.mock("../lib/api.js", () => ({
 }));
 
 import { useDashboardData } from "../lib/use-dashboard-data";
-import { fetchDashboard } from "../lib/api";
+import { fetchDashboard, refreshSnapshot } from "../lib/api";
+import { AUTO_REFRESH_INTERVAL_MS } from "../lib/use-data-fetcher";
 
 const mockFetchDashboard = vi.mocked(fetchDashboard);
+const mockRefreshSnapshot = vi.mocked(refreshSnapshot);
 
 describe("useDashboardData Hook", () => {
   let store: ReturnType<typeof createStore>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     store = createStore();
 
     mockFetchDashboard.mockResolvedValue({
@@ -52,6 +55,10 @@ describe("useDashboardData Hook", () => {
       providers: makeProviderInsightsPayload().providers,
       selectedDay: null,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   function wrapper({ children }: { children: ReactNode }) {
@@ -189,5 +196,30 @@ describe("useDashboardData Hook", () => {
     expect(store.get(seriesOptionsAtom)).toEqual([]);
     expect(store.get(seriesLinesAtom)).toEqual([]);
     expect(store.get(providerInsightsAtom)).toEqual([]);
+  });
+
+  test("should auto refresh every 10 minutes", async () => {
+    vi.useFakeTimers();
+
+    const { unmount } = renderHook(() => useDashboardData(), { wrapper });
+
+    await waitFor(() => {
+      expect(store.get(loadingAtom)).toBe(false);
+    });
+
+    const initialFetchCount = mockFetchDashboard.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTO_REFRESH_INTERVAL_MS);
+    });
+
+    await waitFor(() => {
+      expect(mockRefreshSnapshot).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(mockFetchDashboard.mock.calls.length).toBeGreaterThan(initialFetchCount);
+    });
+
+    unmount();
   });
 });

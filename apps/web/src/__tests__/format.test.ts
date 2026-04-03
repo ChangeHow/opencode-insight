@@ -29,19 +29,19 @@ describe("Format Functions", () => {
   });
 
   describe("formatCurrency", () => {
-    it("should show 0-2 decimal places for amounts >= $1 (based on value)", () => {
-      expect(formatCurrency(1)).toBe("$1");
-      expect(formatCurrency(10.5)).toBe("$10.5");
+    it("should always show 2 decimal places for amounts >= $1", () => {
+      expect(formatCurrency(1)).toBe("$1.00");
+      expect(formatCurrency(10.5)).toBe("$10.50");
       expect(formatCurrency(100.123)).toBe("$100.12");
-      expect(formatCurrency(1000)).toBe("$1,000");
+      expect(formatCurrency(1000)).toBe("$1,000.00");
     });
 
-    it("should show 2-4 decimal places for amounts < $1", () => {
+    it("should round amounts under $1 to 2 decimal places", () => {
       expect(formatCurrency(0.5)).toBe("$0.50");
       expect(formatCurrency(0.05)).toBe("$0.05");
-      expect(formatCurrency(0.005)).toBe("$0.005");
-      expect(formatCurrency(0.0051)).toBe("$0.0051");
-      expect(formatCurrency(0.00512)).toBe("$0.0051");
+      expect(formatCurrency(0.005)).toBe("$0.01");
+      expect(formatCurrency(0.0051)).toBe("$0.01");
+      expect(formatCurrency(0.00512)).toBe("$0.01");
     });
   });
 

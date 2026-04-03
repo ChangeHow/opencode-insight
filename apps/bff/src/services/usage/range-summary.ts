@@ -6,6 +6,7 @@ import type {
   ProviderInsight,
   TrendPoint,
 } from "@opencode-dashboard/shared";
+import { roundCost } from "../cost";
 import type { UsageSnapshot } from "./types";
 import { computeStreak } from "./streak";
 
@@ -61,7 +62,7 @@ export function buildSeries(
       label: entry.label,
       providerId: entry.providerId,
       modelId: entry.modelId,
-      totalCost: Number(entry.totalCost.toFixed(4)),
+      totalCost: roundCost(entry.totalCost),
       totalTokens: entry.totalTokens,
       totalMessages: entry.totalMessages,
     }));
@@ -146,7 +147,7 @@ export function buildProviderInsights(days: DayBreakdown[]) {
         )[0] ?? null;
       return {
         providerId: entry.providerId,
-        totalCost: Number(entry.totalCost.toFixed(4)),
+        totalCost: roundCost(entry.totalCost),
         totalTokens: entry.totalTokens,
         pricedTokens: entry.pricedTokens,
         pricingCoverage:
@@ -158,7 +159,7 @@ export function buildProviderInsights(days: DayBreakdown[]) {
           ? {
               modelId: topModel.modelId,
               tokens: topModel.tokens,
-              cost: Number(topModel.cost.toFixed(4)),
+              cost: roundCost(topModel.cost),
             }
           : null,
         trend: sortedDates.map(
@@ -196,7 +197,7 @@ export function buildRangeSummary(snapshot: UsageSnapshot, summaryDays: DayBreak
   return {
     ...snapshot.summary,
     totalTokens,
-    totalCost: Number(totalCost.toFixed(4)),
+    totalCost: roundCost(totalCost),
     pricedTokens,
     pricingCoverage: totalTokens === 0 ? 0 : Number((pricedTokens / totalTokens).toFixed(4)),
     totalMessages,
@@ -206,13 +207,13 @@ export function buildRangeSummary(snapshot: UsageSnapshot, summaryDays: DayBreak
     currentStreak: streaks.current,
     longestStreak: streaks.longest,
     bestDay: bestDay
-      ? { date: bestDay.date, tokens: bestDay.tokens, cost: Number(bestDay.cost.toFixed(4)) }
+      ? { date: bestDay.date, tokens: bestDay.tokens, cost: roundCost(bestDay.cost) }
       : null,
     topModel: topModel
       ? {
           modelId: topModel.modelId,
           tokens: topModel.tokens,
-          cost: Number(topModel.cost.toFixed(4)),
+          cost: roundCost(topModel.cost),
         }
       : null,
   } satisfies DashboardSummary;

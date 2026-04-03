@@ -1,5 +1,6 @@
 import type { DayBreakdown, SessionBreakdown, TokenBreakdown } from "@opencode-dashboard/shared";
 import { formatDateInTimeZone } from "@opencode-dashboard/shared";
+import { roundCost } from "../cost";
 import type { RawMessage } from "./types";
 import { emptyBreakdown, totalTokens } from "./sqlite-reader";
 
@@ -141,7 +142,7 @@ export function buildDayMap(messages: RawMessage[], timeZone: string) {
       directory: session.directory,
       tokens: session.tokens,
       pricedTokens: session.pricedTokens,
-      cost: Number(session.cost.toFixed(4)),
+      cost: roundCost(session.cost),
       messages: session.messages,
       breakdown: session.breakdown,
       models: [...session.models.values()].toSorted(
