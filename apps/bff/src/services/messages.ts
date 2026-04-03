@@ -13,6 +13,7 @@ import type {
   TokenBreakdown,
   ToolUsageStat,
 } from "@opencode-dashboard/shared";
+import { roundCost } from "./cost";
 import { querySqliteRows } from "./sqlite";
 
 export interface RawMessageRow {
@@ -228,7 +229,7 @@ function parseMessage(row: RawMessageRow, parts: MessagePart[]): MessageDetail |
     completedAt: data.time?.completed ? Math.trunc(data.time.completed) : undefined,
     modelId: data.modelID,
     providerId: data.providerID,
-    cost: Math.max(0, Number(data.cost ?? 0)),
+    cost: roundCost(Math.max(0, Number(data.cost ?? 0))),
     tokens: normalizeTokens(data.tokens),
     finish: data.finish,
     parts,
@@ -306,20 +307,21 @@ export async function buildMessagePayloads(
   const timeline: TimelinePoint[] = [];
   const toolCountMap = new Map<string, { count: number; totalTokens: number }>();
   let cumulativeTokens = 0;
-  let cumulativeCost = 0;
+  let intermediateCumulativeCost = 0;
 
   for (let i = 0; i < allMessages.length; i++) {
     const msg = allMessages[i];
     const msgTokens = totalTokenCount(msg.tokens);
     cumulativeTokens += msgTokens;
-    cumulativeCost += msg.cost;
+    intermediateCumulativeCost += msg.cost;
+    const cumulativeCost = roundCost(intermediateCumulativeCost);
 
     timeline.push({
       messageIndex: i,
       role: msg.role,
       createdAt: msg.createdAt,
       tokens: msg.tokens,
-      cost: msg.cost,
+      cost: roundCost(msg.cost),
       cumulativeTokens,
       cumulativeCost,
     });

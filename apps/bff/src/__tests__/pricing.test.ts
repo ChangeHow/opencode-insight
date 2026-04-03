@@ -51,7 +51,7 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       // Base rates: 50000 * 0.000003 + 25000 * 0.000015 = 0.15 + 0.375 = 0.525
-      expect(result.estimatedCost).toBeCloseTo(0.525, 5);
+      expect(result.estimatedCost).toBe(0.53);
     });
   });
 
@@ -72,7 +72,7 @@ describe("Pricing Module", () => {
       // Next 50k input: 50000 * 0.000002 = 0.1
       // Output under 200k: 100000 * 0.000015 = 1.5
       // Total: 0.6 + 0.1 + 1.5 = 2.2
-      expect(result.estimatedCost).toBeCloseTo(2.2, 5);
+      expect(result.estimatedCost).toBe(2.2);
     });
   });
 
@@ -99,7 +99,7 @@ describe("Pricing Module", () => {
       // Cache read: 50000 * 0.0000003 = 0.015
       // Cache write: 20000 * 0.00000375 = 0.075
       // Total: 0.03 + 0.075 + 0.015 + 0.075 = 0.195
-      expect(result.estimatedCost).toBeCloseTo(0.195, 5);
+      expect(result.estimatedCost).toBe(0.2);
     });
   });
 
@@ -119,7 +119,7 @@ describe("Pricing Module", () => {
       expect(result.priced).toBe(true);
       // Cursor override rates: input 0.00000175, output 0.000014
       // 10000 * 0.00000175 + 5000 * 0.000014 = 0.0175 + 0.07 = 0.0875
-      expect(result.estimatedCost).toBeCloseTo(0.0875, 5);
+      expect(result.estimatedCost).toBe(0.09);
     });
   });
 
@@ -141,7 +141,7 @@ describe("Pricing Module", () => {
       // output: 5000 * 0.000004 = 0.02
       // cacheRead: 20000 * 0.00000024 = 0.0048
       // Total: 0.012 + 0.02 + 0.0048 = 0.0368
-      expect(result.estimatedCost).toBeCloseTo(0.0368, 5);
+      expect(result.estimatedCost).toBe(0.04);
     });
 
     it("should price gpt-5.3-codex via fallback dataset", () => {
@@ -157,7 +157,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "gpt-5.3-codex", "cursor", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBeCloseTo(0.0875, 5);
+      expect(result.estimatedCost).toBe(0.09);
     });
 
     it("should price composer-1.5 via fallback dataset", () => {
@@ -174,7 +174,7 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       // 10000 * 0.0000035 + 5000 * 0.0000175 = 0.035 + 0.0875 = 0.1225
-      expect(result.estimatedCost).toBeCloseTo(0.1225, 5);
+      expect(result.estimatedCost).toBe(0.12);
     });
 
     it("should prefer zai pricing for zai-coding-plan over openrouter matches", () => {
@@ -195,7 +195,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "glm-5", "zai-coding-plan", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBeCloseTo(0.232, 5);
+      expect(result.estimatedCost).toBe(0.23);
     });
 
     it("should price glm-5.1 using glm-5 alias for zai providers", () => {
@@ -211,7 +211,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "glm-5.1", "zai-coding-plan", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBeCloseTo(0.03, 5);
+      expect(result.estimatedCost).toBe(0.03);
     });
   });
 });

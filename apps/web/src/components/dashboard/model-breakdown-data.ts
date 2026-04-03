@@ -19,7 +19,7 @@ export function buildModelBreakdownData(models: ModelBreakdown[]): {
     label: `${model.providerId} / ${model.modelId}`,
     providerId: model.providerId,
     modelId: model.modelId,
-    cost: Number(model.cost.toFixed(4)),
+    cost: Number(model.cost.toFixed(2)),
     tokens: model.tokens,
   }));
 

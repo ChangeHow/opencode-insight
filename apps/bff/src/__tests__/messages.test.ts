@@ -21,7 +21,7 @@ describe("message payload builder", () => {
           time: { created: 1_700_000_010_000, completed: 1_700_000_020_000 },
           modelID: "glm-5.1",
           providerID: "zai-coding-plan",
-          cost: 0.25,
+          cost: 0.255,
           tokens: {
             input: 100,
             output: 40,
@@ -70,6 +70,8 @@ describe("message payload builder", () => {
     expect(payloads.overview.totalMessages).toBe(2);
     expect(payloads.overview.timeline).toHaveLength(2);
     expect(payloads.overview.timeline[1]?.cumulativeTokens).toBe(165);
+    expect(payloads.overview.timeline[1]?.cost).toBe(0.26);
+    expect(payloads.overview.timeline[1]?.cumulativeCost).toBe(0.26);
     expect(payloads.overview.toolUsage).toEqual([{ tool: "read", count: 1, totalTokens: 165 }]);
 
     expect(payloads.distribution.totalMessages).toBe(2);
@@ -91,6 +93,7 @@ describe("message payload builder", () => {
     expect(page.total).toBe(2);
     expect(page.messages[1]).toMatchObject({
       id: "msg_assistant",
+      cost: 0.26,
       parts: [
         { type: "text", text: "hello" },
         { type: "tool", toolName: "read", status: "completed", title: "Read file" },

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import type { TokenBreakdown } from "@opencode-dashboard/shared";
 import { formatDateInTimeZone, DEFAULT_TIME_ZONE } from "@opencode-dashboard/shared";
 import { logger } from "../../logger";
+import { roundCost } from "../cost";
 import { querySqliteRows } from "../sqlite";
 import type { RawMessage } from "./types";
 
@@ -101,7 +102,7 @@ export function parseAssistantMessage(
     timestampMs,
     modelId: message.modelID,
     providerId: message.providerID ?? "unknown",
-    cost: Math.max(0, Number(message.cost ?? 0)),
+    cost: roundCost(Math.max(0, Number(message.cost ?? 0))),
     estimatedCost: 0,
     pricedTokens: 0,
     tokens,
