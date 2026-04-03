@@ -307,14 +307,14 @@ export async function buildMessagePayloads(
   const timeline: TimelinePoint[] = [];
   const toolCountMap = new Map<string, { count: number; totalTokens: number }>();
   let cumulativeTokens = 0;
-  let unroundedCumulativeCost = 0;
+  let intermediateCumulativeCost = 0;
 
   for (let i = 0; i < allMessages.length; i++) {
     const msg = allMessages[i];
     const msgTokens = totalTokenCount(msg.tokens);
     cumulativeTokens += msgTokens;
-    unroundedCumulativeCost += msg.cost;
-    const cumulativeCost = roundCost(unroundedCumulativeCost);
+    intermediateCumulativeCost += msg.cost;
+    const cumulativeCost = roundCost(intermediateCumulativeCost);
 
     timeline.push({
       messageIndex: i,
