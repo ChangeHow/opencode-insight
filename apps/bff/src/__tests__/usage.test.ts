@@ -145,16 +145,7 @@ describe("Usage Module", () => {
     test("should round returned cost metrics to two decimal places", () => {
       const today = getTodayDate();
       const snapshot = makeUsageSnapshot({
-        breakdownByDate: new Map([
-          [
-            today,
-            makeDayBreakdown(today, {
-              cost: 0.335,
-              models: [makeModelBreakdown({ cost: 0.335 })],
-              sessions: [],
-            }),
-          ],
-        ]),
+        messages: [makeRawMessage(today, { estimatedCost: 0.335 })],
       });
 
       const result = getDateFilteredData(snapshot, today, today);

@@ -203,22 +203,20 @@ describe("useDashboardData Hook", () => {
 
     const { unmount } = renderHook(() => useDashboardData(), { wrapper });
 
-    await waitFor(() => {
-      expect(store.get(loadingAtom)).toBe(false);
+    await act(async () => {
+      await Promise.resolve();
     });
+    expect(store.get(loadingAtom)).toBe(false);
 
     const initialFetchCount = mockFetchDashboard.mock.calls.length;
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(AUTO_REFRESH_INTERVAL_MS);
+      await Promise.resolve();
     });
 
-    await waitFor(() => {
-      expect(mockRefreshSnapshot).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(mockFetchDashboard.mock.calls.length).toBeGreaterThan(initialFetchCount);
-    });
+    expect(mockRefreshSnapshot).toHaveBeenCalledTimes(1);
+    expect(mockFetchDashboard.mock.calls.length).toBeGreaterThan(initialFetchCount);
 
     unmount();
   });
