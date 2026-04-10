@@ -19,6 +19,14 @@ const intensityClass = {
   4: "bg-[var(--heat-4)] text-[var(--heat-fg-4)]",
 } as const;
 
+const spendClass = {
+  0: "text-[var(--heat-token-0)]",
+  1: "text-[var(--heat-token-1)]",
+  2: "text-[var(--heat-token-2)]",
+  3: "text-[var(--heat-token-3)]",
+  4: "text-[var(--heat-token-4)]",
+} as const;
+
 interface HeatmapProps {
   days: HeatmapDay[];
   selectedDate: string | null;
@@ -93,7 +101,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">
               {dateKey.slice(8)}
             </span>
-            <span className="text-[11px] font-semibold text-[var(--heat-token)]">
+            <span className={cn("text-[11px] font-semibold", spendClass[entry.intensity])}>
               {formatCurrency(entry.cost)}
             </span>
           </DayPickerDayButton>
