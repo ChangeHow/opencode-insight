@@ -64,7 +64,11 @@
   --heat-fg-2: oklch(0.42 0.06 55);
   --heat-fg-3: oklch(0.97 0.01 70);
   --heat-fg-4: oklch(0.98 0.01 70);
-  --heat-token: rgba(28, 22, 17, 0.52);
+  --heat-token-0: rgba(28, 22, 17, 0.42);
+  --heat-token-1: rgba(28, 22, 17, 0.54);
+  --heat-token-2: rgba(28, 22, 17, 0.68);
+  --heat-token-3: rgba(255, 255, 255, 0.92);
+  --heat-token-4: rgba(255, 255, 255, 0.96);
   --heat-empty-fg: color-mix(in oklch, var(--foreground) 26%, white);
   --heat-empty-date: color-mix(in oklch, var(--foreground) 20%, white);
   --chart: oklch(0.6 0.14 39);
@@ -102,7 +106,11 @@
   --heat-fg-2: oklch(0.83 0.02 62);
   --heat-fg-3: oklch(0.95 0.01 70);
   --heat-fg-4: oklch(0.17 0.02 38);
-  --heat-token: rgba(255, 255, 255, 0.62);
+  --heat-token-0: rgba(255, 255, 255, 0.56);
+  --heat-token-1: rgba(255, 255, 255, 0.72);
+  --heat-token-2: rgba(255, 255, 255, 0.84);
+  --heat-token-3: rgba(255, 255, 255, 0.94);
+  --heat-token-4: rgba(255, 255, 255, 0.96);
   --heat-empty-fg: oklch(0.44 0.018 45);
   --heat-empty-date: oklch(0.74 0.018 58);
   --chart: oklch(0.76 0.15 52);

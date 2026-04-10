@@ -26,6 +26,12 @@ describe("Format Functions", () => {
       expect(formatCompactNumber(1500000)).toBe("1.5M");
       expect(formatCompactNumber(5000000)).toBe("5M");
     });
+
+    it("should show 'B' suffix for billions", () => {
+      expect(formatCompactNumber(1000000000)).toBe("1B");
+      expect(formatCompactNumber(1500000000)).toBe("1.5B");
+      expect(formatCompactNumber(5000000000)).toBe("5B");
+    });
   });
 
   describe("formatCurrency", () => {

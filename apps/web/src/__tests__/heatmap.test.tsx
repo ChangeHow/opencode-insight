@@ -122,6 +122,22 @@ describe("Heatmap", () => {
     expect((await screen.findAllByText("1.2K tokens")).length).toBeGreaterThan(0);
   });
 
+  it("should use light spend text on darker heat levels", () => {
+    render(
+      <Heatmap
+        days={[
+          makeHeatmapDay("2025-01-16", { cost: 36.47, messages: 2, tokens: 1200, intensity: 4 }),
+        ]}
+        selectedDate={null}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const amount = screen.getByText("$36.47");
+
+    expect(amount).toHaveClass("text-[var(--heat-token-4)]");
+  });
+
   it("should reset visible month when the range data changes", async () => {
     const user = userEvent.setup();
 
