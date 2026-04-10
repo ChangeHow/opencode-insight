@@ -13,10 +13,6 @@ vi.mock("../services/usage/index.js", () => ({
   getDateFilteredData: vi.fn(),
 }));
 
-vi.mock("../services/pricing.js", () => ({
-  invalidatePricingCache: vi.fn(),
-}));
-
 vi.mock("../services/messages.js", () => ({
   buildMessagePayloads: vi.fn(),
   getDbPath: vi.fn(() => "/tmp/opencode.db"),
@@ -26,13 +22,11 @@ vi.mock("../services/messages.js", () => ({
 import app from "../app";
 import { clearMemoryLogs, getMemoryLogs } from "../logger";
 import { loadUsageSnapshot, getRangeData, getDateFilteredData } from "../services/usage/index";
-import { invalidatePricingCache } from "../services/pricing";
 import { buildMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
 
 const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
 const mockGetRangeData = vi.mocked(getRangeData);
 const mockGetDateFilteredData = vi.mocked(getDateFilteredData);
-const mockInvalidatePricingCache = vi.mocked(invalidatePricingCache);
 const mockBuildMessagePayloads = vi.mocked(buildMessagePayloads);
 const mockInvalidateMessagePayloadCache = vi.mocked(invalidateMessagePayloadCache);
 const timeZone = "Asia/Shanghai";
@@ -343,7 +337,6 @@ describe("BFF API Routes", () => {
     const res = await app.request("/api/refresh", { method: "POST" });
 
     expect(res.status).toBe(200);
-    expect(mockInvalidatePricingCache).toHaveBeenCalled();
     expect(mockInvalidateMessagePayloadCache).toHaveBeenCalled();
     expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
 

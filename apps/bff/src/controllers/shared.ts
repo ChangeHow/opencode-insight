@@ -4,6 +4,7 @@ import { resolveTimeZone } from "@opencode-dashboard/shared";
 import { getDateFilteredData, getRangeData, loadUsageSnapshot } from "../services/usage/index";
 
 export let snapshotPromise = loadUsageSnapshot();
+let refreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
 
 export function parseRange(value: string | undefined): TimeRange {
   if (value === "7d" || value === "month" || value === "3mo" || value === "year") {
@@ -24,6 +25,18 @@ export async function readData(c: Context, providerId?: string) {
 }
 
 export function refreshSnapshot() {
-  snapshotPromise = loadUsageSnapshot({ forceRefresh: true });
-  return snapshotPromise;
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = loadUsageSnapshot({ forceRefresh: true })
+    .then((snapshot) => {
+      snapshotPromise = Promise.resolve(snapshot);
+      return snapshot;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
 }

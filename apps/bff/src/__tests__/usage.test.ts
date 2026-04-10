@@ -73,6 +73,20 @@ describe("Usage Module", () => {
       expect(result.trend.length).toBeGreaterThan(0);
       expect(result.summary).toBeDefined();
     });
+
+    test("should reuse precomputed breakdowns for default timezone requests", () => {
+      const today = getTodayDate();
+      const snapshot = makeUsageSnapshot({
+        messages: [],
+        breakdownByDate: new Map([[today, makeDayBreakdown(today, { tokens: 1234, messages: 2 })]]),
+      });
+
+      const result = getDateFilteredData(snapshot, today, today);
+
+      expect(result.summary.totalTokens).toBe(1234);
+      expect(result.summary.totalMessages).toBe(2);
+      expect(result.byDate.get(today)?.tokens).toBe(1234);
+    });
   });
 
   describe("Given multiple models used on one day", () => {
@@ -146,6 +160,39 @@ describe("Usage Module", () => {
       const today = getTodayDate();
       const snapshot = makeUsageSnapshot({
         messages: [makeRawMessage(today, { estimatedCost: 0.335 })],
+        breakdownByDate: new Map([
+          [
+            today,
+            makeDayBreakdown(today, {
+              cost: 0.335,
+              tokens: 6500,
+              pricedTokens: 6500,
+              messages: 10,
+              breakdown: {
+                input: 5000,
+                output: 1500,
+                cacheRead: 0,
+                cacheWrite: 0,
+                reasoning: 0,
+              },
+              models: [
+                makeModelBreakdown({
+                  cost: 0.335,
+                  tokens: 6500,
+                  pricedTokens: 6500,
+                  messages: 10,
+                  breakdown: {
+                    input: 5000,
+                    output: 1500,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                    reasoning: 0,
+                  },
+                }),
+              ],
+            }),
+          ],
+        ]),
       });
 
       const result = getDateFilteredData(snapshot, today, today);
