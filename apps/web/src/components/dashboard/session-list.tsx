@@ -1,8 +1,11 @@
+import { useState } from "react";
 import type { SessionBreakdown } from "@opencode-dashboard/shared";
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, MessageSquare } from "lucide-react";
+import { ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { Stat } from "@/components/dashboard/stat";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 
 const TOKEN_THRESHOLD = 1_000_000;
@@ -10,14 +13,18 @@ const TOKEN_THRESHOLD = 1_000_000;
 export function SessionListPanel({
   date,
   sessions,
+  hiddenSessions,
   totalSessions,
   filteredCount,
 }: {
   date: string;
   sessions: SessionBreakdown[];
+  hiddenSessions: SessionBreakdown[];
   totalSessions: number;
   filteredCount: number;
 }) {
+  const [showHiddenSessions, setShowHiddenSessions] = useState(false);
+
   if (totalSessions === 0) {
     return (
       <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-6">
@@ -34,23 +41,6 @@ export function SessionListPanel({
     );
   }
 
-  if (sessions.length === 0 && filteredCount > 0) {
-    return (
-      <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-          Sessions
-        </p>
-        <h3 className="mt-2 text-lg font-semibold text-[var(--foreground)]">
-          No high-token sessions
-        </h3>
-        <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-          This day has {totalSessions} session{totalSessions > 1 ? "s" : ""}, but all have fewer
-          than {formatCompactNumber(TOKEN_THRESHOLD)} tokens.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">
       <div className="space-y-2">
@@ -62,15 +52,53 @@ export function SessionListPanel({
         </h3>
         {filteredCount > 0 && (
           <p className="text-xs text-[var(--muted-foreground)]">
-            {filteredCount} session{filteredCount > 1 ? "s" : ""} below threshold hidden
+            {filteredCount} session{filteredCount > 1 ? "s" : ""} below threshold hidden by default
           </p>
         )}
       </div>
-      <div className="mt-5 max-h-[450px] overflow-y-auto space-y-3">
-        {sessions.map((session) => (
-          <SessionCard key={session.sessionId} date={date} session={session} />
-        ))}
-      </div>
+      {sessions.length > 0 ? (
+        <div className="mt-5 max-h-[450px] overflow-y-auto space-y-3">
+          {sessions.map((session) => (
+            <SessionCard key={session.sessionId} date={date} session={session} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-[22px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/45 p-4 text-sm text-[var(--muted-foreground)]">
+          No sessions meet the {formatCompactNumber(TOKEN_THRESHOLD)} token threshold. Expand the
+          hidden sessions below to inspect the rest of the day.
+        </div>
+      )}
+      {hiddenSessions.length > 0 && (
+        <Collapsible open={showHiddenSessions} onOpenChange={setShowHiddenSessions}>
+          <div className="mt-4 rounded-[22px] border border-[var(--border)] bg-[var(--panel-strong)]/45 p-2">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-auto w-full justify-between rounded-[18px] px-3 py-2.5"
+              >
+                <span>
+                  {showHiddenSessions ? "Hide" : "Show"} {filteredCount} session
+                  {filteredCount > 1 ? "s" : ""} below {formatCompactNumber(TOKEN_THRESHOLD)} tokens
+                </span>
+                <ChevronDown
+                  className={`size-4 transition-transform ${showHiddenSessions ? "rotate-180" : ""}`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-2 pt-2 pb-1">
+              <p className="mb-3 text-xs text-[var(--muted-foreground)]">
+                These sessions are hidden by default, but you can still open any of them to inspect
+                detailed usage.
+              </p>
+              <div className="max-h-[360px] space-y-3 overflow-y-auto">
+                {hiddenSessions.map((session) => (
+                  <SessionCard key={session.sessionId} date={date} session={session} />
+                ))}
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      )}
     </div>
   );
 }

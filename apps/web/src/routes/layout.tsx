@@ -84,6 +84,8 @@ export function DetailStickyHeader({
   onRefresh?: () => Promise<void>;
 }) {
   const [refreshing, setRefreshing] = useState(false);
+  const detailHeaderLinkClassName =
+    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
 
   async function handleRefreshClick() {
     if (!onRefresh || refreshing || !canRefresh) return;
@@ -98,14 +100,13 @@ export function DetailStickyHeader({
   return (
     <StickyHeaderShell>
       <div className="relative flex items-center justify-between gap-3">
-        <div className="relative z-10 shrink-0">
-          <Link
-            to={backTo}
-            params={backParams}
-            className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          >
+        <div className="relative z-10 flex shrink-0 items-center gap-2">
+          <Link to={backTo} params={backParams} className={detailHeaderLinkClassName}>
             <ChevronLeft className="size-4" />
             {backLabel}
+          </Link>
+          <Link to="/" className={detailHeaderLinkClassName}>
+            Dashboard home
           </Link>
         </div>
         <p className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-base font-semibold text-[var(--foreground)]">
