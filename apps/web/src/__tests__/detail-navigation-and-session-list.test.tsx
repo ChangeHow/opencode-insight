@@ -51,12 +51,6 @@ describe("detail navigation and session list", () => {
   });
 
   test("renders a dashboard-home shortcut beside the back button", () => {
-    globalThis.IntersectionObserver = class {
-      observe() {}
-      disconnect() {}
-      unobserve() {}
-    } as typeof IntersectionObserver;
-
     render(
       <DetailStickyHeader
         backTo="/overview"

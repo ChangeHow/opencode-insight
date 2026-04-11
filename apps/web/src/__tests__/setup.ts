@@ -6,4 +6,11 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
+class IntersectionObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 globalThis.ResizeObserver = ResizeObserverMock;
+globalThis.IntersectionObserver = IntersectionObserverMock as typeof IntersectionObserver;
