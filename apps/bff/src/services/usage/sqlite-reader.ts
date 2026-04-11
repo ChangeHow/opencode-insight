@@ -9,22 +9,45 @@ import type { RawMessage } from "./types";
 const SQLITE_USAGE_QUERY = `
   SELECT
     m.id,
-    m.data,
+    m.time_created,
+    json_extract(m.data, '$.modelID') AS model_id,
+    json_extract(m.data, '$.providerID') AS provider_id,
+    json_extract(m.data, '$.cost') AS cost,
+    json_extract(m.data, '$.tokens.input') AS input_tokens,
+    json_extract(m.data, '$.tokens.output') AS output_tokens,
+    json_extract(m.data, '$.tokens.reasoning') AS reasoning_tokens,
+    json_extract(m.data, '$.tokens.cache.read') AS cache_read_tokens,
+    json_extract(m.data, '$.tokens.cache.write') AS cache_write_tokens,
     s.id AS session_id,
     s.title AS session_title,
     s.slug AS session_slug,
     s.directory AS session_directory
   FROM message m
   JOIN session s ON s.id = m.session_id
+  WHERE json_extract(m.data, '$.role') = 'assistant'
+    AND json_extract(m.data, '$.modelID') IS NOT NULL
 `;
 
 interface SqliteUsageRow {
   id: string;
-  data: string;
+  time_created: number;
+  model_id: string;
+  provider_id: string | null;
+  cost: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  reasoning_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
   session_id: string;
   session_title: string;
   session_slug: string | null;
   session_directory: string;
+}
+
+function toFiniteNumber(value: unknown) {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) ? number : 0;
 }
 
 export function emptyBreakdown(): TokenBreakdown {
@@ -112,16 +135,34 @@ export function parseAssistantMessage(
 function parseUsageRows(rows: SqliteUsageRow[]) {
   return rows
     .map((row) => {
-      try {
-        return parseAssistantMessage(JSON.parse(row.data), row.id, {
-          id: row.session_id,
-          title: row.session_title,
-          slug: row.session_slug ?? "",
-          directory: row.session_directory,
-        });
-      } catch {
+      const timestampMs = Math.trunc(toFiniteNumber(row.time_created));
+      if (!timestampMs || !row.model_id) {
         return null;
       }
+
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        sessionTitle: row.session_title,
+        sessionSlug: row.session_slug ?? "",
+        sessionDirectory: row.session_directory,
+        date: formatDateInTimeZone(timestampMs, DEFAULT_TIME_ZONE),
+        timestampMs,
+        modelId: row.model_id,
+        providerId: row.provider_id ?? "unknown",
+        cost: roundCost(Math.max(0, toFiniteNumber(row.cost))),
+        estimatedCost: 0,
+        pricedTokens: 0,
+        tokens: normalizeTokenBreakdown({
+          input: toFiniteNumber(row.input_tokens),
+          output: toFiniteNumber(row.output_tokens),
+          reasoning: toFiniteNumber(row.reasoning_tokens),
+          cache: {
+            read: toFiniteNumber(row.cache_read_tokens),
+            write: toFiniteNumber(row.cache_write_tokens),
+          },
+        }),
+      } satisfies RawMessage;
     })
     .filter((item): item is RawMessage => item !== null);
 }

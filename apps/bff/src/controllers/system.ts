@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { getMemoryLogs, getMemoryLogsStats } from "../logger";
-import { invalidatePricingCache } from "../services/pricing";
 import { invalidateMessagePayloadCache } from "../services/messages";
 import { refreshSnapshot } from "./shared";
 
@@ -15,7 +14,6 @@ system.get("/api/logs", (c) => {
 });
 
 system.post("/api/refresh", async (c) => {
-  invalidatePricingCache();
   invalidateMessagePayloadCache();
   const snapshot = await refreshSnapshot();
   return c.json({ ok: true, scannedAt: snapshot.summary.scannedAt });

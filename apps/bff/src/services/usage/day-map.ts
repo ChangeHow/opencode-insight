@@ -15,6 +15,8 @@ import { buildSnapshot } from "./snapshot-builder";
 
 export { buildDayMap, buildSnapshot };
 
+const derivedDayMapCache = new WeakMap<UsageSnapshot, Map<string, Map<string, DayBreakdown>>>();
+
 function emptyDayBreakdown(date: string): DayBreakdown {
   return {
     date,
@@ -128,6 +130,24 @@ function buildTrendFromDays(days: DayBreakdown[]) {
   }));
 }
 
+function getSourceByDate(snapshot: UsageSnapshot, timeZone: string, providerId?: string) {
+  if (!providerId && timeZone === DEFAULT_TIME_ZONE) {
+    return snapshot.breakdownByDate;
+  }
+
+  const cacheKey = `${timeZone}:${providerId ?? ""}`;
+  const snapshotCache = derivedDayMapCache.get(snapshot) ?? new Map();
+  const cached = snapshotCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const derived = buildDayMap(filterMessagesByProvider(snapshot.messages, providerId), timeZone);
+  snapshotCache.set(cacheKey, derived);
+  derivedDayMapCache.set(snapshot, snapshotCache);
+  return derived;
+}
+
 export function getRangeData(
   snapshot: UsageSnapshot,
   range: TimeRange,
@@ -136,10 +156,7 @@ export function getRangeData(
   providerId?: string,
 ): RangeData {
   const { start, end } = getPresetBounds(range, timeZone);
-  const sourceByDate = buildDayMap(
-    filterMessagesByProvider(snapshot.messages, providerId),
-    timeZone,
-  );
+  const sourceByDate = getSourceByDate(snapshot, timeZone, providerId);
   const byDate = new Map<string, DayBreakdown>();
   for (const [date, breakdown] of sourceByDate.entries()) {
     if (date >= start && date <= end) {
@@ -170,10 +187,7 @@ export function getDateFilteredData(
   timeZone = DEFAULT_TIME_ZONE,
   providerId?: string,
 ): RangeData {
-  const sourceByDate = buildDayMap(
-    filterMessagesByProvider(snapshot.messages, providerId),
-    timeZone,
-  );
+  const sourceByDate = getSourceByDate(snapshot, timeZone, providerId);
   const byDate = new Map<string, DayBreakdown>();
   for (const [date, breakdown] of sourceByDate.entries()) {
     if ((!start || date >= start) && (!end || date <= end)) {
