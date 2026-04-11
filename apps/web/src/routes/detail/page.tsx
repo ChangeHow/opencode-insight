@@ -49,6 +49,7 @@ export function DetailPage() {
 
   const sessions = day?.sessions ?? [];
   const highTokenSessions = sessions.filter((s) => s.tokens >= TOKEN_THRESHOLD);
+  const lowTokenSessions = sessions.filter((s) => s.tokens < TOKEN_THRESHOLD);
   const totalSessions = sessions.length;
   const filteredCount = totalSessions - highTokenSessions.length;
 
@@ -74,6 +75,7 @@ export function DetailPage() {
           <SessionListPanel
             date={date}
             sessions={highTokenSessions}
+            hiddenSessions={lowTokenSessions}
             totalSessions={totalSessions}
             filteredCount={filteredCount}
           />
