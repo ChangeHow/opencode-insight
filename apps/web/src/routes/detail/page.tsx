@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { SessionBreakdown } from "@opencode-dashboard/shared";
 import { useAtom, useAtomValue } from "jotai";
 import { useParams } from "@tanstack/react-router";
 import { DayBreakdownPanel } from "@/components/dashboard/day-breakdown";
@@ -8,6 +9,21 @@ import { customDateRangeAtom, dayAtom, detailLoadingAtom, errorAtom, rangeAtom }
 import { fetchDay, refreshSnapshot } from "@/lib/api";
 
 const TOKEN_THRESHOLD = 1_000_000;
+
+function splitSessionsByTokenThreshold(sessions: SessionBreakdown[]) {
+  const highTokenSessions: SessionBreakdown[] = [];
+  const lowTokenSessions: SessionBreakdown[] = [];
+
+  for (const session of sessions) {
+    if (session.tokens >= TOKEN_THRESHOLD) {
+      highTokenSessions.push(session);
+    } else {
+      lowTokenSessions.push(session);
+    }
+  }
+
+  return { highTokenSessions, lowTokenSessions };
+}
 
 export function DetailPage() {
   const { date } = useParams({ from: "/dashboard/detail/$date" });
@@ -48,21 +64,7 @@ export function DetailPage() {
   }, [customDateRange, date, range, setDay, setDetailLoading, setError]);
 
   const sessions = day?.sessions ?? [];
-  const { highTokenSessions, lowTokenSessions } = sessions.reduce<{
-    highTokenSessions: typeof sessions;
-    lowTokenSessions: typeof sessions;
-  }>(
-    (acc, session) => {
-      if (session.tokens >= TOKEN_THRESHOLD) {
-        acc.highTokenSessions.push(session);
-      } else {
-        acc.lowTokenSessions.push(session);
-      }
-
-      return acc;
-    },
-    { highTokenSessions: [], lowTokenSessions: [] },
-  );
+  const { highTokenSessions, lowTokenSessions } = splitSessionsByTokenThreshold(sessions);
   const totalSessions = sessions.length;
   const filteredCount = totalSessions - highTokenSessions.length;
 
