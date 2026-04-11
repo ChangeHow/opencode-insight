@@ -6,9 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ThemeToggleButton } from "./shared";
 
-const detailHeaderLinkClassName =
-  "inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
-
 function useStuck(): [React.RefObject<HTMLDivElement | null>, boolean] {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [stuck, setStuck] = useState(false);
@@ -87,6 +84,8 @@ export function DetailStickyHeader({
   onRefresh?: () => Promise<void>;
 }) {
   const [refreshing, setRefreshing] = useState(false);
+  const detailHeaderLinkClassName =
+    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
 
   async function handleRefreshClick() {
     if (!onRefresh || refreshing || !canRefresh) return;

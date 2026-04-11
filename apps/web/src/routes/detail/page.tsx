@@ -48,8 +48,21 @@ export function DetailPage() {
   }, [customDateRange, date, range, setDay, setDetailLoading, setError]);
 
   const sessions = day?.sessions ?? [];
-  const highTokenSessions = sessions.filter((s) => s.tokens >= TOKEN_THRESHOLD);
-  const lowTokenSessions = sessions.filter((s) => s.tokens < TOKEN_THRESHOLD);
+  const { highTokenSessions, lowTokenSessions } = sessions.reduce<{
+    highTokenSessions: typeof sessions;
+    lowTokenSessions: typeof sessions;
+  }>(
+    (acc, session) => {
+      if (session.tokens >= TOKEN_THRESHOLD) {
+        acc.highTokenSessions.push(session);
+      } else {
+        acc.lowTokenSessions.push(session);
+      }
+
+      return acc;
+    },
+    { highTokenSessions: [], lowTokenSessions: [] },
+  );
   const totalSessions = sessions.length;
   const filteredCount = totalSessions - highTokenSessions.length;
 
