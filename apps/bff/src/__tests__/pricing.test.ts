@@ -213,5 +213,27 @@ describe("Pricing Module", () => {
       expect(result.priced).toBe(true);
       expect(result.estimatedCost).toBe(0.03);
     });
+
+    it("should price k2p5 via kimi-for-coding as kimi-k2.5", () => {
+      const dataset = makePricingDataset({
+        "moonshotai/kimi-k2.5": {
+          input_cost_per_token: 0.0000006,
+          output_cost_per_token: 0.000003,
+          cache_read_input_token_cost: 0.0000001,
+        },
+        "moonshotai/kimi-k2-thinking": {
+          input_cost_per_token: 0.0000006,
+          output_cost_per_token: 0.0000025,
+          cache_read_input_token_cost: 0.00000015,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000, cacheRead: 20000 });
+
+      const result = estimateUsageCostFromDataset(dataset, "k2p5", "kimi-for-coding", usage);
+
+      expect(result.priced).toBe(true);
+      // 10000 * 0.0000006 + 5000 * 0.000003 + 20000 * 0.0000001 = 0.006 + 0.015 + 0.002 = 0.023
+      expect(result.estimatedCost).toBe(0.02);
+    });
   });
 });

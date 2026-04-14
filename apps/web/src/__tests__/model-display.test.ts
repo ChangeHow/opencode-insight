@@ -11,6 +11,8 @@ describe("getModelDisplayName", () => {
     expect(getModelDisplayName("moonshot/kimi-k2-0905-preview")).toBe("Kimi K2.5");
     expect(getModelDisplayName("moonshotai.kimi-k2.5", "moonshotai")).toBe("Kimi K2.5");
     expect(getModelDisplayName("moonshot-v1-8k", "moonshotai")).toBe("Moonshot v1 8K");
+    expect(getModelDisplayName("k2p5", "kimi-for-coding")).toBe("Kimi K2.5");
+    expect(getModelDisplayName("k2-p5", "kimi-for-coding")).toBe("Kimi K2.5");
   });
 
   test("formats GPT model ids into readable names", () => {
