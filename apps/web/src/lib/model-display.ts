@@ -250,8 +250,9 @@ export function getModelDisplayName(modelId: string, providerId?: string): strin
   const stripped = stripProviderPrefix(trimmed, providerId);
   const normalized = stripped.toLowerCase();
 
-  if (MODEL_NAME_ALIASES[normalized]) {
-    return MODEL_NAME_ALIASES[normalized];
+  const alias = MODEL_NAME_ALIASES[normalized];
+  if (alias !== undefined) {
+    return alias;
   }
 
   if (normalized.startsWith("claude-")) {
