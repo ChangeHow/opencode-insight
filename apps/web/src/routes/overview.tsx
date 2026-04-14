@@ -23,6 +23,7 @@ import {
   trendAtom,
 } from "@/lib/atoms";
 import { formatCompactNumber, formatCurrency, formatDateLabel } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 import { useDashboardData } from "@/lib/use-dashboard-data";
 import {
   CompactMetric,
@@ -101,7 +102,7 @@ export function DashboardPage() {
           value={summary ? formatCompactNumber(summary.totalTokens) : "—"}
           subline={
             summary?.topModel
-              ? `Top model ${summary.topModel.modelId}`
+              ? `Top model ${getModelDisplayName(summary.topModel.modelId)}`
               : hasPeriodData
                 ? "No model usage available"
                 : "No active model usage in this range"
@@ -261,12 +262,14 @@ export function DashboardPage() {
                                     className="size-3.5"
                                   />
                                   <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                                    {option.modelId}
+                                    {getModelDisplayName(option.modelId, option.providerId)}
                                   </span>
                                 </div>
                               </UiTooltipTrigger>
                               <UiTooltipContent>
-                                <p className="font-semibold">{option.modelId}</p>
+                                <p className="font-semibold">
+                                  {getModelDisplayName(option.modelId, option.providerId)}
+                                </p>
                                 <p className="mt-1 text-[11px] opacity-80">{option.providerId}</p>
                               </UiTooltipContent>
                             </UiTooltip>

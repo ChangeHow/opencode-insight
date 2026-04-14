@@ -13,6 +13,7 @@ import type { CostSeriesLine, CostSeriesOption, TrendPoint } from "@opencode-das
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 import { cn } from "@/lib/utils";
 import { ProviderIcon } from "./provider-icon";
 
@@ -151,7 +152,7 @@ export function TrendChart({
                           withTooltip
                         />
                         <span className="block truncate text-sm font-semibold text-[var(--foreground)]">
-                          {option.modelId}
+                          {getModelDisplayName(option.modelId, option.providerId)}
                         </span>
                       </span>
                       <span className="block text-xs text-[var(--muted-foreground)]">

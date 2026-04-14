@@ -3,6 +3,7 @@ import type {
   CostByModelEntry,
   ModelTokenShareEntry,
 } from "@/components/dashboard/model-breakdown-panels";
+import { getModelDisplayName } from "@/lib/model-display";
 
 export function buildModelBreakdownData(models: ModelBreakdown[]): {
   sortedModels: ModelBreakdown[];
@@ -16,7 +17,7 @@ export function buildModelBreakdownData(models: ModelBreakdown[]): {
   const topModels = sortedModels.slice(0, 6);
 
   const costByModel = topModels.map((model: ModelBreakdown) => ({
-    label: `${model.providerId} / ${model.modelId}`,
+    label: `${model.providerId} / ${getModelDisplayName(model.modelId, model.providerId)}`,
     providerId: model.providerId,
     modelId: model.modelId,
     cost: Number(model.cost.toFixed(2)),
@@ -28,7 +29,7 @@ export function buildModelBreakdownData(models: ModelBreakdown[]): {
     const total = model.breakdown.input + model.breakdown.output + cache;
 
     return {
-      label: `${model.providerId} / ${model.modelId}`,
+      label: `${model.providerId} / ${getModelDisplayName(model.modelId, model.providerId)}`,
       providerId: model.providerId,
       modelId: model.modelId,
       inputShare: total > 0 ? (model.breakdown.input / total) * 100 : 0,

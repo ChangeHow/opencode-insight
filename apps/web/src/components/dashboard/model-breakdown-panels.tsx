@@ -4,6 +4,7 @@ import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 import { TOKEN_COLORS } from "./token-breakdown-panel";
 
 export interface CostByModelEntry {
@@ -49,7 +50,7 @@ export function CostByModelPanel({
                     {model.providerId}
                   </p>
                   <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                    {model.modelId}
+                    {getModelDisplayName(model.modelId, model.providerId)}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -106,7 +107,7 @@ export function ModelTokenSharePanel({
                   {model.providerId}
                 </p>
                 <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                  {model.modelId}
+                  {getModelDisplayName(model.modelId, model.providerId)}
                 </p>
               </div>
               <div className="flex h-4 overflow-hidden rounded-full bg-black/6">

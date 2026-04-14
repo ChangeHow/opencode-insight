@@ -5,6 +5,7 @@ import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { Stat } from "@/components/dashboard/stat";
 import { Separator } from "@/components/ui/separator";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 
 export function ModelLedgerPanel({ models }: { models: ModelBreakdown[] }) {
   return (
@@ -27,7 +28,9 @@ export function ModelLedgerPanel({ models }: { models: ModelBreakdown[] }) {
               className="grid gap-3 rounded-[22px] border border-[var(--border)] bg-[var(--panel-strong)] p-4 sm:grid-cols-[1.4fr_1fr_1fr_1fr]"
             >
               <div>
-                <p className="font-semibold text-[var(--foreground)]">{model.modelId}</p>
+                <p className="font-semibold text-[var(--foreground)]">
+                  {getModelDisplayName(model.modelId, model.providerId)}
+                </p>
                 <p className="mt-1">
                   <ProviderIcon providerId={model.providerId} className="size-3.5" withTooltip />
                 </p>

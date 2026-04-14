@@ -2,6 +2,7 @@ import { Bot } from "lucide-react";
 import Anthropic from "@lobehub/icons/es/Anthropic";
 import ChatGLM from "@lobehub/icons/es/ChatGLM";
 import GithubCopilot from "@lobehub/icons/es/GithubCopilot";
+import Moonshot from "@lobehub/icons/es/Moonshot";
 import OpenAI from "@lobehub/icons/es/OpenAI";
 import XAI from "@lobehub/icons/es/XAI";
 import ZAI from "@lobehub/icons/es/ZAI";
@@ -18,6 +19,7 @@ function resolveProviderIcon(providerId: string) {
   if (value.includes("chatglm") || value.includes("glm")) return ChatGLM;
   if (value.includes("xai") || value.includes("grok")) return XAI;
   if (value.includes("zai")) return ZAI;
+  if (value.includes("moonshot") || value.includes("kimi")) return Moonshot;
   if (value.includes("anthropic") || value.includes("claude")) return Anthropic;
 
   return null;

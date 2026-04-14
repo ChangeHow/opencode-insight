@@ -7,6 +7,7 @@ import { Stat } from "@/components/dashboard/stat";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 
 const TOKEN_THRESHOLD = 1_000_000;
 
@@ -121,7 +122,7 @@ export function SessionCard({ date, session }: { date: string; session: SessionB
           <p className="mt-1.5 flex items-center gap-1.5">
             <ProviderIcon providerId={topModel.providerId} className="size-3" withTooltip />
             <span className="truncate text-[11px] text-[var(--muted-foreground)]">
-              {topModel.modelId}
+              {getModelDisplayName(topModel.modelId, topModel.providerId)}
             </span>
           </p>
         )}
