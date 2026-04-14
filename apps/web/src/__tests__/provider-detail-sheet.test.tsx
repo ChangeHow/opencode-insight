@@ -82,6 +82,7 @@ describe("Provider detail surfaces", () => {
     );
 
     expect(screen.getAllByRole("row")).toHaveLength(2);
+    expect(screen.getByRole("row", { name: /moonshotai/i })).toBeTruthy();
     expect(screen.queryByText(/idle-provider/i)).toBeNull();
   });
 });
