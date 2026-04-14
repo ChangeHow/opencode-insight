@@ -22,6 +22,7 @@ import {
   formatDateLabel,
   formatDateWithYearLabel,
 } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
@@ -148,7 +149,11 @@ export function ProviderDetailSheet({
                   icon={Wallet}
                   label="Total spend"
                   value={formatCurrency(provider.totalCost)}
-                  detail={`Top model ${provider.topModel?.modelId ?? "-"}`}
+                  detail={
+                    provider.topModel
+                      ? `Top model ${getModelDisplayName(provider.topModel.modelId, provider.providerId)}`
+                      : "Top model -"
+                  }
                 />
                 <DetailMetric
                   icon={Activity}
@@ -251,7 +256,7 @@ export function ProviderDetailSheet({
                             <td className="px-3 py-3">
                               <div className="space-y-1">
                                 <p className="text-sm font-semibold text-[var(--foreground)]">
-                                  {model.modelId}
+                                  {getModelDisplayName(model.modelId, provider.providerId)}
                                 </p>
                                 <p className="text-xs text-[var(--muted-foreground)]">
                                   {model.label}

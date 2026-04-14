@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, User, Bot } from "lucide-react";
 import type { MessageDetail } from "@opencode-dashboard/shared";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ToolCallCard } from "./tool-call-card";
 
@@ -35,7 +36,9 @@ export function MessageItem({ message, cumulativeTokens }: MessageItemProps) {
           {message.role}
         </span>
         {message.modelId ? (
-          <span className="text-[10px] text-[var(--muted-foreground)]">{message.modelId}</span>
+          <span className="text-[10px] text-[var(--muted-foreground)]">
+            {getModelDisplayName(message.modelId, message.providerId)}
+          </span>
         ) : null}
         {totalTokens > 0 ? (
           <span className="text-[10px] text-[var(--muted-foreground)]">

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCompactNumber, formatCurrency, formatDateLabel } from "@/lib/format";
+import { getModelDisplayName } from "@/lib/model-display";
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
@@ -327,7 +328,12 @@ export function ProviderInsightsPage({
                         <td className="px-3 py-3 text-sm text-[var(--muted-foreground)]">
                           {provider.topModel ? (
                             <span className="inline-flex items-center gap-2">
-                              <span className="truncate">{provider.topModel.modelId}</span>
+                              <span className="truncate">
+                                {getModelDisplayName(
+                                  provider.topModel.modelId,
+                                  provider.providerId,
+                                )}
+                              </span>
                               <span className="text-[11px] opacity-75">
                                 {formatCurrency(provider.topModel.cost)}
                               </span>

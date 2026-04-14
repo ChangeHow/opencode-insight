@@ -12,14 +12,22 @@ import { makeProviderDashboardPayload, makeProviderInsight } from "./factories";
 describe("Provider detail surfaces", () => {
   test("renders provider detail content inside the sheet", () => {
     const detail = makeProviderDashboardPayload({
-      provider: makeProviderInsight({ providerId: "zai-coding-plan", totalCost: 71.0012 }),
+      provider: makeProviderInsight({
+        providerId: "moonshotai",
+        totalCost: 71.0012,
+        topModel: {
+          modelId: "moonshot/kimi-k2-0905-preview",
+          tokens: 50000,
+          cost: 1.2,
+        },
+      }),
     });
 
     render(
       <ProviderDetailSheet
         open
         onOpenChange={() => {}}
-        providerId="zai-coding-plan"
+        providerId="moonshotai"
         detail={detail}
         loading={false}
         error={null}
@@ -28,8 +36,9 @@ describe("Provider detail surfaces", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "zai-coding-plan" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "moonshotai" })).toBeTruthy();
     expect(screen.getByText("Which models drive the bill")).toBeTruthy();
+    expect(screen.getByText("Top model Kimi K2.5")).toBeTruthy();
   });
 
   test("calls onSelectProvider when a provider row is activated", async () => {
