@@ -134,7 +134,8 @@ export function ProviderInsightsPage({
   onSelectProvider?: (providerId: string) => void;
 }) {
   const summary = buildSummary(providers);
-  const hasData = providers.length > 0;
+  const ledgerProviders = providers.filter((provider) => provider.totalTokens > 0);
+  const hasLedgerData = ledgerProviders.length > 0;
 
   return (
     <div className="space-y-6">
@@ -229,7 +230,7 @@ export function ProviderInsightsPage({
                 <div key={index} className="h-12 animate-pulse rounded-[14px] bg-black/5" />
               ))}
             </div>
-          ) : !hasData ? (
+          ) : !hasLedgerData ? (
             <div className="mt-6 rounded-[20px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-5 py-7">
               <p className="text-lg font-semibold text-[var(--foreground)]">{emptyTitle}</p>
               <p className="mt-2 max-w-2xl text-sm text-[var(--muted-foreground)]">
@@ -277,7 +278,7 @@ export function ProviderInsightsPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {providers.map((provider) => (
+                    {ledgerProviders.map((provider) => (
                       <tr
                         key={provider.providerId}
                         className={`border-b border-[var(--border)]/70 transition last:border-b-0 ${selectedProviderId === provider.providerId ? "bg-[var(--panel-strong)]/75" : ""}`}

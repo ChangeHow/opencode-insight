@@ -56,4 +56,32 @@ describe("Provider detail surfaces", () => {
 
     expect(onSelectProvider).toHaveBeenCalledWith("zai-coding-plan");
   });
+
+  test("filters providers without tokens from the provider ledger", () => {
+    render(
+      <ProviderInsightsPage
+        providers={[
+          makeProviderInsight({
+            providerId: "moonshotai",
+            totalTokens: 50000,
+            totalCost: 1.2,
+            totalMessages: 30,
+          }),
+          makeProviderInsight({
+            providerId: "idle-provider",
+            totalTokens: 0,
+            pricedTokens: 0,
+            totalCost: 0,
+            totalMessages: 12,
+            activeDays: 3,
+            modelCount: 1,
+            topModel: null,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByRole("row")).toHaveLength(2);
+    expect(screen.queryByText(/idle-provider/i)).toBeNull();
+  });
 });
