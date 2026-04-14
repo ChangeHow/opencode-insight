@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 vi.mock("../components/dashboard/provider-icon.js", () => ({
   ProviderIcon: ({ providerId }: { providerId: string }) => <span>{providerId}</span>,
@@ -81,8 +81,10 @@ describe("Provider detail surfaces", () => {
       />,
     );
 
-    expect(screen.getAllByRole("row")).toHaveLength(2);
-    expect(screen.getByRole("row", { name: /moonshotai/i })).toBeTruthy();
+    const table = screen.getByRole("table");
+    const [, body] = within(table).getAllByRole("rowgroup");
+    expect(within(body).getAllByRole("row")).toHaveLength(1);
+    within(body).getByRole("row", { name: /moonshotai/i });
     expect(screen.queryByText(/idle-provider/i)).toBeNull();
   });
 });
