@@ -13,6 +13,7 @@ function canonicalizeProviderSegment(segment: string) {
     case "zai_coding_plan":
     case "bigmodel":
       return "zai";
+    case "kimi_for_coding":
     case "moonshot":
     case "moonshotai":
       return "moonshotai";

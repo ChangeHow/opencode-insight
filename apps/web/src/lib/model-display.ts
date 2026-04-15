@@ -35,8 +35,8 @@ const MODEL_NAME_ALIASES: Record<string, string> = {
   "big-pickle": "GLM-4.7",
   bigpickle: "GLM-4.7",
   "glm-5.1": "GLM-5",
-  "k2-p5": "Kimi K2 Thinking",
-  k2p5: "Kimi K2 Thinking",
+  "k2-p5": "Kimi K2.5",
+  k2p5: "Kimi K2.5",
   "kimi-for-coding": "Kimi K2.5",
   "kimi-k2-0711-preview": "Kimi K2",
   "kimi-k2-0905-preview": "Kimi K2.5",
@@ -66,6 +66,7 @@ function canonicalizeProviderSegment(segment: string) {
     case "zai_coding_plan":
     case "bigmodel":
       return "zai";
+    case "kimi_for_coding":
     case "moonshot":
       return "moonshotai";
     default:
