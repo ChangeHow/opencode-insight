@@ -38,6 +38,9 @@ function canonicalizeProviderSegment(segment: string) {
     case "openai":
     case "openai_codex":
       return "openai";
+    case "opencode":
+    case "opencode_go":
+      return "opencode";
     case "mistral":
     case "mistralai":
       return "mistralai";

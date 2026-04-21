@@ -16,6 +16,9 @@ vi.mock("@lobehub/icons/es/Moonshot", () => ({
 vi.mock("@lobehub/icons/es/OpenAI", () => ({
   default: (props: Record<string, unknown>) => <svg data-icon="openai" {...props} />,
 }));
+vi.mock("@lobehub/icons/es/OpenCode", () => ({
+  default: (props: Record<string, unknown>) => <svg data-icon="opencode" {...props} />,
+}));
 vi.mock("@lobehub/icons/es/XAI", () => ({
   default: (props: Record<string, unknown>) => <svg data-icon="xai" {...props} />,
 }));
@@ -37,5 +40,15 @@ describe("ProviderIcon", () => {
   test("renders the Moonshot icon for Kimi providers", () => {
     const { container } = render(<ProviderIcon providerId="kimi" />);
     expect(container.querySelector('[data-icon="moonshot"]')).toBeTruthy();
+  });
+
+  test("renders the OpenCode icon for opencode-go provider", () => {
+    const { container } = render(<ProviderIcon providerId="opencode-go" />);
+    expect(container.querySelector('[data-icon="opencode"]')).toBeTruthy();
+  });
+
+  test("renders the OpenCode icon for opencode provider", () => {
+    const { container } = render(<ProviderIcon providerId="opencode" />);
+    expect(container.querySelector('[data-icon="opencode"]')).toBeTruthy();
   });
 });
