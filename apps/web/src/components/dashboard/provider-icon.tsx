@@ -4,6 +4,7 @@ import ChatGLM from "@lobehub/icons/es/ChatGLM";
 import GithubCopilot from "@lobehub/icons/es/GithubCopilot";
 import Moonshot from "@lobehub/icons/es/Moonshot";
 import OpenAI from "@lobehub/icons/es/OpenAI";
+import OpenCode from "@lobehub/icons/es/OpenCode";
 import XAI from "@lobehub/icons/es/XAI";
 import ZAI from "@lobehub/icons/es/ZAI";
 import Zhipu from "@lobehub/icons/es/Zhipu";
@@ -15,6 +16,7 @@ function resolveProviderIcon(providerId: string) {
 
   if (value.includes("github-copilot") || value.includes("copilot")) return GithubCopilot;
   if (value.includes("openai")) return OpenAI;
+  if (value.includes("opencode")) return OpenCode;
   if (value.includes("zhipu")) return Zhipu;
   if (value.includes("chatglm") || value.includes("glm")) return ChatGLM;
   if (value.includes("xai") || value.includes("grok")) return XAI;
