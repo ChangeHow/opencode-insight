@@ -51,8 +51,8 @@ describe("useProviderInsightsData Hook", () => {
       expect(store.get(loadingAtom)).toBe(false);
     });
 
-    expect(mockFetchSummary).toHaveBeenCalledTimes(1);
-    expect(mockFetchProviders).toHaveBeenCalledTimes(1);
+    expect(mockFetchSummary).toHaveBeenCalledTimes(2);
+    expect(mockFetchProviders).toHaveBeenCalledTimes(2);
     expect(store.get(summaryAtom)).toEqual(summary);
     expect(store.get(providerInsightsAtom)).toEqual(providers.providers);
     expect(store.get(dashboardStateAtom).key?.startsWith("providers:")).toBe(true);
