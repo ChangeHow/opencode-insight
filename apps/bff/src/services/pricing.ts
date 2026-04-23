@@ -86,7 +86,12 @@ function normalizeModelName(modelId: string) {
     .replace(/-low$/, "");
 }
 
-function stripKnownProviderPrefix(modelId: string) {
+// Aggregator routes (openrouter, zenmux, vercel ai gateway, …) wrap model ids
+// as `aggregator/upstream/model`, sometimes with more levels. We progressively
+// peel every known provider/aggregator segment from the head so that a key like
+// `openai/gpt-5.1-codex` in the pricing dataset is reachable from the
+// aggregator-prefixed variant.
+function iterativelyStripProviderPrefixes(modelId: string) {
   const knownPrefixes = [
     "openai/",
     "anthropic/",
@@ -96,6 +101,9 @@ function stripKnownProviderPrefix(modelId: string) {
     "z-ai/",
     "zai/",
     "openrouter/",
+    "zenmux/",
+    "vercel_ai_gateway/",
+    "vercel-ai-gateway/",
     "github_copilot/",
     "github-copilot/",
     "moonshotai/",
@@ -103,13 +111,24 @@ function stripKnownProviderPrefix(modelId: string) {
     "opencode/",
   ];
 
-  for (const prefix of knownPrefixes) {
-    if (modelId.startsWith(prefix)) {
-      return modelId.slice(prefix.length);
+  const results: string[] = [];
+  let current = modelId;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const prefix of knownPrefixes) {
+      if (current.startsWith(prefix)) {
+        current = current.slice(prefix.length);
+        if (current) {
+          results.push(current);
+        }
+        changed = true;
+        break;
+      }
     }
   }
 
-  return undefined;
+  return results;
 }
 
 function filterLitellmData(data: PricingDataset) {
@@ -132,13 +151,17 @@ function findPricing(
 ): ModelPricing | undefined {
   const raw = resolveAlias(modelId).toLowerCase();
   const hints = providerTags(providerId);
+  const strippedCandidates = iterativelyStripProviderPrefixes(raw);
   const variants = [
     raw,
     normalizeVersionSeparator(raw),
     normalizeModelName(raw),
     normalizeModelName(normalizeVersionSeparator(raw)),
-    stripKnownProviderPrefix(raw),
-  ].filter(Boolean) as string[];
+    ...strippedCandidates,
+    ...strippedCandidates.map((value) => normalizeVersionSeparator(value)),
+    ...strippedCandidates.map((value) => normalizeModelName(value)),
+    ...strippedCandidates.map((value) => normalizeModelName(normalizeVersionSeparator(value))),
+  ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
 
   for (const variant of variants) {
     for (const [key, pricing] of Object.entries(dataset)) {

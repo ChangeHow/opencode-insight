@@ -252,5 +252,70 @@ describe("Pricing Module", () => {
       // 10000 * 9e-7 + 5000 * 3.9e-6 + 20000 * 1.5e-7 = 0.009 + 0.0195 + 0.003 = 0.0315
       expect(result.estimatedCost).toBe(0.03);
     });
+
+    it("should price zenmux/openai/gpt-5.1-codex via openai/gpt-5.1-codex", () => {
+      const dataset = makePricingDataset({
+        "openai/gpt-5.1-codex": {
+          input_cost_per_token: 0.000002,
+          output_cost_per_token: 0.00001,
+          cache_read_input_token_cost: 0.0000002,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "zenmux/openai/gpt-5.1-codex",
+        "zenmux",
+        usage,
+      );
+
+      expect(result.priced).toBe(true);
+      // 10000 * 0.000002 + 5000 * 0.00001 = 0.02 + 0.05 = 0.07
+      expect(result.estimatedCost).toBe(0.07);
+    });
+
+    it("should price openrouter/openai/gpt-5 via openai/gpt-5 after prefix strip", () => {
+      const dataset = makePricingDataset({
+        "openai/gpt-5": {
+          input_cost_per_token: 0.0000015,
+          output_cost_per_token: 0.00001,
+          cache_read_input_token_cost: 0.00000015,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "openrouter/openai/gpt-5",
+        "openrouter",
+        usage,
+      );
+
+      expect(result.priced).toBe(true);
+      // 10000 * 0.0000015 + 5000 * 0.00001 = 0.015 + 0.05 = 0.065, rounded to 2dp => 0.07
+      expect(result.estimatedCost).toBe(0.07);
+    });
+
+    it("should price zenmux/openai/gpt-5.4-nano by bare model fallback", () => {
+      const dataset = makePricingDataset({
+        "gpt-5.4-nano": {
+          input_cost_per_token: 0.0000001,
+          output_cost_per_token: 0.0000004,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
+
+      const result = estimateUsageCostFromDataset(
+        dataset,
+        "zenmux/openai/gpt-5.4-nano",
+        "zenmux",
+        usage,
+      );
+
+      expect(result.priced).toBe(true);
+      // 10000 * 0.0000001 + 5000 * 0.0000004 = 0.001 + 0.002 = 0.003, rounded to 2dp => 0
+      expect(result.estimatedCost).toBe(0);
+    });
   });
 });

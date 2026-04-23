@@ -25,6 +25,9 @@ vi.mock("@lobehub/icons/es/XAI", () => ({
 vi.mock("@lobehub/icons/es/ZAI", () => ({
   default: (props: Record<string, unknown>) => <svg data-icon="zai" {...props} />,
 }));
+vi.mock("@lobehub/icons/es/ZenMux", () => ({
+  default: (props: Record<string, unknown>) => <svg data-icon="zenmux" {...props} />,
+}));
 vi.mock("@lobehub/icons/es/Zhipu", () => ({
   default: (props: Record<string, unknown>) => <svg data-icon="zhipu" {...props} />,
 }));
@@ -50,5 +53,15 @@ describe("ProviderIcon", () => {
   test("renders the OpenCode icon for opencode provider", () => {
     const { container } = render(<ProviderIcon providerId="opencode" />);
     expect(container.querySelector('[data-icon="opencode"]')).toBeTruthy();
+  });
+
+  test("renders the ZenMux icon for zenmux provider", () => {
+    const { container } = render(<ProviderIcon providerId="zenmux" />);
+    expect(container.querySelector('[data-icon="zenmux"]')).toBeTruthy();
+  });
+
+  test("renders the ZenMux icon for hyphenated zen-mux id", () => {
+    const { container } = render(<ProviderIcon providerId="zen-mux" />);
+    expect(container.querySelector('[data-icon="zenmux"]')).toBeTruthy();
   });
 });
