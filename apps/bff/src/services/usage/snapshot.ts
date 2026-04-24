@@ -1,12 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { DayBreakdown, TimeRange } from "@opencode-dashboard/shared";
-import { DEFAULT_TIME_ZONE } from "@opencode-dashboard/shared";
+import type { DayBreakdown } from "@opencode-dashboard/shared";
+import { formatDateInTimeZone, resolveTimeZone, shiftDateKey } from "@opencode-dashboard/shared";
 import { logger } from "../../logger";
 import { estimateUsageCostFromDataset, getPricingDataset } from "../pricing";
 import { readLegacyMessages } from "./legacy-reader";
 import { buildSnapshot } from "./day-map";
-import { emptyBreakdown, totalTokens, readSqliteMessages } from "./sqlite-reader";
+import {
+  emptyBreakdown,
+  readSqliteMessages,
+  readSqliteMessagesInWindow,
+  totalTokens,
+} from "./sqlite-reader";
 import type { RawMessage, SerializedUsageSnapshot, SourceKind, UsageSnapshot } from "./types";
 
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
@@ -18,6 +23,13 @@ const PROVIDER_ALIASES: Record<string, string> = {
   "z.ai": "zai-coding-plan",
   bigmodel: "zai-coding-plan",
 };
+
+interface RefreshWindow {
+  date: string;
+  timeZone: string;
+  startMs: number;
+  endMs: number;
+}
 
 export function normalizeProviderId(providerId: string) {
   const normalized = providerId.trim().toLowerCase();
@@ -81,6 +93,87 @@ function dedupeMessages(messages: RawMessage[]) {
   return [...map.values()].toSorted((a, b) => a.timestampMs - b.timestampMs);
 }
 
+function parseDateKeyParts(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return { year, month, day };
+}
+
+function getTimeZoneParts(value: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+    second: get("second"),
+  };
+}
+
+function zonedDateTimeToUtcMs(
+  target: {
+    year: number;
+    month: number;
+    day: number;
+    hour?: number;
+    minute?: number;
+    second?: number;
+  },
+  timeZone: string,
+) {
+  const targetUtc = Date.UTC(
+    target.year,
+    target.month - 1,
+    target.day,
+    target.hour ?? 0,
+    target.minute ?? 0,
+    target.second ?? 0,
+  );
+  let utc = targetUtc;
+  for (let index = 0; index < 3; index++) {
+    const parts = getTimeZoneParts(utc, timeZone);
+    const localAsUtc = Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    );
+    const delta = targetUtc - localAsUtc;
+    if (delta === 0) {
+      break;
+    }
+    utc += delta;
+  }
+  return utc;
+}
+
+function getTodayRefreshWindow(timeZone?: string): RefreshWindow {
+  const resolvedTimeZone = resolveTimeZone(timeZone);
+  const date = formatDateInTimeZone(Date.now(), resolvedTimeZone);
+  const startParts = parseDateKeyParts(date);
+  const endParts = parseDateKeyParts(shiftDateKey(date, 1));
+  return {
+    date,
+    timeZone: resolvedTimeZone,
+    startMs: zonedDateTimeToUtcMs(startParts, resolvedTimeZone),
+    endMs: zonedDateTimeToUtcMs(endParts, resolvedTimeZone),
+  };
+}
+
 export function filterMessagesByProvider(messages: RawMessage[], providerId?: string) {
   if (!providerId) {
     return messages;
@@ -122,6 +215,7 @@ function serializeSnapshot(snapshot: UsageSnapshot): SerializedUsageSnapshot {
 function deserializeSnapshot(snapshot: SerializedUsageSnapshot): UsageSnapshot {
   return {
     summary: snapshot.summary,
+    dataFingerprint: snapshot.dataFingerprint ?? "",
     messages: snapshot.messages,
     heatmap: snapshot.heatmap,
     trendByRange: snapshot.trendByRange,
@@ -131,7 +225,7 @@ function deserializeSnapshot(snapshot: SerializedUsageSnapshot): UsageSnapshot {
   };
 }
 
-function readSnapshotCache(dbPath: string, legacyDir: string) {
+function readSnapshotCache(dbPath: string, legacyDir: string, currentFingerprint: string) {
   if (!fs.existsSync(SNAPSHOT_CACHE_FILE)) {
     return null;
   }
@@ -144,11 +238,8 @@ function readSnapshotCache(dbPath: string, legacyDir: string) {
     if (missingSessionShape) {
       return null;
     }
-    if (cached.dataFingerprint !== undefined) {
-      const currentFingerprint = computeDataFingerprint(dbPath, legacyDir);
-      if (cached.dataFingerprint !== currentFingerprint) {
-        return null;
-      }
+    if (cached.dataFingerprint !== currentFingerprint) {
+      return null;
     }
     return deserializeSnapshot(cached);
   } catch {
@@ -167,6 +258,7 @@ function writeSnapshotCache(snapshot: UsageSnapshot, dbPath: string, legacyDir: 
 
 export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
   const { dbPath, legacyDir, root, isDefault } = getOpenCodePaths();
+  const dataFingerprint = computeDataFingerprint(dbPath, legacyDir);
 
   logger.debug(
     {
@@ -180,7 +272,7 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
   );
 
   if (!options?.forceRefresh) {
-    const cached = readSnapshotCache(dbPath, legacyDir);
+    const cached = readSnapshotCache(dbPath, legacyDir, dataFingerprint);
     if (cached) {
       logger.info(
         { source: cached.summary.source, dayCount: cached.breakdownByDate.size, fromCache: true },
@@ -204,7 +296,10 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
           : "none";
 
   const paths = [dbPath, legacyDir].filter((currentPath) => fs.existsSync(currentPath));
-  const snapshot = buildSnapshot(messages, sourceKind, paths);
+  const snapshot = {
+    ...buildSnapshot(messages, sourceKind, paths),
+    dataFingerprint,
+  };
 
   if (messages.length === 0) {
     logger.warn(
@@ -241,4 +336,53 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
 
   writeSnapshotCache(snapshot, dbPath, legacyDir);
   return snapshot;
+}
+
+export async function refreshUsageSnapshotToday(
+  current: UsageSnapshot,
+  options?: { timeZone?: string },
+) {
+  const { dbPath, legacyDir } = getOpenCodePaths();
+  const dataFingerprint = computeDataFingerprint(dbPath, legacyDir);
+  const window = getTodayRefreshWindow(options?.timeZone);
+  const sqliteMessages = await readSqliteMessagesInWindow(dbPath, window.startMs, window.endMs);
+  const legacyMessages = readLegacyMessages(legacyDir, window);
+  const refreshedMessages = await enrichMessages(
+    dedupeMessages([...sqliteMessages, ...legacyMessages]),
+  );
+  const retainedMessages = current.messages.filter(
+    (message) => message.timestampMs < window.startMs || message.timestampMs >= window.endMs,
+  );
+  const messages = dedupeMessages([...retainedMessages, ...refreshedMessages]);
+  const paths = [dbPath, legacyDir].filter((currentPath) => fs.existsSync(currentPath));
+  const sourceKind: SourceKind =
+    current.summary.source.kind !== "none"
+      ? current.summary.source.kind
+      : sqliteMessages.length > 0
+        ? "sqlite"
+        : legacyMessages.length > 0
+          ? "json"
+          : "none";
+  const snapshot = {
+    ...buildSnapshot(messages, sourceKind, paths),
+    dataFingerprint,
+  };
+
+  logger.info(
+    {
+      date: window.date,
+      timeZone: window.timeZone,
+      refreshedMessages: refreshedMessages.length,
+      retainedMessages: retainedMessages.length,
+    },
+    "Refreshed today's usage messages",
+  );
+
+  writeSnapshotCache(snapshot, dbPath, legacyDir);
+  return snapshot;
+}
+
+export function getUsageDataFingerprint() {
+  const { dbPath, legacyDir } = getOpenCodePaths();
+  return computeDataFingerprint(dbPath, legacyDir);
 }

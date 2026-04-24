@@ -169,6 +169,7 @@ export function makeMockProviders(): ProviderInsightsPayload {
   const trendPoints = makeMockTrend();
 
   return {
+    summary: makeMockSummary(),
     providers: [
       {
         providerId: "anthropic",

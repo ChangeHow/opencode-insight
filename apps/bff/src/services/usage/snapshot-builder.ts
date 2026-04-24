@@ -88,6 +88,7 @@ export function buildSnapshot(
       scannedAt: new Date().toISOString(),
       source: { kind: sourceKind, paths },
     },
+    dataFingerprint: "",
     messages,
     heatmap,
     trendByRange,

@@ -41,8 +41,6 @@ export function useDataFetcher<T>({
   }, [bumpRefresh]);
 
   useEffect(() => {
-    void doRefresh();
-
     const timer = setInterval(() => {
       void doRefresh();
     }, AUTO_REFRESH_INTERVAL_MS);

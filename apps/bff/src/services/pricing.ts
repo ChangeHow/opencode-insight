@@ -161,7 +161,9 @@ function findPricing(
     ...strippedCandidates.map((value) => normalizeVersionSeparator(value)),
     ...strippedCandidates.map((value) => normalizeModelName(value)),
     ...strippedCandidates.map((value) => normalizeModelName(normalizeVersionSeparator(value))),
-  ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
+  ].filter(
+    (value, index, array): value is string => Boolean(value) && array.indexOf(value) === index,
+  );
 
   for (const variant of variants) {
     for (const [key, pricing] of Object.entries(dataset)) {

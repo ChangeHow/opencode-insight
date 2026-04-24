@@ -18,6 +18,7 @@
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
+    "bench": "pnpm --filter @opencode-dashboard/bff bench",
     "daemon:start": "node ./scripts/daemon.mjs",
     "daemon:stop": "node ./scripts/stop-daemon.mjs",
     "daemon:restart": "node ./scripts/stop-daemon.mjs && node ./scripts/daemon.mjs",
@@ -43,6 +44,9 @@
       "oxlint --fix --quiet",
       "oxfmt --write"
     ]
+  },
+  "engines": {
+    "node": ">=24.0.0"
   },
   "packageManager": "pnpm@10.30.3",
   "pnpm": {

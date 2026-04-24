@@ -170,7 +170,10 @@ describe("API Client Functions", () => {
     it("should call POST /api/refresh", async () => {
       await refreshSnapshot();
 
-      expect(mockFetch).toHaveBeenCalledWith("/api/refresh", { method: "POST" });
+      expect(mockFetch).toHaveBeenCalledWith(
+        `/api/refresh?timeZone=${encodeURIComponent(timeZone)}`,
+        { method: "POST" },
+      );
     });
 
     it("should throw when response is not ok", async () => {

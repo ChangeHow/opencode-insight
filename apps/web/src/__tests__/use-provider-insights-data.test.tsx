@@ -13,15 +13,13 @@ import { makeDashboardSummary, makeProviderInsightsPayload } from "./factories";
 
 vi.mock("../lib/api.js", () => ({
   fetchProviders: vi.fn(),
-  fetchSummary: vi.fn(),
   refreshSnapshot: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { fetchProviders, fetchSummary } from "../lib/api";
+import { fetchProviders } from "../lib/api";
 import { useProviderInsightsData } from "../lib/use-provider-insights-data";
 
 const mockFetchProviders = vi.mocked(fetchProviders);
-const mockFetchSummary = vi.mocked(fetchSummary);
 
 describe("useProviderInsightsData Hook", () => {
   let store: ReturnType<typeof createStore>;
@@ -30,8 +28,10 @@ describe("useProviderInsightsData Hook", () => {
     vi.clearAllMocks();
     store = createStore();
 
-    mockFetchSummary.mockResolvedValue(makeDashboardSummary());
-    mockFetchProviders.mockResolvedValue(makeProviderInsightsPayload());
+    mockFetchProviders.mockResolvedValue({
+      ...makeProviderInsightsPayload(),
+      summary: makeDashboardSummary(),
+    });
   });
 
   function wrapper({ children }: { children: ReactNode }) {
@@ -42,8 +42,7 @@ describe("useProviderInsightsData Hook", () => {
     const summary = makeDashboardSummary({ totalCost: 71.0012 });
     const providers = makeProviderInsightsPayload();
 
-    mockFetchSummary.mockResolvedValue(summary);
-    mockFetchProviders.mockResolvedValue(providers);
+    mockFetchProviders.mockResolvedValue({ ...providers, summary });
 
     renderHook(() => useProviderInsightsData(), { wrapper });
 
@@ -51,15 +50,14 @@ describe("useProviderInsightsData Hook", () => {
       expect(store.get(loadingAtom)).toBe(false);
     });
 
-    expect(mockFetchSummary).toHaveBeenCalledTimes(2);
-    expect(mockFetchProviders).toHaveBeenCalledTimes(2);
+    expect(mockFetchProviders).toHaveBeenCalledTimes(1);
     expect(store.get(summaryAtom)).toEqual(summary);
     expect(store.get(providerInsightsAtom)).toEqual(providers.providers);
     expect(store.get(dashboardStateAtom).key?.startsWith("providers:")).toBe(true);
   });
 
   test("clears provider atoms when request fails", async () => {
-    mockFetchSummary.mockRejectedValue(new Error("Provider API error"));
+    mockFetchProviders.mockRejectedValue(new Error("Provider API error"));
 
     renderHook(() => useProviderInsightsData(), { wrapper });
 

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { customDateRangeAtom, providerInsightsAtom, rangeAtom, summaryAtom } from "@/lib/atoms";
-import { fetchProviders, fetchSummary } from "@/lib/api";
+import { fetchProviders } from "@/lib/api";
 import { useDataFetcher } from "@/lib/use-data-fetcher";
 
 export function useProviderInsightsData() {
@@ -10,22 +10,13 @@ export function useProviderInsightsData() {
   const setSummary = useSetAtom(summaryAtom);
   const setProviderInsights = useSetAtom(providerInsightsAtom);
 
-  type ProviderInsightsFetchResult = [
-    Awaited<ReturnType<typeof fetchSummary>>,
-    Awaited<ReturnType<typeof fetchProviders>>,
-  ];
-
   useDataFetcher({
     prefix: "providers",
-    fetchFn: useCallback(
-      async () =>
-        Promise.all([fetchSummary(range, customDateRange), fetchProviders(range, customDateRange)]),
-      [range, customDateRange],
-    ),
+    fetchFn: useCallback(() => fetchProviders(range, customDateRange), [range, customDateRange]),
     onSuccess: useCallback(
-      ([summary, providers]: ProviderInsightsFetchResult) => {
-        setSummary(summary);
-        setProviderInsights(providers.providers);
+      (payload: Awaited<ReturnType<typeof fetchProviders>>) => {
+        setSummary(payload.summary ?? null);
+        setProviderInsights(payload.providers);
       },
       [setProviderInsights, setSummary],
     ),
