@@ -24,5 +24,11 @@ export default defineConfig({
         "no-console": "off",
       },
     },
+    {
+      files: ["**/main.tsx", "**/__tests__/setup.ts"],
+      rules: {
+        "import/no-unassigned-import": "off",
+      },
+    },
   ],
 });
