@@ -74,10 +74,10 @@ export function ControlBar({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex h-9 items-center rounded-[16px] border border-[var(--border)] bg-[var(--panel)] p-0.5">
+        <div className="inline-flex h-10 items-center rounded-[16px] border border-[var(--border)] bg-[var(--panel)] p-1">
           <Link
             to="/overview"
-            className={`inline-flex h-[1.875rem] cursor-pointer items-center rounded-[12px] px-3 text-[11px] font-semibold uppercase tracking-[0.16em] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+            className={`inline-flex h-8 cursor-pointer items-center rounded-[12px] px-3 text-[11px] font-semibold uppercase tracking-[0.16em] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
               currentView === "overview"
                 ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
                 : "text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[var(--foreground)]"
@@ -87,7 +87,7 @@ export function ControlBar({
           </Link>
           <Link
             to="/providers"
-            className={`inline-flex h-[1.875rem] cursor-pointer items-center rounded-[12px] px-3 text-[11px] font-semibold uppercase tracking-[0.16em] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+            className={`inline-flex h-8 cursor-pointer items-center rounded-[12px] px-3 text-[11px] font-semibold uppercase tracking-[0.16em] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
               currentView === "providers"
                 ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
                 : "text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[var(--foreground)]"

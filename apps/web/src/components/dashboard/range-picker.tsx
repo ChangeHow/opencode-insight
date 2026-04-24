@@ -15,7 +15,7 @@ const ranges: Array<{ value: TimeRange; label: string }> = [
 
 export function RangePicker({ value, onChange }: RangePickerProps) {
   return (
-    <div className="inline-flex h-9 rounded-[16px] border border-[var(--border)] bg-[var(--panel)]/92 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div className="inline-flex h-10 items-center rounded-[16px] border border-[var(--border)] bg-[var(--panel)]/92 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       {ranges.map((range) => (
         <button
           key={range.value}
