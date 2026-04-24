@@ -83,6 +83,9 @@ jobs:
   benchmark:
     name: Benchmarks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -103,8 +106,20 @@ jobs:
         run: pnpm --filter @opencode-dashboard/shared build
 
       - name: Run benchmarks
+        env:
+          NO_COLOR: 1
         run: |
-          pnpm bench 2>&1 | tee benchmark-results.txt
+          pnpm bench 2>&1 |
+            sed '/^Benchmarking is/d' |
+            sed '/^Breaking changes/d' |
+            sed '/^ RUN /d' |
+            sed '/^ExperimentalWarning:/d' |
+            sed '/^Use `node --trace-warnings`/d' |
+            sed '/^\s*$/d' |
+            tee benchmark-results.txt
+
+      - name: Write benchmark summary
+        run: |
           {
             echo "## Benchmark Results"
             echo ""
@@ -112,3 +127,11 @@ jobs:
             cat benchmark-results.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment benchmark results on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: benchmark
+          recreate: true
+          path: benchmark-results.txt
