@@ -116,17 +116,11 @@ jobs:
             sed '/^ExperimentalWarning:/d' |
             sed '/^Use `node --trace-warnings`/d' |
             sed '/^\s*$/d' |
-            tee benchmark-results.txt
+            tee benchmark-raw.txt
+          node scripts/parse-benchmark.mjs < benchmark-raw.txt > benchmark-results.md
 
       - name: Write benchmark summary
-        run: |
-          {
-            echo "## Benchmark Results"
-            echo ""
-            echo '```text'
-            cat benchmark-results.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: cat benchmark-results.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment benchmark results on PR
         if: github.event_name == 'pull_request'
@@ -134,4 +128,4 @@ jobs:
         with:
           header: benchmark
           recreate: true
-          path: benchmark-results.txt
+          path: benchmark-results.md
