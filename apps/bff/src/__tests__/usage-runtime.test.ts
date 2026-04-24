@@ -18,6 +18,11 @@ vi.mock("../services/pricing.js", async () => {
 });
 
 import { loadUsageSnapshot, refreshUsageSnapshotToday } from "../services/usage/index";
+import {
+  refreshSnapshot,
+  resetSnapshotPromise,
+  snapshotPromise as globalSnapshotPromise,
+} from "../controllers/shared";
 
 async function createTestDatabase(dbPath: string) {
   const { DatabaseSync } = (await import("node:sqlite")) as {
@@ -194,6 +199,58 @@ describe("Usage runtime integration", () => {
       "msg_old",
       "msg_today",
       "msg_today_new",
+    ]);
+  });
+
+  test("historical message appears after background rebuild", async () => {
+    const dbPath = path.join(tempRoot, "opencode.db");
+    const db = await createTestDatabase(dbPath);
+    const yesterday = Date.UTC(2026, 2, 26, 12, 0, 0);
+
+    db.exec(`
+      CREATE TABLE session (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        slug TEXT,
+        directory TEXT NOT NULL
+      );
+      CREATE TABLE message (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        time_created INTEGER NOT NULL,
+        data TEXT NOT NULL
+      );
+    `);
+    insertSession(db, tempRoot);
+    insertAssistantMessage(db, "msg_yesterday", yesterday);
+    db.close();
+
+    const snapshot1 = await loadUsageSnapshot({ forceRefresh: true });
+    expect(snapshot1.messages).toHaveLength(1);
+    expect(snapshot1.messages[0].id).toBe("msg_yesterday");
+    snapshot1.dataFingerprint = "stale-fingerprint";
+    resetSnapshotPromise(Promise.resolve(snapshot1));
+
+    const db2 = await createTestDatabase(dbPath);
+    const dayBefore = yesterday - 86400000;
+    insertAssistantMessage(db2, "msg_day_before", dayBefore);
+    db2.close();
+
+    const incremental = await refreshSnapshot();
+    expect(incremental.messages).toHaveLength(1);
+    expect(incremental.messages[0].id).toBe("msg_yesterday");
+
+    // Wait for background rebuild with retries
+    let snapshot2 = await globalSnapshotPromise;
+    for (let i = 0; i < 20; i++) {
+      if (snapshot2.messages.length >= 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      snapshot2 = await globalSnapshotPromise;
+    }
+
+    expect(snapshot2.messages.map((m) => m.id).toSorted()).toEqual([
+      "msg_day_before",
+      "msg_yesterday",
     ]);
   });
 });

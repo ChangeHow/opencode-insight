@@ -11,6 +11,11 @@ import {
 
 export let snapshotPromise = loadUsageSnapshot();
 let refreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
+let isRebuilding = false;
+
+export function resetSnapshotPromise(promise = loadUsageSnapshot()) {
+  snapshotPromise = promise;
+}
 
 export function parseRange(value: string | undefined): TimeRange {
   if (value === "7d" || value === "month" || value === "3mo" || value === "year") {
@@ -45,6 +50,21 @@ export function refreshSnapshot(options?: { timeZone?: string }) {
       ? await refreshUsageSnapshotToday(current, options)
       : await loadUsageSnapshot({ forceRefresh: true });
     snapshotPromise = Promise.resolve(snapshot);
+
+    if (current && !isRebuilding) {
+      isRebuilding = true;
+      loadUsageSnapshot({ forceRefresh: true })
+        .then((rebuilt) => {
+          snapshotPromise = Promise.resolve(rebuilt);
+        })
+        .catch(() => {
+          /* silently fail, keep incremental snapshot */
+        })
+        .finally(() => {
+          isRebuilding = false;
+        });
+    }
+
     return snapshot;
   })().finally(() => {
     refreshPromise = null;

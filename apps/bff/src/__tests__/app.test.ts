@@ -23,10 +23,19 @@ vi.mock("../services/messages.js", () => ({
 
 import app from "../app";
 import { clearMemoryLogs, getMemoryLogs } from "../logger";
-import { loadUsageSnapshot, getRangeData, getDateFilteredData } from "../services/usage/index";
+import {
+  loadUsageSnapshot,
+  getUsageDataFingerprint,
+  refreshUsageSnapshotToday,
+  getRangeData,
+  getDateFilteredData,
+} from "../services/usage/index";
 import { buildMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
+import { resetSnapshotPromise } from "../controllers/shared";
 
 const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
+const mockGetUsageDataFingerprint = vi.mocked(getUsageDataFingerprint);
+const mockRefreshUsageSnapshotToday = vi.mocked(refreshUsageSnapshotToday);
 const mockGetRangeData = vi.mocked(getRangeData);
 const mockGetDateFilteredData = vi.mocked(getDateFilteredData);
 const mockBuildMessagePayloads = vi.mocked(buildMessagePayloads);
@@ -331,23 +340,31 @@ describe("BFF API Routes", () => {
     });
   });
 
-  test("POST /api/refresh invalidates cache and returns new scannedAt", async () => {
-    const newSnapshot = makeUsageSnapshot({
+  test("POST /api/refresh performs incremental refresh and triggers background rebuild when fingerprint changes", async () => {
+    const snapshot = makeUsageSnapshot();
+    resetSnapshotPromise(Promise.resolve(snapshot));
+
+    const incrementalSnapshot = makeUsageSnapshot({
       summary: { scannedAt: "2025-01-20T12:00:00.000Z" },
+      dataFingerprint: "changed-fingerprint",
     });
-    mockLoadUsageSnapshot.mockResolvedValue(newSnapshot);
+    mockRefreshUsageSnapshotToday.mockResolvedValue(incrementalSnapshot);
+    mockGetUsageDataFingerprint.mockReturnValue("changed-fingerprint");
 
     const res = await app.request("/api/refresh", { method: "POST" });
 
     expect(res.status).toBe(200);
     expect(mockInvalidateMessagePayloadCache).toHaveBeenCalled();
-    expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
+    expect(mockRefreshUsageSnapshotToday).toHaveBeenCalled();
 
     const json = await res.json();
     expect(json).toEqual({
       ok: true,
       scannedAt: "2025-01-20T12:00:00.000Z",
     });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
   });
 
   test("message analytics endpoints return payloads per request", async () => {
