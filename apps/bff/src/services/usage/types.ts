@@ -40,6 +40,7 @@ export interface RangeData {
 
 export interface UsageSnapshot {
   summary: DashboardSummary;
+  dataFingerprint: string;
   messages: RawMessage[];
   heatmap: HeatmapDay[];
   trendByRange: Record<TimeRange, TrendPoint[]>;

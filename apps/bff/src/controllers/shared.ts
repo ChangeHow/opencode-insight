@@ -1,7 +1,13 @@
 import type { Context } from "hono";
 import type { TimeRange } from "@opencode-dashboard/shared";
 import { resolveTimeZone } from "@opencode-dashboard/shared";
-import { getDateFilteredData, getRangeData, loadUsageSnapshot } from "../services/usage/index";
+import {
+  getDateFilteredData,
+  getRangeData,
+  getUsageDataFingerprint,
+  loadUsageSnapshot,
+  refreshUsageSnapshotToday,
+} from "../services/usage/index";
 
 export let snapshotPromise = loadUsageSnapshot();
 let refreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
@@ -24,19 +30,25 @@ export async function readData(c: Context, providerId?: string) {
   return getRangeData(snapshot, parseRange(c.req.query("range")), [], timeZone, providerId);
 }
 
-export function refreshSnapshot() {
+export function refreshSnapshot(options?: { timeZone?: string }) {
   if (refreshPromise) {
     return refreshPromise;
   }
 
-  refreshPromise = loadUsageSnapshot({ forceRefresh: true })
-    .then((snapshot) => {
-      snapshotPromise = Promise.resolve(snapshot);
-      return snapshot;
-    })
-    .finally(() => {
-      refreshPromise = null;
-    });
+  refreshPromise = (async () => {
+    const current = await Promise.resolve(snapshotPromise).catch(() => null);
+    if (current?.dataFingerprint === getUsageDataFingerprint()) {
+      return current;
+    }
+
+    const snapshot = current
+      ? await refreshUsageSnapshotToday(current, options)
+      : await loadUsageSnapshot({ forceRefresh: true });
+    snapshotPromise = Promise.resolve(snapshot);
+    return snapshot;
+  })().finally(() => {
+    refreshPromise = null;
+  });
 
   return refreshPromise;
 }

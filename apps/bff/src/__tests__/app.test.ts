@@ -9,6 +9,8 @@ import {
 
 vi.mock("../services/usage/index.js", () => ({
   loadUsageSnapshot: vi.fn(),
+  getUsageDataFingerprint: vi.fn(() => "test-fingerprint"),
+  refreshUsageSnapshotToday: vi.fn(),
   getRangeData: vi.fn(),
   getDateFilteredData: vi.fn(),
 }));
@@ -204,6 +206,7 @@ describe("BFF API Routes", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({
+      summary: rangeData.summary,
       providers: rangeData.providers,
     });
   });

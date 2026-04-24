@@ -27,6 +27,10 @@ const SQLITE_USAGE_QUERY = `
   WHERE json_extract(m.data, '$.role') = 'assistant'
     AND json_extract(m.data, '$.modelID') IS NOT NULL
 `;
+const SQLITE_USAGE_WINDOW_QUERY = `${SQLITE_USAGE_QUERY}
+    AND m.time_created >= ?
+    AND m.time_created < ?
+`;
 
 interface SqliteUsageRow {
   id: string;
@@ -182,6 +186,25 @@ export async function readSqliteMessages(dbPath: string) {
     return parseUsageRows(rows);
   } catch (err) {
     logger.error({ err, dbPath }, "Failed to read sqlite usage messages");
+    return [] as RawMessage[];
+  }
+}
+
+export async function readSqliteMessagesInWindow(dbPath: string, startMs: number, endMs: number) {
+  if (!fs.existsSync(dbPath)) {
+    return [] as RawMessage[];
+  }
+
+  try {
+    const rows = await querySqliteRows<SqliteUsageRow>(
+      dbPath,
+      SQLITE_USAGE_WINDOW_QUERY,
+      [startMs, endMs],
+      "Failed to read sqlite usage messages in window",
+    );
+    return parseUsageRows(rows);
+  } catch (err) {
+    logger.error({ err, dbPath, startMs, endMs }, "Failed to read sqlite usage messages in window");
     return [] as RawMessage[];
   }
 }

@@ -8,6 +8,20 @@ import type {
 import { readData } from "./shared";
 
 const dashboard = new Hono();
+const DASHBOARD_SERIES_LIMIT = 10;
+
+function hasSeriesValue(option: { totalCost: number; totalTokens: number; totalMessages: number }) {
+  return option.totalCost > 0 || option.totalTokens > 0 || option.totalMessages > 0;
+}
+
+function getDashboardSeries(data: Awaited<ReturnType<typeof readData>>) {
+  const options = data.seriesOptions.filter(hasSeriesValue).slice(0, DASHBOARD_SERIES_LIMIT);
+  const keys = new Set(options.map((option) => option.key));
+  return {
+    options,
+    lines: data.seriesLines.filter((line) => keys.has(line.key)),
+  };
+}
 
 dashboard.get("/api/summary", async (c) => c.json((await readData(c)).summary));
 dashboard.get("/api/heatmap", async (c) => c.json((await readData(c)).heatmap));
@@ -29,16 +43,17 @@ dashboard.get("/api/series", async (c) => {
 
 dashboard.get("/api/providers", async (c) => {
   const data = await readData(c);
-  return c.json<ProviderInsightsPayload>({ providers: data.providers });
+  return c.json<ProviderInsightsPayload>({ summary: data.summary, providers: data.providers });
 });
 
 dashboard.get("/api/dashboard", async (c) => {
   const data = await readData(c);
+  const series = getDashboardSeries(data);
   return c.json<DashboardPayload>({
     summary: data.summary,
     heatmap: data.heatmap,
     trend: data.trend,
-    series: { options: data.seriesOptions, lines: data.seriesLines },
+    series,
     providers: data.providers,
     selectedDay: null,
   });

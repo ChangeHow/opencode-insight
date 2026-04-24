@@ -3,7 +3,7 @@ import path from "node:path";
 import type { RawMessage } from "./types";
 import { parseAssistantMessage } from "./sqlite-reader";
 
-export function readLegacyMessages(legacyDir: string) {
+export function readLegacyMessages(legacyDir: string, window?: { startMs: number; endMs: number }) {
   if (!fs.existsSync(legacyDir)) {
     return [] as RawMessage[];
   }
@@ -25,5 +25,8 @@ export function readLegacyMessages(legacyDir: string) {
         return null;
       }
     })
-    .filter((item): item is RawMessage => item !== null);
+    .filter((item): item is RawMessage => item !== null)
+    .filter(
+      (item) => !window || (item.timestampMs >= window.startMs && item.timestampMs < window.endMs),
+    );
 }

@@ -24,6 +24,7 @@ interface RangeData {
 
 interface UsageSnapshot {
   summary: DashboardSummary;
+  dataFingerprint: string;
   messages: Array<{
     id: string;
     sessionId: string;
@@ -299,6 +300,7 @@ export function makeUsageSnapshot(options?: {
 
   return {
     summary: makeDashboardSummary(options?.summary),
+    dataFingerprint: "test-fingerprint",
     messages:
       options?.messages ??
       [...breakdownByDate.keys()].map((date, index) =>

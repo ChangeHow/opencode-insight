@@ -96,6 +96,7 @@ export interface ProviderInsight {
 
 export interface ProviderInsightsPayload {
   providers: ProviderInsight[];
+  summary?: DashboardSummary;
 }
 
 export interface ModelBreakdown {

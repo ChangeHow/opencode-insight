@@ -126,7 +126,8 @@ export function fetchDashboard(range: TimeRange, customRange?: { start: string; 
 }
 
 export async function refreshSnapshot() {
-  const response = await fetch("/api/refresh", { method: "POST" });
+  const params = new URLSearchParams({ timeZone: getCurrentTimeZone() });
+  const response = await fetch(`/api/refresh?${params.toString()}`, { method: "POST" });
   if (!response.ok) {
     throw new Error("Failed to refresh snapshot.");
   }

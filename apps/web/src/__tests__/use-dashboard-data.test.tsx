@@ -152,7 +152,7 @@ describe("useDashboardData Hook", () => {
     });
   });
 
-  test("should refresh on mount even when state matches cached data", async () => {
+  test("should reuse cached data when state matches current request", async () => {
     store.set(summaryAtom, makeDashboardSummary({ totalTokens: 999 }));
     store.set(heatmapAtom, [makeHeatmapDay("2025-01-25")]);
     store.set(trendAtom, [makeTrendPoint("2025-01-25")]);
@@ -176,8 +176,9 @@ describe("useDashboardData Hook", () => {
       expect(store.get(loadingAtom)).toBe(false);
     });
 
-    expect(mockFetchDashboard).toHaveBeenCalledTimes(1);
-    expect(store.get(summaryAtom)?.totalTokens).toBe(100000);
+    expect(mockFetchDashboard).not.toHaveBeenCalled();
+    expect(mockRefreshSnapshot).not.toHaveBeenCalled();
+    expect(store.get(summaryAtom)?.totalTokens).toBe(999);
   });
 
   test("should set error atom and clear data atoms on API error", async () => {
@@ -215,7 +216,7 @@ describe("useDashboardData Hook", () => {
       await Promise.resolve();
     });
 
-    expect(mockRefreshSnapshot).toHaveBeenCalledTimes(2);
+    expect(mockRefreshSnapshot).toHaveBeenCalledTimes(1);
     expect(mockFetchDashboard.mock.calls.length).toBeGreaterThan(initialFetchCount);
 
     unmount();

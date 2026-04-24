@@ -79,3 +79,36 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build shared package
+        run: pnpm --filter @opencode-dashboard/shared build
+
+      - name: Run benchmarks
+        run: |
+          pnpm bench 2>&1 | tee benchmark-results.txt
+          {
+            echo "## Benchmark Results"
+            echo ""
+            echo '```text'
+            cat benchmark-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
