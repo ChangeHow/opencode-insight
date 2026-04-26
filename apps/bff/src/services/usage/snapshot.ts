@@ -317,13 +317,20 @@ export async function refreshRecentUsageSnapshot(
     (await loadUsageSnapshot({ forceRefresh: true }));
   const refreshStartDateKey = getFastRefreshStartDateKey(options?.now);
   const refreshStartTimestampMs = dateKeyToUtcStartTimestampMs(refreshStartDateKey);
+  const snapshotLastTimestampMs = snapshot.messages.at(-1)?.timestampMs;
+  const effectiveRefreshStartTimestampMs =
+    snapshotLastTimestampMs !== undefined
+      ? Math.min(refreshStartTimestampMs, snapshotLastTimestampMs)
+      : refreshStartTimestampMs;
   const {
     sqliteMessages,
     legacyMessages,
     messages: recentMessages,
-  } = await readUsageMessages(dbPath, legacyDir, { fromTimestampMs: refreshStartTimestampMs });
+  } = await readUsageMessages(dbPath, legacyDir, {
+    fromTimestampMs: effectiveRefreshStartTimestampMs,
+  });
   const historicalMessages = snapshot.messages.filter(
-    (message) => message.timestampMs < refreshStartTimestampMs,
+    (message) => message.timestampMs < effectiveRefreshStartTimestampMs,
   );
   const mergedMessages = dedupeMessages([...historicalMessages, ...recentMessages]);
   const refreshedSnapshot = buildSnapshot(
