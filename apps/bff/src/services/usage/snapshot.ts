@@ -329,6 +329,11 @@ export async function refreshRecentUsageSnapshot(
   } = await readUsageMessages(dbPath, legacyDir, {
     fromTimestampMs: effectiveRefreshStartTimestampMs,
   });
+
+  if (recentMessages.length === 0) {
+    return snapshot;
+  }
+
   const historicalMessages = snapshot.messages.filter(
     (message) => message.timestampMs < effectiveRefreshStartTimestampMs,
   );
