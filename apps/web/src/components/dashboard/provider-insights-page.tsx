@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Activity, Building2, ChevronRight, Wallet } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { ProviderInsight } from "@opencode-dashboard/shared";
+import { ProviderLedgerMobileCard } from "@/components/dashboard/provider-ledger-mobile-card";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -151,7 +152,7 @@ export function ProviderInsightsPage({
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <CardContent className="space-y-2 p-5">
+          <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Wallet className="size-3.5" />
               Total spend
@@ -168,7 +169,7 @@ export function ProviderInsightsPage({
         </Card>
 
         <Card>
-          <CardContent className="space-y-2 p-5">
+          <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Building2 className="size-3.5" />
               Active providers
@@ -181,7 +182,7 @@ export function ProviderInsightsPage({
         </Card>
 
         <Card>
-          <CardContent className="space-y-2 p-5">
+          <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Activity className="size-3.5" />
               Total tokens
@@ -196,7 +197,7 @@ export function ProviderInsightsPage({
         </Card>
 
         <Card>
-          <CardContent className="space-y-2 p-5">
+          <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Building2 className="size-3.5" />
               Provider count
@@ -243,112 +244,132 @@ export function ProviderInsightsPage({
               ) : null}
             </div>
           ) : (
-            <div className="mt-5 overflow-visible pb-2">
-              <div className="w-full overflow-x-auto whitespace-nowrap">
-                <table className="min-w-full border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Provider
-                      </th>
-                      <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Trend
-                      </th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Spend
-                      </th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Tokens
-                      </th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Messages
-                      </th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Coverage
-                      </th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Active days
-                      </th>
-                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Models
-                      </th>
-                      <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                        Top model
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ledgerProviders.map((provider) => (
-                      <tr
-                        key={provider.providerId}
-                        className={`border-b border-[var(--border)]/70 transition last:border-b-0 ${selectedProviderId === provider.providerId ? "bg-[var(--panel-strong)]/75" : ""}`}
-                      >
-                        <td className="px-3 py-3">
-                          {onSelectProvider ? (
-                            <button
-                              type="button"
-                              className="inline-flex max-w-[14rem] cursor-pointer items-center gap-2 rounded-full px-2 py-1 text-left transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)] outline-none"
-                              onClick={() => onSelectProvider(provider.providerId)}
-                            >
-                              <ProviderIcon providerId={provider.providerId} className="size-4" />
-                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                                {provider.providerId}
-                              </span>
-                              <ChevronRight className="size-4 shrink-0 text-[var(--muted-foreground)]" />
-                            </button>
-                          ) : (
-                            <div className="inline-flex max-w-[14rem] items-center gap-2">
-                              <ProviderIcon providerId={provider.providerId} className="size-4" />
-                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                                {provider.providerId}
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-3">
-                          <ProviderTrend provider={provider} />
-                        </td>
-                        <td className="px-3 py-3 text-right text-sm font-semibold text-[var(--foreground)]">
-                          {formatCurrency(provider.totalCost)}
-                        </td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                          {formatCompactNumber(provider.totalTokens)}
-                        </td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                          {provider.totalMessages}
-                        </td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                          {formatPercent(provider.pricingCoverage)}
-                        </td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                          {provider.activeDays}
-                        </td>
-                        <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                          {provider.modelCount}
-                        </td>
-                        <td className="px-3 py-3 text-sm text-[var(--muted-foreground)]">
-                          {provider.topModel ? (
-                            <span className="inline-flex items-center gap-2">
-                              <span className="truncate">
-                                {getModelDisplayName(
-                                  provider.topModel.modelId,
-                                  provider.providerId,
-                                )}
-                              </span>
-                              <span className="text-[11px] opacity-75">
-                                {formatCurrency(provider.topModel.cost)}
-                              </span>
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <>
+              <div className="mt-5 space-y-3 md:hidden">
+                {ledgerProviders.map((provider) => (
+                  <ProviderLedgerMobileCard
+                    key={provider.providerId}
+                    provider={provider}
+                    selected={selectedProviderId === provider.providerId}
+                    onSelect={onSelectProvider}
+                    coverage={formatPercent(provider.pricingCoverage)}
+                    topModel={
+                      provider.topModel
+                        ? `Top model ${getModelDisplayName(provider.topModel.modelId, provider.providerId)} (${formatCurrency(provider.topModel.cost)})`
+                        : "Top model —"
+                    }
+                    trend={<ProviderTrend provider={provider} />}
+                  />
+                ))}
               </div>
-            </div>
+
+              <div className="mt-5 hidden overflow-visible pb-2 md:block">
+                <div className="w-full overflow-x-auto whitespace-nowrap">
+                  <table className="min-w-full border-collapse text-left">
+                    <thead>
+                      <tr className="border-b border-[var(--border)]">
+                        <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Provider
+                        </th>
+                        <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Trend
+                        </th>
+                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Spend
+                        </th>
+                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Tokens
+                        </th>
+                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Messages
+                        </th>
+                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Coverage
+                        </th>
+                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Active days
+                        </th>
+                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Models
+                        </th>
+                        <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Top model
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledgerProviders.map((provider) => (
+                        <tr
+                          key={provider.providerId}
+                          className={`border-b border-[var(--border)]/70 transition last:border-b-0 ${selectedProviderId === provider.providerId ? "bg-[var(--panel-strong)]/75" : ""}`}
+                        >
+                          <td className="px-3 py-3">
+                            {onSelectProvider ? (
+                              <button
+                                type="button"
+                                className="inline-flex max-w-[14rem] cursor-pointer items-center gap-2 rounded-full px-2 py-1 text-left transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)] outline-none"
+                                onClick={() => onSelectProvider(provider.providerId)}
+                              >
+                                <ProviderIcon providerId={provider.providerId} className="size-4" />
+                                <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                                  {provider.providerId}
+                                </span>
+                                <ChevronRight className="size-4 shrink-0 text-[var(--muted-foreground)]" />
+                              </button>
+                            ) : (
+                              <div className="inline-flex max-w-[14rem] items-center gap-2">
+                                <ProviderIcon providerId={provider.providerId} className="size-4" />
+                                <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                                  {provider.providerId}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <ProviderTrend provider={provider} />
+                          </td>
+                          <td className="px-3 py-3 text-right text-sm font-semibold text-[var(--foreground)]">
+                            {formatCurrency(provider.totalCost)}
+                          </td>
+                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                            {formatCompactNumber(provider.totalTokens)}
+                          </td>
+                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                            {provider.totalMessages}
+                          </td>
+                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                            {formatPercent(provider.pricingCoverage)}
+                          </td>
+                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                            {provider.activeDays}
+                          </td>
+                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
+                            {provider.modelCount}
+                          </td>
+                          <td className="px-3 py-3 text-sm text-[var(--muted-foreground)]">
+                            {provider.topModel ? (
+                              <span className="inline-flex items-center gap-2">
+                                <span className="truncate">
+                                  {getModelDisplayName(
+                                    provider.topModel.modelId,
+                                    provider.providerId,
+                                  )}
+                                </span>
+                                <span className="text-[11px] opacity-75">
+                                  {formatCurrency(provider.topModel.cost)}
+                                </span>
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

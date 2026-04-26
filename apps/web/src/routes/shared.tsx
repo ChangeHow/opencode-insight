@@ -117,6 +117,7 @@ export function ControlBar({
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <RangePicker
+          className="w-max"
           value={range}
           onChange={(nextRange) => {
             setRange(nextRange);
@@ -318,9 +319,11 @@ export function OverviewEmptyState({
 export function ThemeToggleButton({
   theme,
   onChange,
+  compact = false,
 }: {
   theme: "light" | "dark" | "system";
   onChange: (value: "light" | "dark" | "system") => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const items = [
@@ -334,9 +337,14 @@ export function ThemeToggleButton({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" aria-label="Theme mode">
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={`Theme mode (${active.label})`}
+          className={compact ? "px-2.5" : undefined}
+        >
           <ActiveIcon className="size-4" />
-          {active.label}
+          {compact ? null : active.label}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-40 p-1.5" align="end">

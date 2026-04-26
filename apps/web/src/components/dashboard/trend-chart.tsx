@@ -58,7 +58,7 @@ export function TrendChart({
           </p>
         </div>
       </div>
-      <div className="h-84 min-w-0 w-full">
+      <div className="h-72 min-w-0 w-full sm:h-84">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <CartesianGrid vertical={false} stroke="rgba(77, 61, 44, 0.08)" />

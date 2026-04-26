@@ -107,8 +107,8 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
   }
 
   return (
-    <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">
-      <div className="space-y-2 mb-5">
+    <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 sm:p-6">
+      <div className="mb-5 space-y-2">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           <Activity className="size-3.5" />
           Message analytics
@@ -117,17 +117,17 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
       </div>
 
       <Tabs defaultValue="overview" onValueChange={handleTabChange}>
-        <TabsList>
-          <TabsTrigger value="overview">
-            <Activity className="mr-1.5 size-3" />
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview" className="h-10 px-2 text-[11px] sm:text-xs">
+            <Activity className="mr-1.5 hidden size-3 sm:inline" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="distribution">
-            <BarChart2 className="mr-1.5 size-3" />
+          <TabsTrigger value="distribution" className="h-10 px-2 text-[11px] sm:text-xs">
+            <BarChart2 className="mr-1.5 hidden size-3 sm:inline" />
             Token Distribution
           </TabsTrigger>
-          <TabsTrigger value="messages">
-            <MessageSquare className="mr-1.5 size-3" />
+          <TabsTrigger value="messages" className="h-10 px-2 text-[11px] sm:text-xs">
+            <MessageSquare className="mr-1.5 hidden size-3 sm:inline" />
             Messages
             {overview ? (
               <span className="ml-1.5 rounded-full bg-[var(--panel-strong)] px-1.5 py-0.5 text-[10px]">
@@ -180,7 +180,7 @@ function OverviewTab() {
         <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">
           Cumulative tokens over messages
         </p>
-        <div className="h-48">
+        <div className="h-44 sm:h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={timelineData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -234,7 +234,7 @@ function OverviewTab() {
             {topTools.map((t) => (
               <div key={t.tool} className="flex items-center gap-3">
                 <p
-                  className="w-44 shrink-0 truncate text-xs text-[var(--foreground)]"
+                  className="w-28 shrink-0 truncate text-xs text-[var(--foreground)] sm:w-44"
                   title={t.tool}
                 >
                   {t.tool}
@@ -282,7 +282,7 @@ function DistributionTab() {
       <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">
         Token breakdown per message
       </p>
-      <div className="h-64">
+      <div className="h-56 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

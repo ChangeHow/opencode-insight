@@ -26,7 +26,7 @@ export function DayBreakdownPanel({
 }) {
   if (loading) {
     return (
-      <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
         <div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">
           Loading day detail...
         </div>
@@ -36,7 +36,7 @@ export function DayBreakdownPanel({
 
   if (!day) {
     return (
-      <div className="mx-6 rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)] sm:mx-8 lg:mx-10">
+      <div className="mx-4 rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)] sm:mx-8 lg:mx-10">
         Select a day to inspect model mix, message count, and token split.
       </div>
     );
@@ -74,7 +74,10 @@ export function DayBreakdownPanel({
         }
       />
 
-      <HorizontalPanelRail contentClassName="h-[26rem] gap-6 px-6 sm:px-8 lg:px-10">
+      <HorizontalPanelRail
+        stackOnMobile
+        contentClassName="gap-4 px-4 sm:px-8 md:h-[26rem] md:gap-6 lg:px-10"
+      >
         <TokenBreakdownPanel breakdown={day.breakdown} />
 
         <CostByModelPanel eyebrow="Pinned spend" entries={costByModel} />

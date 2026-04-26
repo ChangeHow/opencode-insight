@@ -85,7 +85,7 @@ export function DetailPage() {
     >
       <DayBreakdownPanel day={day} loading={detailLoading} />
 
-      <div className="px-6 sm:px-8 lg:px-10">
+      <div className="px-4 sm:px-8 lg:px-10">
         {!detailLoading && (
           <SessionListPanel
             date={date}

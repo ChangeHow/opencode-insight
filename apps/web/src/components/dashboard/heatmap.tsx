@@ -68,7 +68,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
         <DayPickerDayButton
           {...props}
           className={cn(
-            "group relative flex size-full flex-col items-start justify-between rounded-[8px] border border-transparent bg-transparent p-1.5 text-left text-[var(--heat-empty-fg)] outline-none sm:p-2",
+            "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border border-transparent bg-transparent p-1.5 text-left text-[var(--heat-empty-fg)] outline-none sm:p-2",
             props.modifiers.outside && "opacity-42",
           )}
         >
@@ -80,6 +80,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
     }
 
     const isDisabled = props.modifiers.disabled;
+    const isZeroCost = entry.cost === 0;
 
     return (
       <Tooltip>
@@ -87,24 +88,33 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
           <DayPickerDayButton
             {...props}
             className={cn(
-              "group relative flex size-full flex-col items-start justify-between rounded-[8px] border p-1.5 text-left outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:p-2",
-              intensityClass[entry.intensity],
+              "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border p-1.5 text-left outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:p-2",
+              isZeroCost
+                ? "border-transparent bg-transparent text-[var(--heat-empty-fg)]"
+                : intensityClass[entry.intensity],
               isDisabled
                 ? "cursor-not-allowed opacity-80 saturate-75"
                 : "cursor-pointer hover:-translate-y-0.5",
               props.modifiers.selected
-                ? "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]"
+                ? isZeroCost
+                  ? "border-[var(--accent)]"
+                  : "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]"
                 : "border-transparent",
               props.modifiers.outside && "opacity-48 saturate-75",
             )}
           >
-            <span className="text-[9px] font-semibold uppercase tracking-[0.16em] sm:text-[10px]">
+            <span
+              className={cn(
+                "text-[9px] font-semibold uppercase tracking-[0.16em] sm:text-[10px]",
+                isZeroCost && "text-[var(--heat-empty-date)]",
+              )}
+            >
               {dateKey.slice(8)}
             </span>
             <span
               className={cn(
-                "text-[10px] font-semibold sm:text-[11px]",
-                spendClass[entry.intensity],
+                "hidden text-[10px] font-semibold sm:block sm:text-[11px]",
+                isZeroCost ? "text-[var(--heat-empty-fg)]" : spendClass[entry.intensity],
               )}
             >
               {formatCurrency(entry.cost)}
@@ -149,7 +159,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
         </div>
 
         <div className="rounded-[24px] bg-[var(--chart-surface)]/55 p-4">
-          <div className="flex items-start justify-center overflow-x-auto">
+          <div className="flex items-start justify-center">
             <div className="w-full max-w-[42rem] min-w-0 px-1 sm:px-2">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <Button
@@ -196,7 +206,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                   const entry = dayMap.get(dateKey);
                   return !entry || entry.messages === 0;
                 }}
-                className="w-full [--heatmap-day-gap:0.5rem] [--heatmap-day-size:2.625rem] sm:[--heatmap-day-gap:0.55rem] sm:[--heatmap-day-size:3.75rem]"
+                className="w-full [--heatmap-day-gap:0.625rem] [--heatmap-day-size:2.625rem] sm:[--heatmap-day-gap:0.75rem] sm:[--heatmap-day-size:3.75rem]"
                 classNames={{
                   root: "mx-auto w-fit min-w-fit",
                   months: "flex w-fit",

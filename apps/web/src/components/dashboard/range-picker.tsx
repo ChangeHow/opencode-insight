@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 interface RangePickerProps {
   value: TimeRange;
   onChange: (range: TimeRange) => void;
+  className?: string;
 }
 
 const ranges: Array<{ value: TimeRange; label: string }> = [
@@ -13,9 +14,14 @@ const ranges: Array<{ value: TimeRange; label: string }> = [
   { value: "year", label: "1yr" },
 ];
 
-export function RangePicker({ value, onChange }: RangePickerProps) {
+export function RangePicker({ value, onChange, className }: RangePickerProps) {
   return (
-    <div className="inline-flex h-10 items-center rounded-[16px] border border-[var(--border)] bg-[var(--panel)]/92 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div
+      className={cn(
+        "inline-flex h-10 items-center rounded-[16px] border border-[var(--border)] bg-[var(--panel)]/92 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+        className,
+      )}
+    >
       {ranges.map((range) => (
         <button
           key={range.value}

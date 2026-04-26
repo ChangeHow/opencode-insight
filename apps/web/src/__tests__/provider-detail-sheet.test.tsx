@@ -52,7 +52,7 @@ describe("Provider detail surfaces", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /zai-coding-plan/i }));
+    await user.click(screen.getAllByRole("button", { name: /zai-coding-plan/i })[0]);
 
     expect(onSelectProvider).toHaveBeenCalledWith("zai-coding-plan");
   });

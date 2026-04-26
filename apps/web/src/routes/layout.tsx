@@ -56,7 +56,7 @@ export function StickyHeaderShell({ children }: { children: ReactNode }) {
       <div
         className={`w-full bg-[color-mix(in_oklch,var(--background)_82%,transparent)]/90 backdrop-blur-xl transition-shadow duration-200 supports-[backdrop-filter]:bg-[color-mix(in_oklch,var(--background)_72%,transparent)]${stuck ? " shadow-[0_1px_3px_var(--header-shadow-color),0_8px_24px_var(--header-shadow-color)]" : ""}`}
       >
-        <div className="mx-auto max-w-7xl px-6 pt-2.5 pb-2 sm:px-8 lg:px-10">{children}</div>
+        <div className="mx-auto max-w-7xl px-4 pt-2.5 pb-2 sm:px-8 lg:px-10">{children}</div>
       </div>
     </div>
   );
@@ -99,28 +99,29 @@ export function DetailStickyHeader({
 
   return (
     <StickyHeaderShell>
-      <div className="relative flex items-center justify-between gap-3">
-        <div className="relative z-10 flex shrink-0 items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Link to={backTo} params={backParams} className={detailHeaderLinkClassName}>
             <ChevronLeft className="size-4" />
-            {backLabel}
+            <span className="hidden sm:inline">{backLabel}</span>
+            <span className="sm:hidden">Back</span>
           </Link>
-          <Link to="/" className={detailHeaderLinkClassName}>
+          <Link to="/" className={`${detailHeaderLinkClassName} hidden sm:inline-flex`}>
             Dashboard home
           </Link>
         </div>
-        <p className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-base font-semibold text-[var(--foreground)]">
-          {title}
-        </p>
-        <div className="relative z-10 flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <HeaderRefreshButton
             canRefresh={canRefresh}
             refreshing={refreshing}
             disabledReason={refreshDisabledReason}
             onRefresh={handleRefreshClick}
           />
-          <ThemeToggleButton theme={theme} onChange={onThemeChange} />
+          <ThemeToggleButton theme={theme} onChange={onThemeChange} compact />
         </div>
+        <p className="w-full truncate text-sm font-semibold text-[var(--foreground)] sm:text-base">
+          {title}
+        </p>
       </div>
     </StickyHeaderShell>
   );

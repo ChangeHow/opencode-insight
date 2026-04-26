@@ -46,7 +46,7 @@ const dashboardLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "dashboard",
   component: () => (
-    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <main className="min-h-screen overflow-x-clip bg-[var(--background)] text-[var(--foreground)]">
       <Outlet />
     </main>
   ),

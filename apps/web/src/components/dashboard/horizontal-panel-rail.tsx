@@ -6,10 +6,12 @@ export function HorizontalPanelRail({
   children,
   className,
   contentClassName,
+  stackOnMobile = false,
 }: {
   children: ReactNode;
   className?: string;
   contentClassName?: string;
+  stackOnMobile?: boolean;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const interactedRef = useRef(false);
@@ -52,7 +54,12 @@ export function HorizontalPanelRail({
   return (
     <div
       ref={viewportRef}
-      className={cn("w-full overflow-x-auto overflow-y-hidden", className)}
+      className={cn(
+        stackOnMobile
+          ? "w-full overflow-x-visible overflow-y-visible md:overflow-x-auto md:overflow-y-hidden"
+          : "w-full overflow-x-auto overflow-y-hidden",
+        className,
+      )}
       onPointerDown={() => {
         interactedRef.current = true;
       }}
@@ -60,7 +67,16 @@ export function HorizontalPanelRail({
         interactedRef.current = true;
       }}
     >
-      <div className={cn("flex w-max min-w-full justify-center", contentClassName)}>{children}</div>
+      <div
+        className={cn(
+          stackOnMobile
+            ? "flex w-full min-w-0 flex-col justify-start md:w-max md:min-w-full md:flex-row md:justify-center"
+            : "flex w-max min-w-full justify-center",
+          contentClassName,
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
