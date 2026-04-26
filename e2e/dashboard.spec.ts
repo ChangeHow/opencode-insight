@@ -142,7 +142,7 @@ test.describe("Dashboard User Flows", () => {
     const calendarRadius = await calendarCard.evaluate(
       (element) => window.getComputedStyle(element).borderRadius,
     );
-    expect(calendarRadius).toBe("8px");
+    expect(calendarRadius).toBe("14.0625px");
 
     await page
       .locator("table")

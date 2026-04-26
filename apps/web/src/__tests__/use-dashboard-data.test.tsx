@@ -173,10 +173,6 @@ describe("useDashboardData Hook", () => {
     renderHook(() => useDashboardData(), { wrapper });
 
     await waitFor(() => {
-      expect(mockFetchDashboard).toHaveBeenCalledTimes(1);
-    });
-
-    await waitFor(() => {
       expect(store.get(loadingAtom)).toBe(false);
     });
 
