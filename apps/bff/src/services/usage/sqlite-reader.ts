@@ -171,16 +171,19 @@ function parseUsageRows(rows: SqliteUsageRow[]) {
     .filter((item): item is RawMessage => item !== null);
 }
 
-export async function readSqliteMessages(dbPath: string) {
+export async function readSqliteMessages(dbPath: string, options?: { fromTimestampMs?: number }) {
   if (!fs.existsSync(dbPath)) {
     return [] as RawMessage[];
   }
 
   try {
+    const query = `${SQLITE_USAGE_QUERY}${
+      options?.fromTimestampMs ? " AND m.time_created >= ?" : ""
+    }`;
     const rows = await querySqliteRows<SqliteUsageRow>(
       dbPath,
-      SQLITE_USAGE_QUERY,
-      [],
+      query,
+      options?.fromTimestampMs ? [options.fromTimestampMs] : [],
       "Failed to read sqlite usage messages",
     );
     return parseUsageRows(rows);

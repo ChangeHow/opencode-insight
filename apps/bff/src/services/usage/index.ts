@@ -1,4 +1,4 @@
-export { getUsageDataFingerprint, loadUsageSnapshot, refreshUsageSnapshotToday } from "./snapshot";
+export { loadUsageSnapshot, refreshRecentUsageSnapshot } from "./snapshot";
 export { getRangeData, getDateFilteredData } from "./day-map";
 export type {
   RawMessage,

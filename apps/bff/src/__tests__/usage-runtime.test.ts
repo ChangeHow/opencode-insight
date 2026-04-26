@@ -17,12 +17,7 @@ vi.mock("../services/pricing.js", async () => {
   };
 });
 
-import { loadUsageSnapshot, refreshUsageSnapshotToday } from "../services/usage/index";
-import {
-  refreshSnapshot,
-  resetSnapshotPromise,
-  snapshotPromise as globalSnapshotPromise,
-} from "../controllers/shared";
+import { loadUsageSnapshot, refreshRecentUsageSnapshot } from "../services/usage/index";
 
 async function createTestDatabase(dbPath: string) {
   const { DatabaseSync } = (await import("node:sqlite")) as {
@@ -157,11 +152,13 @@ describe("Usage runtime integration", () => {
     });
   });
 
-  test("refreshes only today's sqlite usage window when a snapshot already exists", async () => {
+  test("refreshes recent usage without rebuilding older history first", async () => {
     const dbPath = path.join(tempRoot, "opencode.db");
     const db = await createTestDatabase(dbPath);
-    const oldCreatedAt = Date.now() - 2 * 24 * 60 * 60 * 1000;
-    const todayCreatedAt = Date.now();
+    const today = new Date(Date.UTC(2026, 3, 26, 12, 0, 0));
+    const olderDay = Date.UTC(2026, 3, 24, 12, 0, 0);
+    const todayFirst = today.getTime();
+    const todaySecond = todayFirst + 60_000;
 
     db.exec(`
       CREATE TABLE session (
@@ -178,79 +175,90 @@ describe("Usage runtime integration", () => {
       );
     `);
 
-    insertSession(db, tempRoot);
-    insertAssistantMessage(db, "msg_old", oldCreatedAt);
-    insertAssistantMessage(db, "msg_today", todayCreatedAt);
+    db.prepare(`
+      INSERT INTO session (id, title, slug, directory)
+      VALUES (?, ?, ?, ?)
+    `).run("ses_runtime", "Runtime session", "runtime-session", tempRoot);
+
+    db.prepare(`
+      INSERT INTO message (id, session_id, time_created, data)
+      VALUES (?, ?, ?, ?)
+    `).run(
+      "msg_older",
+      "ses_runtime",
+      olderDay,
+      JSON.stringify({
+        id: "msg_older",
+        role: "assistant",
+        modelID: "gpt-4o",
+        providerID: "openai",
+        cost: 0.05,
+        time: { created: olderDay },
+        tokens: {
+          input: 100,
+          output: 50,
+          reasoning: 0,
+          cache: { read: 0, write: 0 },
+        },
+      }),
+    );
+
+    db.prepare(`
+      INSERT INTO message (id, session_id, time_created, data)
+      VALUES (?, ?, ?, ?)
+    `).run(
+      "msg_today_first",
+      "ses_runtime",
+      todayFirst,
+      JSON.stringify({
+        id: "msg_today_first",
+        role: "assistant",
+        modelID: "gpt-4o",
+        providerID: "openai",
+        cost: 0.05,
+        time: { created: todayFirst },
+        tokens: {
+          input: 120,
+          output: 30,
+          reasoning: 0,
+          cache: { read: 0, write: 0 },
+        },
+      }),
+    );
+
+    const initialSnapshot = await loadUsageSnapshot({ forceRefresh: true });
+
+    db.prepare(`
+      INSERT INTO message (id, session_id, time_created, data)
+      VALUES (?, ?, ?, ?)
+    `).run(
+      "msg_today_second",
+      "ses_runtime",
+      todaySecond,
+      JSON.stringify({
+        id: "msg_today_second",
+        role: "assistant",
+        modelID: "gpt-4o",
+        providerID: "openai",
+        cost: 0.05,
+        time: { created: todaySecond },
+        tokens: {
+          input: 80,
+          output: 20,
+          reasoning: 0,
+          cache: { read: 0, write: 0 },
+        },
+      }),
+    );
+
     db.close();
 
-    const snapshot = await loadUsageSnapshot({ forceRefresh: true });
-    expect(snapshot.messages.map((message) => message.id).toSorted()).toEqual([
-      "msg_old",
-      "msg_today",
-    ]);
+    const refreshedSnapshot = await refreshRecentUsageSnapshot(initialSnapshot, { now: today });
 
-    const writeDb = await createTestDatabase(dbPath);
-    insertAssistantMessage(writeDb, "msg_today_new", Date.now());
-    writeDb.close();
-
-    const refreshed = await refreshUsageSnapshotToday(snapshot, { timeZone: "UTC" });
-
-    expect(refreshed.messages.map((message) => message.id).toSorted()).toEqual([
-      "msg_old",
-      "msg_today",
-      "msg_today_new",
-    ]);
-  });
-
-  test("historical message appears after background rebuild", async () => {
-    const dbPath = path.join(tempRoot, "opencode.db");
-    const db = await createTestDatabase(dbPath);
-    const yesterday = Date.UTC(2026, 2, 26, 12, 0, 0);
-
-    db.exec(`
-      CREATE TABLE session (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        slug TEXT,
-        directory TEXT NOT NULL
-      );
-      CREATE TABLE message (
-        id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
-        time_created INTEGER NOT NULL,
-        data TEXT NOT NULL
-      );
-    `);
-    insertSession(db, tempRoot);
-    insertAssistantMessage(db, "msg_yesterday", yesterday);
-    db.close();
-
-    const snapshot1 = await loadUsageSnapshot({ forceRefresh: true });
-    expect(snapshot1.messages).toHaveLength(1);
-    expect(snapshot1.messages[0].id).toBe("msg_yesterday");
-    snapshot1.dataFingerprint = "stale-fingerprint";
-    resetSnapshotPromise(Promise.resolve(snapshot1));
-
-    const db2 = await createTestDatabase(dbPath);
-    const dayBefore = yesterday - 86400000;
-    insertAssistantMessage(db2, "msg_day_before", dayBefore);
-    db2.close();
-
-    const incremental = await refreshSnapshot();
-    expect(incremental.messages).toHaveLength(1);
-    expect(incremental.messages[0].id).toBe("msg_yesterday");
-
-    // Wait for background rebuild with retries
-    let snapshot2 = await globalSnapshotPromise;
-    for (let i = 0; i < 20; i++) {
-      if (snapshot2.messages.length >= 2) break;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      snapshot2 = await globalSnapshotPromise;
-    }
-
-    expect(snapshot2.messages.map((m) => m.id).toSorted()).toEqual([
-      "msg_day_before",
-      "msg_yesterday",
-    ]);
+    expect(refreshedSnapshot.messages).toHaveLength(3);
+    expect(refreshedSnapshot.summary.totalMessages).toBe(3);
+    expect(refreshedSnapshot.summary.totalTokens).toBe(400);
+    expect(refreshedSnapshot.breakdownByDate.get("2026-04-24")?.tokens).toBe(150);
+    expect(refreshedSnapshot.breakdownByDate.get("2026-04-26")?.tokens).toBe(250);
   });
 });
