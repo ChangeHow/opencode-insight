@@ -4,6 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { Heatmap } from "../components/dashboard/heatmap";
 import { makeHeatmapDay } from "./factories";
 
+function makeScenarioDays(dates: string[]) {
+  return dates.map((date, index) =>
+    makeHeatmapDay(date, {
+      cost: index + 0.25,
+      intensity: (index % 5) as 0 | 1 | 2 | 3 | 4,
+      messages: index % 2 === 0 ? 2 : 8,
+      tokens: (index + 1) * 1200,
+    }),
+  );
+}
+
 describe("Heatmap", () => {
   it("should disable selection for days without messages", async () => {
     const user = userEvent.setup();
@@ -52,7 +63,9 @@ describe("Heatmap", () => {
     );
 
     expect(screen.getByText(/january 2025/i, { selector: "p" })).toBeInTheDocument();
-    expect(document.querySelectorAll(".grid.grid-cols-7.gap-2").length).toBeGreaterThanOrEqual(7);
+    expect(screen.getByText("15").closest("td")?.className).toContain(
+      "size-[var(--heatmap-day-size)]",
+    );
   });
 
   it("should show month navigation buttons instead of horizontal scrolling", () => {
@@ -167,5 +180,67 @@ describe("Heatmap", () => {
     );
 
     expect(screen.getByText(/december 2025/i, { selector: "p" })).toBeInTheDocument();
+  });
+
+  it("should keep a stable six-row frame across sparse and dense month scenarios", () => {
+    const scenarios = [
+      {
+        label: /february 2026/i,
+        days: makeScenarioDays(["2026-02-02", "2026-02-28"]),
+      },
+      {
+        label: /april 2026/i,
+        days: makeScenarioDays(["2026-04-01", "2026-04-12", "2026-04-24", "2026-04-30"]),
+      },
+      {
+        label: /august 2026/i,
+        days: makeScenarioDays([
+          "2026-08-01",
+          "2026-08-08",
+          "2026-08-16",
+          "2026-08-24",
+          "2026-08-31",
+        ]),
+      },
+    ];
+
+    const { container, rerender } = render(
+      <Heatmap days={scenarios[0].days} selectedDate={null} onSelect={vi.fn()} />,
+    );
+
+    const root = container.firstElementChild;
+
+    expect(root).not.toBeNull();
+    expect(root).toHaveClass("min-h-[27rem]", "sm:min-h-[32rem]");
+
+    for (const scenario of scenarios) {
+      rerender(<Heatmap days={scenario.days} selectedDate={null} onSelect={vi.fn()} />);
+
+      expect(screen.getByText(scenario.label, { selector: "p" })).toBeInTheDocument();
+      expect(container.querySelectorAll("td")).toHaveLength(42);
+      expect(container.firstElementChild).toHaveClass("min-h-[27rem]", "sm:min-h-[32rem]");
+    }
+  });
+
+  it("should keep the same six-row calendar frame while navigating across month shapes", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Heatmap
+        days={makeScenarioDays(["2026-02-28", "2026-03-31", "2026-04-30"])}
+        selectedDate={null}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/april 2026/i, { selector: "p" })).toBeInTheDocument();
+    expect(container.querySelectorAll("td")).toHaveLength(42);
+
+    await user.click(screen.getByRole("button", { name: /^previous month$/i }));
+    expect(screen.getByText(/march 2026/i, { selector: "p" })).toBeInTheDocument();
+    expect(container.querySelectorAll("td")).toHaveLength(42);
+
+    await user.click(screen.getByRole("button", { name: /^previous month$/i }));
+    expect(screen.getByText(/february 2026/i, { selector: "p" })).toBeInTheDocument();
+    expect(container.querySelectorAll("td")).toHaveLength(42);
   });
 });

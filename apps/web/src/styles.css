@@ -134,6 +134,7 @@
 html {
   font-size: 15px;
   scroll-behavior: smooth;
+  overflow-x: clip;
   scrollbar-width: none;
   scrollbar-color: transparent transparent;
 }
@@ -141,6 +142,7 @@ html {
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: clip;
   background:
     radial-gradient(circle at top left, rgba(197, 142, 100, 0.18), transparent 28%),
     linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(247, 240, 231, 0.94));

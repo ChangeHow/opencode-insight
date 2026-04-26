@@ -49,7 +49,7 @@ export function ListLayoutShell({
       }
     >
       {error ? (
-        <div className="px-6 sm:px-8 lg:px-10">
+        <div className="px-4 sm:px-8 lg:px-10">
           <div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-red-700">
             {error}
           </div>

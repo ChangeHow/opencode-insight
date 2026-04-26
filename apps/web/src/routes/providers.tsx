@@ -64,7 +64,7 @@ export function ProvidersPage() {
 
   return (
     <ListLayoutShell currentView="providers">
-      <div className="px-6 sm:px-8 lg:px-10">
+      <div className="px-4 sm:px-8 lg:px-10">
         <MemoProviderInsightsPanel
           providers={providers}
           loading={loading}

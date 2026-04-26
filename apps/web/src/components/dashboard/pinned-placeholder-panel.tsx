@@ -10,7 +10,7 @@ export function PinnedPlaceholderPanel({
   status?: string;
 }) {
   return (
-    <div className="flex h-full w-[16rem] min-w-[16rem] shrink-0 flex-col rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/72 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/72 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] md:h-full md:w-[16rem] md:min-w-[16rem] md:p-6">
       <div className="flex min-h-0 flex-1 flex-col justify-between">
         <div className="space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">

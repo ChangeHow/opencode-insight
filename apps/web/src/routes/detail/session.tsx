@@ -70,7 +70,7 @@ export function SessionDetailPage() {
       onRefresh={handleRefresh}
     >
       {loading ? (
-        <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
           <div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">
             Loading session detail...
           </div>
@@ -78,7 +78,7 @@ export function SessionDetailPage() {
       ) : session ? (
         <>
           <SessionBreakdownPanel date={date} session={session} />
-          <div className="px-6 sm:px-8 lg:px-10">
+          <div className="px-4 sm:px-8 lg:px-10">
             <MessageAnalyticsPanel date={date} sessionId={sessionId} />
           </div>
         </>

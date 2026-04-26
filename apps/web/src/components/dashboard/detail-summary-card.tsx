@@ -20,9 +20,9 @@ export function DetailSummaryCard({
   titleClassName?: string;
 }) {
   return (
-    <div className="px-6 sm:px-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">
-        <div className="flex items-start justify-between gap-4">
+    <div className="px-4 sm:px-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 sm:p-6">
+        <div className="flex flex-col items-start gap-4 md:flex-row md:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="gap-2">{primaryBadge}</Badge>
@@ -47,7 +47,7 @@ export function DetailSummaryCard({
 
 export function InlineStatList({ children }: { children: ReactNode }) {
   return (
-    <div className="grid shrink-0 grid-cols-1 gap-2 self-center text-sm min-[920px]:min-w-56">
+    <div className="grid w-full grid-cols-1 gap-2 text-sm md:w-auto md:shrink-0 md:self-center min-[920px]:min-w-56">
       {children}
     </div>
   );

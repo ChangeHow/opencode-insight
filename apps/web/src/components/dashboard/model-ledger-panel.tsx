@@ -9,8 +9,8 @@ import { getModelDisplayName } from "@/lib/model-display";
 
 export function ModelLedgerPanel({ models }: { models: ModelBreakdown[] }) {
   return (
-    <div className="px-6 sm:px-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">
+    <div className="px-4 sm:px-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 sm:p-6">
         <div className="space-y-2">
           <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
             <Layers3 className="size-3.5" />

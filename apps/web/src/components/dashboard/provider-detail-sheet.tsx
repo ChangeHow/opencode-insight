@@ -49,7 +49,7 @@ function DetailMetric({
 }) {
   return (
     <Card className="rounded-[24px]">
-      <CardContent className="space-y-2 p-5">
+      <CardContent className="space-y-2 p-4 sm:p-5">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           <Icon className="size-3.5" />
           {label}
@@ -176,7 +176,7 @@ export function ProviderDetailSheet({
               </div>
 
               <Card className="rounded-[28px]">
-                <CardContent className="space-y-4 p-5 sm:p-6">
+                <CardContent className="space-y-4 p-4 sm:p-6">
                   <div className="space-y-1">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                       Spend trajectory
@@ -186,7 +186,7 @@ export function ProviderDetailSheet({
                       Useful for spotting bursts, idle gaps, and expensive streaks.
                     </p>
                   </div>
-                  <div className="h-64 rounded-[22px] border border-[var(--border)] bg-[var(--chart-surface)] p-4">
+                  <div className="h-52 rounded-[22px] border border-[var(--border)] bg-[var(--chart-surface)] p-4 sm:h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={detail.trend}>
                         <XAxis
@@ -221,7 +221,7 @@ export function ProviderDetailSheet({
               </Card>
 
               <Card className="rounded-[28px]">
-                <CardContent className="space-y-4 p-5 sm:p-6">
+                <CardContent className="space-y-4 p-4 sm:p-6">
                   <div className="space-y-1">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                       Model ledger
@@ -229,7 +229,31 @@ export function ProviderDetailSheet({
                     <h3 className="text-xl font-semibold">Which models drive the bill</h3>
                   </div>
                   <Separator />
-                  <ScrollArea className="w-full whitespace-nowrap">
+                  <div className="space-y-3 md:hidden">
+                    {modelRows.map((model) => (
+                      <div
+                        key={model.key}
+                        className="rounded-[18px] border border-[var(--border)] bg-[var(--panel-strong)]/55 p-4"
+                      >
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-[var(--foreground)]">
+                            {getModelDisplayName(model.modelId, provider.providerId)}
+                          </p>
+                          <p className="text-xs text-[var(--muted-foreground)]">{model.label}</p>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                          <MetricCell label="Spend" value={formatCurrency(model.totalCost)} />
+                          <MetricCell
+                            label="Tokens"
+                            value={formatCompactNumber(model.totalTokens)}
+                          />
+                          <MetricCell label="Messages" value={String(model.totalMessages)} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <ScrollArea className="hidden w-full whitespace-nowrap md:block">
                     <table className="min-w-full border-collapse text-left">
                       <thead>
                         <tr className="border-b border-[var(--border)]">
@@ -284,5 +308,16 @@ export function ProviderDetailSheet({
         </SheetBody>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function MetricCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[12px] border border-[var(--border)]/70 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{value}</p>
+    </div>
   );
 }

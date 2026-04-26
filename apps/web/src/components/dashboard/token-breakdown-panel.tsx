@@ -35,7 +35,7 @@ export function TokenBreakdownPanel({
   const tokenBreakdown = buildTokenBreakdown(breakdown);
 
   return (
-    <div className="flex h-full w-[38rem] min-w-[38rem] shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">
+    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 md:h-full md:w-[38rem] md:min-w-[38rem] md:p-6">
       <div className="space-y-2">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           <Layers3 className="size-3.5" />
@@ -43,7 +43,7 @@ export function TokenBreakdownPanel({
         </p>
         <h3 className="text-xl font-semibold text-[var(--foreground)]">{title}</h3>
       </div>
-      <div className="mt-4 flex min-h-0 flex-1 items-center gap-4">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 md:items-center lg:flex-row">
         <div className="h-52 min-w-0 flex-1">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -71,7 +71,7 @@ export function TokenBreakdownPanel({
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <div className="grid min-w-44 content-center gap-2">
+        <div className="grid w-full min-w-0 content-center gap-2 md:min-w-44">
           {tokenBreakdown.map((entry) => (
             <div key={entry.label} className="ui-pill-card">
               <div className="flex items-center gap-2">

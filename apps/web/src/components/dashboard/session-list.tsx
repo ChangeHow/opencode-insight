@@ -28,7 +28,7 @@ export function SessionListPanel({
 
   if (totalSessions === 0) {
     return (
-      <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-6">
+      <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-dashed border-[var(--border)] bg-[var(--panel)] p-5 sm:p-6">
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           Sessions
         </p>
@@ -43,7 +43,7 @@ export function SessionListPanel({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6">
+    <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 sm:p-6">
       <div className="space-y-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           Sessions

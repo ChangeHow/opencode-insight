@@ -39,7 +39,7 @@ const SheetContent = React.forwardRef<
     >
       {children}
       <SheetClose
-        className="absolute top-4 right-4 inline-flex size-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted-foreground)] transition hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] outline-none"
+        className="absolute top-4 right-4 inline-flex size-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted-foreground)] transition hover:text-[var(--foreground)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] outline-none"
         aria-label="Close"
       >
         <X className="size-4" />

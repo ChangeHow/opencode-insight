@@ -15,7 +15,7 @@ system.get("/api/logs", (c) => {
 
 system.post("/api/refresh", async (c) => {
   invalidateMessagePayloadCache();
-  const snapshot = await refreshSnapshot({ timeZone: c.req.query("timeZone") });
+  const snapshot = await refreshSnapshot();
   return c.json({ ok: true, scannedAt: snapshot.summary.scannedAt });
 });
 

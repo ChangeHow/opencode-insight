@@ -60,7 +60,10 @@ export function SessionBreakdownPanel({
         }
       />
 
-      <HorizontalPanelRail contentClassName="h-[26rem] gap-6 px-6 sm:px-8 lg:px-10">
+      <HorizontalPanelRail
+        stackOnMobile
+        contentClassName="gap-4 px-4 sm:px-8 md:h-[26rem] md:gap-6 lg:px-10"
+      >
         <TokenBreakdownPanel breakdown={session.breakdown} eyebrow="Token mix" />
         <CostByModelPanel eyebrow="Session spend" entries={costByModel} />
         <ModelTokenSharePanel eyebrow="Model share" entries={modelTokenMix} />

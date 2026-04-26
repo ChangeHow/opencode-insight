@@ -98,11 +98,56 @@ test.describe("Dashboard User Flows", () => {
     await page.goto("/overview");
     await page.waitForLoadState("domcontentloaded");
 
-    const threeMonthButton = page.getByRole("button", { name: "last 3m" });
+    const threeMonthButton = page.getByRole("button", { name: "3mo" });
     await expect(threeMonthButton).toBeVisible({ timeout: 5_000 });
     await threeMonthButton.click();
 
     await expect(threeMonthButton).toHaveClass(/bg-\[var\(--accent\)\]/);
+  });
+
+  test("Range pills and calendar cards match updated visuals", async ({ page }) => {
+    await page.goto("/overview");
+    await page.waitForLoadState("domcontentloaded");
+
+    const rangePicker = page.getByRole("button", { name: "7d" }).locator("xpath=..");
+    const headerPills = ["7d", "1mo", "3mo", "1yr"] as const;
+
+    for (const label of headerPills) {
+      await expect(page.getByRole("button", { name: label })).toBeVisible({ timeout: 5_000 });
+    }
+
+    for (const label of ["1mo", "3mo"] as const) {
+      const metrics = await page.getByRole("button", { name: label }).evaluate((element) => {
+        const buttonRect = element.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const textRect = range.getBoundingClientRect();
+        return {
+          topGap: textRect.top - buttonRect.top,
+          bottomGap: buttonRect.bottom - textRect.bottom,
+        };
+      });
+
+      expect(Math.abs(metrics.topGap - metrics.bottomGap)).toBeLessThanOrEqual(1.5);
+    }
+
+    await rangePicker.screenshot({ path: "/tmp/opencode-dashboard-header-range.png" });
+
+    const calendarCard = page
+      .locator("button")
+      .filter({ has: page.locator("span", { hasText: /^\d{2}$/ }) })
+      .first();
+    await expect(calendarCard).toBeVisible({ timeout: 5_000 });
+
+    const calendarRadius = await calendarCard.evaluate(
+      (element) => window.getComputedStyle(element).borderRadius,
+    );
+    expect(calendarRadius).toBe("14.0625px");
+
+    await page
+      .locator("table")
+      .first()
+      .screenshot({ path: "/tmp/opencode-dashboard-calendar.png" });
   });
 
   test("User navigates to providers view", async ({ page }) => {
