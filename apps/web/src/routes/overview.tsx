@@ -5,6 +5,7 @@ import { Activity, Coins, Flame, Rows3, Sparkles, Wallet } from "lucide-react";
 import { ListLayoutShell } from "@/components/dashboard/list-layout-shell";
 import { Heatmap } from "@/components/dashboard/heatmap";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
+import { RemoteUsagePanel } from "@/components/dashboard/remote-usage-panel";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -16,6 +17,7 @@ import {
 import {
   heatmapAtom,
   loadingAtom,
+  remoteUsageAtom,
   selectedSeriesKeysAtom,
   seriesLinesAtom,
   seriesOptionsAtom,
@@ -43,6 +45,7 @@ export function DashboardPage() {
   const trend = useAtomValue(trendAtom);
   const seriesOptions = useAtomValue(seriesOptionsAtom);
   const seriesLines = useAtomValue(seriesLinesAtom);
+  const remoteUsage = useAtomValue(remoteUsageAtom);
   const loading = useAtomValue(loadingAtom);
   const visibleSeriesOptions = useMemo(
     () =>
@@ -202,6 +205,8 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <RemoteUsagePanel remote={remoteUsage} />
 
       <div className="px-4 sm:px-8 lg:px-10">
         <Card>

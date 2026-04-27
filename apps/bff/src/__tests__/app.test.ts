@@ -274,6 +274,13 @@ describe("BFF API Routes", () => {
       },
       providers: rangeData.providers,
       selectedDay: null,
+      remoteSync: {
+        enabled: false,
+        status: "disabled",
+        machines: [],
+        rows: [],
+        totals: { machines: 0, tokens: 0, pricedTokens: 0, cost: 0, messages: 0 },
+      },
     });
   });
 

@@ -140,6 +140,61 @@ export interface DashboardPayload {
   series: CostSeriesPayload;
   providers: ProviderInsight[];
   selectedDay: DayBreakdown | null;
+  remoteSync?: RemoteUsagePayload;
+}
+
+export interface UsageSyncMachine {
+  id: string;
+  label: string;
+}
+
+export interface UsageSyncRow {
+  providerId: string;
+  modelId: string;
+  tokens: number;
+  pricedTokens: number;
+  cost: number;
+  messages: number;
+  breakdown: TokenBreakdown;
+}
+
+export interface UsageSyncDay {
+  date: string;
+  hash: string;
+  rows: UsageSyncRow[];
+}
+
+export interface UsageSyncPushPayload {
+  schemaVersion: 1;
+  machine: UsageSyncMachine;
+  mode: "replace-days";
+  generatedAt: string;
+  days: UsageSyncDay[];
+}
+
+export interface RemoteUsageRow extends UsageSyncRow {
+  machineId: string;
+  machineLabel: string;
+  date: string;
+  updatedAt: string;
+}
+
+export interface RemoteUsageTotals {
+  machines: number;
+  tokens: number;
+  pricedTokens: number;
+  cost: number;
+  messages: number;
+}
+
+export interface RemoteUsagePayload {
+  enabled: boolean;
+  status: "disabled" | "fresh" | "stale";
+  machines: UsageSyncMachine[];
+  rows: RemoteUsageRow[];
+  totals: RemoteUsageTotals;
+  lastFetchedAt?: string;
+  error?: string;
 }
 
 export interface ProviderDashboardPayload extends DashboardPayload {

@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import type {
-  ApiErrorPayload,
   CostSeriesPayload,
   DashboardPayload,
   ProviderInsightsPayload,
+  TimeRange,
 } from "@opencode-dashboard/shared";
+import { getRemoteUsageForRange } from "../services/sync/remote";
 import { readData } from "./shared";
 
 const dashboard = new Hono();
@@ -20,6 +21,15 @@ function getDashboardSeries(data: Awaited<ReturnType<typeof readData>>) {
   return {
     options,
     lines: data.seriesLines.filter((line) => keys.has(line.key)),
+  };
+}
+
+function getRemoteUsageQuery(c: { req: { query: (name: string) => string | undefined } }) {
+  return {
+    range: c.req.query("range") as TimeRange | undefined,
+    start: c.req.query("start"),
+    end: c.req.query("end"),
+    timeZone: c.req.query("timeZone"),
   };
 }
 
@@ -49,6 +59,7 @@ dashboard.get("/api/providers", async (c) => {
 dashboard.get("/api/dashboard", async (c) => {
   const data = await readData(c);
   const series = getDashboardSeries(data);
+  const remoteSync = await getRemoteUsageForRange(getRemoteUsageQuery(c));
   return c.json<DashboardPayload>({
     summary: data.summary,
     heatmap: data.heatmap,
@@ -56,7 +67,12 @@ dashboard.get("/api/dashboard", async (c) => {
     series,
     providers: data.providers,
     selectedDay: null,
+    remoteSync,
   });
 });
+
+dashboard.get("/api/sync/remote", async (c) =>
+  c.json(await getRemoteUsageForRange(getRemoteUsageQuery(c))),
+);
 
 export { dashboard };
