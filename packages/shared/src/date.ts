@@ -3,6 +3,7 @@ import type { TimeRange } from "./index";
 export const DEFAULT_TIME_ZONE = "UTC";
 
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
+const resolvedTimeZoneCache = new Map<string, string>();
 
 function pad(value: number, length = 2) {
   return String(value).padStart(length, "0");
@@ -34,10 +35,17 @@ export function resolveTimeZone(timeZone?: string) {
     return DEFAULT_TIME_ZONE;
   }
 
+  const cached = resolvedTimeZoneCache.get(timeZone);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   try {
     new Intl.DateTimeFormat("en-US", { timeZone });
+    resolvedTimeZoneCache.set(timeZone, timeZone);
     return timeZone;
   } catch {
+    resolvedTimeZoneCache.set(timeZone, DEFAULT_TIME_ZONE);
     return DEFAULT_TIME_ZONE;
   }
 }
