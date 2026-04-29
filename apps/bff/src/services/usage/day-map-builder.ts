@@ -1,10 +1,11 @@
 import type { DayBreakdown, SessionBreakdown, TokenBreakdown } from "@opencode-dashboard/shared";
-import { formatDateInTimeZone } from "@opencode-dashboard/shared";
+import { DEFAULT_TIME_ZONE, formatDateInTimeZone } from "@opencode-dashboard/shared";
 import { roundCost } from "../cost";
 import type { RawMessage } from "./types";
 import { emptyBreakdown, totalTokens } from "./sqlite-reader";
 
 export function buildDayMap(messages: RawMessage[], timeZone: string) {
+  const usePrecomputedDate = timeZone === DEFAULT_TIME_ZONE;
   const dayMap = new Map<string, DayBreakdown>();
   const modelMap = new Map<
     string,
@@ -36,7 +37,9 @@ export function buildDayMap(messages: RawMessage[], timeZone: string) {
   >();
 
   for (const message of messages) {
-    const date = formatDateInTimeZone(message.timestampMs, timeZone);
+    const date = usePrecomputedDate
+      ? message.date
+      : formatDateInTimeZone(message.timestampMs, timeZone);
     const day = dayMap.get(date) ?? {
       date,
       tokens: 0,
