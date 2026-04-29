@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useAtom } from "jotai";
 import { Link } from "@tanstack/react-router";
 import { Laptop, MoonStar, SunMedium } from "lucide-react";
@@ -142,8 +142,8 @@ export function MetricPanel({
 }: {
   className?: string;
   title: string;
-  value: string;
-  subline: string;
+  value: ReactNode;
+  subline: ReactNode;
   accent: string;
   data: Array<{ date: string; tokens: number; cost: number; messages: number }>;
   dataKey: "tokens" | "cost" | "messages";
@@ -182,8 +182,8 @@ export function CompactMetric({
 }: {
   className?: string;
   title: string;
-  value: string;
-  detail: string;
+  value: ReactNode;
+  detail: ReactNode;
   accent: string;
   data: Array<{ date: string; tokens: number; cost: number; messages: number }>;
   dataKey: "tokens" | "cost" | "messages";

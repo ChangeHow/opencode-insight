@@ -4,10 +4,10 @@ import type {
   DashboardSummary,
   DayBreakdown,
   HeatmapDay,
-  SessionBreakdown,
   TimeRange,
   TokenBreakdown,
   TrendPoint,
+  UsageSyncDay,
 } from "@opencode-dashboard/shared";
 
 export type SourceKind = DashboardSummary["source"]["kind"];
@@ -54,4 +54,14 @@ export interface SerializedUsageSnapshot {
   trendByRange: Record<TimeRange, TrendPoint[]>;
   breakdownByDate: DayBreakdown[];
   dataFingerprint?: string;
+}
+
+export interface SyncPushState {
+  dayHashes: Record<string, string>;
+  lastPushedAt?: string;
+}
+
+export interface LocalUsageSyncData {
+  generatedAt: string;
+  days: UsageSyncDay[];
 }

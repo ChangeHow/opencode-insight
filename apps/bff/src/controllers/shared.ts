@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import type { TimeRange } from "@opencode-dashboard/shared";
 import { resolveTimeZone } from "@opencode-dashboard/shared";
 import { logger } from "../logger";
+import { syncUsageSnapshot } from "../services/sync/remote";
 import {
   getDateFilteredData,
   getRangeData,
@@ -9,7 +10,10 @@ import {
   refreshRecentUsageSnapshot,
 } from "../services/usage/index";
 
-export let snapshotPromise = loadUsageSnapshot();
+export let snapshotPromise = Promise.resolve(loadUsageSnapshot()).then((snapshot) => {
+  void syncUsageSnapshot(snapshot);
+  return snapshot;
+});
 let refreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
 let backgroundRefreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
 
@@ -45,6 +49,7 @@ export function refreshSnapshot() {
     })
     .then((snapshot) => {
       snapshotPromise = Promise.resolve(snapshot);
+      void syncUsageSnapshot(snapshot);
       void scheduleBackgroundRefresh();
       return snapshot;
     })
@@ -63,6 +68,7 @@ function scheduleBackgroundRefresh() {
   backgroundRefreshPromise = loadUsageSnapshot({ forceRefresh: true })
     .then((snapshot) => {
       snapshotPromise = Promise.resolve(snapshot);
+      void syncUsageSnapshot(snapshot);
       return snapshot;
     })
     .catch((error) => {

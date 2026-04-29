@@ -5,6 +5,7 @@ import {
   heatmapAtom,
   providerInsightsAtom,
   rangeAtom,
+  remoteUsageAtom,
   selectedSeriesKeysAtom,
   seriesLinesAtom,
   seriesOptionsAtom,
@@ -27,6 +28,7 @@ export function useDashboardData() {
   const setSeriesOptions = useSetAtom(seriesOptionsAtom);
   const setSeriesLines = useSetAtom(seriesLinesAtom);
   const setProviderInsights = useSetAtom(providerInsightsAtom);
+  const setRemoteUsage = useSetAtom(remoteUsageAtom);
   const setSelectedSeriesKeys = useSetAtom(selectedSeriesKeysAtom);
 
   useDataFetcher({
@@ -39,6 +41,7 @@ export function useDashboardData() {
         setSeriesOptions(dashboard.series.options);
         setSeriesLines(dashboard.series.lines);
         setProviderInsights(dashboard.providers);
+        setRemoteUsage(dashboard.remoteSync ?? null);
         setSelectedSeriesKeys((current) => {
           const visibleOptions = dashboard.series.options.filter(hasSeriesValue).slice(0, 10);
           const valid = current.filter((key) =>
@@ -50,6 +53,7 @@ export function useDashboardData() {
       [
         setHeatmap,
         setProviderInsights,
+        setRemoteUsage,
         setSelectedSeriesKeys,
         setSeriesLines,
         setSeriesOptions,
@@ -64,6 +68,15 @@ export function useDashboardData() {
       setSeriesOptions([]);
       setSeriesLines([]);
       setProviderInsights([]);
-    }, [setHeatmap, setProviderInsights, setSeriesLines, setSeriesOptions, setSummary, setTrend]),
+      setRemoteUsage(null);
+    }, [
+      setHeatmap,
+      setProviderInsights,
+      setRemoteUsage,
+      setSeriesLines,
+      setSeriesOptions,
+      setSummary,
+      setTrend,
+    ]),
   });
 }

@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "opencode-dashboard-sync",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-27",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "opencode-dashboard-sync",
+      "database_id": "62701395-2a90-4c15-b96a-e6b934198794",
+    },
+  ],
+}
