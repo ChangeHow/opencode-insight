@@ -20,6 +20,17 @@ vi.mock("../services/messages.js", () => ({
   invalidateMessagePayloadCache: vi.fn(),
 }));
 
+vi.mock("../services/sync/remote.js", () => ({
+  getRemoteUsageForRange: vi.fn(async () => ({
+    enabled: false,
+    status: "disabled",
+    machines: [],
+    rows: [],
+    totals: { machines: 0, tokens: 0, pricedTokens: 0, cost: 0, messages: 0 },
+  })),
+  syncUsageSnapshot: vi.fn(),
+}));
+
 import app from "../app";
 import { clearMemoryLogs, getMemoryLogs } from "../logger";
 import {
@@ -37,9 +48,13 @@ const mockGetDateFilteredData = vi.mocked(getDateFilteredData);
 const mockBuildMessagePayloads = vi.mocked(buildMessagePayloads);
 const mockInvalidateMessagePayloadCache = vi.mocked(invalidateMessagePayloadCache);
 const timeZone = "Asia/Shanghai";
+const syncEnvKeys = ["SYNC_ENDPOINT", "SYNC_TOKEN", "SYNC_MACHINE_ID", "SYNC_MACHINE_LABEL"];
 
 describe("BFF API Routes", () => {
   beforeEach(() => {
+    for (const key of syncEnvKeys) {
+      delete process.env[key];
+    }
     vi.clearAllMocks();
     clearMemoryLogs();
     const snapshot = makeUsageSnapshot();

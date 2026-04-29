@@ -4,8 +4,66 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { getModelDisplayName } from "@/lib/model-display";
 
-function getTopRows(rows: RemoteUsageRow[]) {
-  return [...rows]
+type MachineUsageCard = {
+  machineId: string;
+  machineLabel: string;
+  tokens: number;
+  cost: number;
+  topModelName: string;
+};
+
+function getTopRows(rows: RemoteUsageRow[]): MachineUsageCard[] {
+  const machineMap = new Map<
+    string,
+    {
+      machineId: string;
+      machineLabel: string;
+      tokens: number;
+      cost: number;
+      modelTokens: Map<string, number>;
+    }
+  >();
+
+  for (const row of rows) {
+    const machine = machineMap.get(row.machineId) ?? {
+      machineId: row.machineId,
+      machineLabel: row.machineLabel,
+      tokens: 0,
+      cost: 0,
+      modelTokens: new Map<string, number>(),
+    };
+
+    machine.tokens += row.tokens;
+    machine.cost += row.cost;
+
+    const modelKey = `${row.providerId}:${row.modelId}`;
+    const nextModelTokens = (machine.modelTokens.get(modelKey) ?? 0) + row.tokens;
+    machine.modelTokens.set(modelKey, nextModelTokens);
+
+    machineMap.set(row.machineId, machine);
+  }
+
+  return [...machineMap.values()]
+    .map((machine) => {
+      let topModelKey = "";
+      let topModelTokens = -1;
+      for (const [key, tokens] of machine.modelTokens) {
+        if (tokens > topModelTokens) {
+          topModelKey = key;
+          topModelTokens = tokens;
+        }
+      }
+
+      const [providerId = "", modelId = ""] = topModelKey.split(":");
+
+      return {
+        machineId: machine.machineId,
+        machineLabel: machine.machineLabel,
+        tokens: machine.tokens,
+        cost: machine.cost,
+        topModelName: getModelDisplayName(modelId, providerId),
+      };
+    })
     .toSorted((left, right) => right.tokens - left.tokens || right.cost - left.cost)
     .slice(0, 6);
 }
@@ -69,27 +127,25 @@ export function RemoteUsagePanel({ remote }: { remote: RemoteUsagePayload | null
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {topRows.map((row) => (
                 <div
-                  key={`${row.machineId}:${row.date}:${row.providerId}:${row.modelId}`}
+                  key={row.machineId}
                   className="rounded-[20px] border border-[var(--border)] bg-[var(--panel-strong)]/55 p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <p className="flex items-center gap-2 text-[11px] font-semibold text-[var(--muted-foreground)]">
-                        <Server className="size-3.5" />
-                        <span className="truncate">{row.machineLabel}</span>
-                      </p>
-                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                        {getModelDisplayName(row.modelId, row.providerId)}
-                      </p>
-                      <p className="text-[11px] text-[var(--muted-foreground)]">{row.providerId}</p>
-                    </div>
+                    <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--muted-foreground)]">
+                      <Server className="size-3.5" />
+                      <span className="truncate">{row.machineLabel}</span>
+                    </p>
                     <p className="shrink-0 text-sm font-semibold text-[var(--foreground)]">
                       {formatCompactNumber(row.tokens)}
                     </p>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-[var(--muted-foreground)]">
-                    <span>{row.messages} messages</span>
-                    <span>{formatCurrency(row.cost)}</span>
+                  <p className="mt-3 truncate text-sm font-semibold text-[var(--foreground)]">
+                    {row.topModelName}
+                  </p>
+                  <div className="mt-8 flex justify-end">
+                    <span className="text-base font-semibold text-[var(--foreground)]">
+                      {formatCurrency(row.cost)}
+                    </span>
                   </div>
                 </div>
               ))}

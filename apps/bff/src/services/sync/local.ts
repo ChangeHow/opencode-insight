@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { TokenBreakdown, UsageSyncDay, UsageSyncRow } from "@opencode-dashboard/shared";
 import type { LocalUsageSyncData, UsageSnapshot } from "../usage/types";
 
-const DEFAULT_SYNC_WINDOW_DAYS = 30;
+const DEFAULT_SYNC_WINDOW_DAYS = 366;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type LocalSyncMode = "history" | "window";

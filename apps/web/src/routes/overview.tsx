@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, Coins, Flame, Rows3, Sparkles, Wallet } from "lucide-react";
+import { Rows3 } from "lucide-react";
 import { ListLayoutShell } from "@/components/dashboard/list-layout-shell";
 import { Heatmap } from "@/components/dashboard/heatmap";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
@@ -24,16 +24,11 @@ import {
   summaryAtom,
   trendAtom,
 } from "@/lib/atoms";
-import { formatCompactNumber, formatCurrency, formatDateLabel } from "@/lib/format";
+import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { getModelDisplayName } from "@/lib/model-display";
 import { useDashboardData } from "@/lib/use-dashboard-data";
-import {
-  CompactMetric,
-  MemoLedgerSparkline,
-  MemoTrendChart,
-  MetricPanel,
-  OverviewEmptyState,
-} from "./shared";
+import { MemoLedgerSparkline, MemoTrendChart, OverviewEmptyState } from "./shared";
+import { OverviewSummaryGrid } from "./overview-summary-grid";
 
 export function DashboardPage() {
   useDashboardData();
@@ -72,8 +67,6 @@ export function DashboardPage() {
     () => visibleSeriesLines.filter((line) => selectedSeriesKeys.includes(line.key)),
     [selectedSeriesKeys, visibleSeriesLines],
   );
-  const hasPeriodData = (summary?.totalTokens ?? 0) > 0 || (summary?.totalMessages ?? 0) > 0;
-
   function handleSeriesToggle(key: string) {
     setSelectedSeriesKeys((current) => {
       if (current.includes(key)) {
@@ -86,72 +79,12 @@ export function DashboardPage() {
 
   return (
     <ListLayoutShell currentView="overview">
-      <div className="grid gap-3 px-4 sm:px-8 lg:grid-cols-12 lg:px-10">
-        <MetricPanel
-          className="lg:col-span-6"
-          title="Estimated spend"
-          value={summary ? formatCurrency(summary.totalCost) : "—"}
-          subline={
-            summary
-              ? hasPeriodData
-                ? `Coverage ${Math.round(summary.pricingCoverage * 100)}% of ${formatCompactNumber(summary.totalTokens)} tokens`
-                : "No retained usage in this period. OpenCode may have cleaned older sessions."
-              : "Waiting for local pricing data"
-          }
-          accent="var(--metric-amber)"
-          data={trend}
-          dataKey="cost"
-          icon={Wallet}
-        />
-        <MetricPanel
-          className="lg:col-span-6"
-          title="Total tokens"
-          value={summary ? formatCompactNumber(summary.totalTokens) : "—"}
-          subline={
-            summary?.topModel
-              ? `Top model ${getModelDisplayName(summary.topModel.modelId)}`
-              : hasPeriodData
-                ? "No model usage available"
-                : "No active model usage in this range"
-          }
-          accent="var(--metric-violet)"
-          data={trend}
-          dataKey="tokens"
-          icon={Coins}
-        />
-        <CompactMetric
-          className="lg:col-span-4"
-          title="Active cadence"
-          value={summary ? `${summary.activeDays}` : "—"}
-          detail={summary ? `${summary.totalMessages} assistant messages` : "No data yet"}
-          accent="var(--metric-green)"
-          data={trend}
-          dataKey="messages"
-          icon={Activity}
-        />
-        <CompactMetric
-          className="lg:col-span-4"
-          title="Avg / active day"
-          value={summary ? formatCompactNumber(summary.averageTokensPerActiveDay) : "—"}
-          detail={
-            summary?.bestDay ? `Peak ${formatDateLabel(summary.bestDay.date)}` : "No best day yet"
-          }
-          accent="var(--metric-orange)"
-          data={trend}
-          dataKey="tokens"
-          icon={Sparkles}
-        />
-        <CompactMetric
-          className="lg:col-span-4"
-          title="Longest streak"
-          value={summary ? `${summary.longestStreak}d` : "—"}
-          detail={summary ? `Current streak ${summary.currentStreak}d` : "No activity streak"}
-          accent="var(--metric-gold)"
-          data={trend}
-          dataKey="messages"
-          icon={Flame}
-        />
-      </div>
+      <OverviewSummaryGrid
+        summary={summary}
+        trend={trend}
+        seriesOptions={seriesOptions}
+        remoteUsage={remoteUsage}
+      />
 
       <div className="grid gap-5 px-4 sm:px-8 lg:px-10 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)]">
         <Card className="min-w-0">
