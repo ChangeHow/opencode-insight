@@ -67,6 +67,7 @@ export function DashboardPage() {
     () => visibleSeriesLines.filter((line) => selectedSeriesKeys.includes(line.key)),
     [selectedSeriesKeys, visibleSeriesLines],
   );
+  const trendChartKey = `${trend[0]?.date ?? "empty"}:${trend.at(-1)?.date ?? "empty"}:${selectedVisibleLines.map((line) => line.key).join("|")}`;
   function handleSeriesToggle(key: string) {
     setSelectedSeriesKeys((current) => {
       if (current.includes(key)) {
@@ -117,7 +118,7 @@ export function DashboardPage() {
         </Card>
 
         <Card className="min-w-0">
-          <CardContent className="w-full p-4 sm:p-6">
+          <CardContent className="flex h-full w-full p-4 sm:p-6">
             {loading ? (
               <div className="h-72 animate-pulse rounded-[24px] bg-black/5" />
             ) : trend.length === 0 ? (
@@ -128,6 +129,7 @@ export function DashboardPage() {
               />
             ) : (
               <MemoTrendChart
+                key={trendChartKey}
                 data={trend}
                 options={visibleSeriesOptions}
                 lines={selectedVisibleLines}

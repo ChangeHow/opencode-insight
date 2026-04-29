@@ -12,7 +12,7 @@ import { getSyncConfig } from "./config";
 import { buildLocalSyncData, selectDaysToPush } from "./local";
 import { PUSH_STATE_FILE, REMOTE_CACHE_FILE, SYNC_CACHE_DIR } from "./paths";
 
-const REMOTE_CACHE_STALE_MS = 60 * 60 * 1000;
+const REMOTE_CACHE_STALE_MS = 30 * 60 * 1000;
 
 export interface RemoteUsageResponse {
   machines: { id: string; label: string }[];
