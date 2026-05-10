@@ -25,7 +25,8 @@
     "upgrade:app": "node ./scripts/upgrade.mjs",
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
-    "prepare": "husky"
+    "check:node": "node ./scripts/check-node.mjs",
+    "prepare": "node ./scripts/check-node.mjs && husky"
   },
   "dependencies": {
     "@clack/prompts": "1.1.0",

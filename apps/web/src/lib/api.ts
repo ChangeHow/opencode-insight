@@ -11,6 +11,7 @@ import type {
   MessageOverviewPayload,
   ProviderDashboardPayload,
   ProviderInsightsPayload,
+  RemoteUsagePayload,
   SessionBreakdown,
   TimeRange,
   TrendPoint,
@@ -123,6 +124,10 @@ export function fetchProviderDashboard(
 
 export function fetchDashboard(range: TimeRange, customRange?: { start: string; end: string }) {
   return getJson<DashboardPayload>(`/api/dashboard${buildQuery(range, customRange)}`);
+}
+
+export function fetchRemoteUsage(range: TimeRange, customRange?: { start: string; end: string }) {
+  return getJson<RemoteUsagePayload>(`/api/sync/remote${buildQuery(range, customRange)}`);
 }
 
 export async function refreshSnapshot() {
