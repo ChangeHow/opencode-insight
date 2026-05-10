@@ -24,15 +24,6 @@ function getDashboardSeries(data: Awaited<ReturnType<typeof readData>>) {
   };
 }
 
-function getRemoteUsageQuery(c: { req: { query: (name: string) => string | undefined } }) {
-  return {
-    range: c.req.query("range") as TimeRange | undefined,
-    start: c.req.query("start"),
-    end: c.req.query("end"),
-    timeZone: c.req.query("timeZone"),
-  };
-}
-
 dashboard.get("/api/summary", async (c) => c.json((await readData(c)).summary));
 dashboard.get("/api/heatmap", async (c) => c.json((await readData(c)).heatmap));
 dashboard.get("/api/trend", async (c) => c.json((await readData(c)).trend));
@@ -56,10 +47,18 @@ dashboard.get("/api/providers", async (c) => {
   return c.json<ProviderInsightsPayload>({ summary: data.summary, providers: data.providers });
 });
 
+function getRemoteUsageQuery(c: { req: { query: (name: string) => string | undefined } }) {
+  return {
+    range: c.req.query("range") as TimeRange | undefined,
+    start: c.req.query("start"),
+    end: c.req.query("end"),
+    timeZone: c.req.query("timeZone"),
+  };
+}
+
 dashboard.get("/api/dashboard", async (c) => {
   const data = await readData(c);
   const series = getDashboardSeries(data);
-  const remoteSync = await getRemoteUsageForRange(getRemoteUsageQuery(c));
   return c.json<DashboardPayload>({
     summary: data.summary,
     heatmap: data.heatmap,
@@ -67,7 +66,7 @@ dashboard.get("/api/dashboard", async (c) => {
     series,
     providers: data.providers,
     selectedDay: null,
-    remoteSync,
+    remoteSync: undefined,
   });
 });
 

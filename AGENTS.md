@@ -5,6 +5,13 @@
 - Use Simplified Chinese for conversation with the user.
 - Keep code, identifiers, comments, and engineering artifacts in English unless the user explicitly requests otherwise.
 
+## Environment Requirements
+
+- **Node.js**: `>=24.0.0` (read from `.nvmrc`). The `prepare` script enforces this.
+- **Package manager**: `pnpm` (declared in `packageManager`).
+
+> **Agent note**: If the shell is non-interactive (e.g. launched by opencode), `fnm/nvm` auto-switch may not fire. Run `fnm use || nvm use` if `node --version` is below `24.x`.
+
 ## Working Style
 
 - Prefer minimal diffs and avoid unrelated refactors.

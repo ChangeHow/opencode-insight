@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
   customDateRangeAtom,
+  dashboardStateAtom,
   heatmapAtom,
   providerInsightsAtom,
   rangeAtom,
@@ -12,7 +13,7 @@ import {
   summaryAtom,
   trendAtom,
 } from "@/lib/atoms";
-import { fetchDashboard } from "@/lib/api";
+import { fetchDashboard, fetchRemoteUsage } from "@/lib/api";
 import { useDataFetcher } from "@/lib/use-data-fetcher";
 
 function hasSeriesValue(option: { totalCost: number; totalTokens: number; totalMessages: number }) {
@@ -30,6 +31,8 @@ export function useDashboardData() {
   const setProviderInsights = useSetAtom(providerInsightsAtom);
   const setRemoteUsage = useSetAtom(remoteUsageAtom);
   const setSelectedSeriesKeys = useSetAtom(selectedSeriesKeysAtom);
+  const dashboardState = useAtomValue(dashboardStateAtom);
+  const refreshTick = dashboardState.refreshTick;
   const requestKey = useMemo(
     () => `${range}:${customDateRange.start}:${customDateRange.end}`,
     [customDateRange.end, customDateRange.start, range],
@@ -46,7 +49,6 @@ export function useDashboardData() {
         setSeriesOptions(dashboard.series.options);
         setSeriesLines(dashboard.series.lines);
         setProviderInsights(dashboard.providers);
-        setRemoteUsage(dashboard.remoteSync ?? null);
         setSelectedSeriesKeys((current) => {
           const visibleOptions = dashboard.series.options.filter(hasSeriesValue).slice(0, 10);
           if (lastSeriesSelectionKey.current !== requestKey) {
@@ -63,7 +65,6 @@ export function useDashboardData() {
       [
         setHeatmap,
         setProviderInsights,
-        setRemoteUsage,
         setSelectedSeriesKeys,
         setSeriesLines,
         setSeriesOptions,
@@ -79,15 +80,36 @@ export function useDashboardData() {
       setSeriesOptions([]);
       setSeriesLines([]);
       setProviderInsights([]);
-      setRemoteUsage(null);
     }, [
       setHeatmap,
       setProviderInsights,
-      setRemoteUsage,
       setSeriesLines,
       setSeriesOptions,
       setSummary,
       setTrend,
     ]),
   });
+
+  useEffect(() => {
+    let canceled = false;
+
+    async function loadRemote() {
+      try {
+        const remote = await fetchRemoteUsage(range, customDateRange);
+        if (!canceled) {
+          setRemoteUsage(remote);
+        }
+      } catch {
+        if (!canceled) {
+          setRemoteUsage(null);
+        }
+      }
+    }
+
+    void loadRemote();
+
+    return () => {
+      canceled = true;
+    };
+  }, [range, customDateRange, refreshTick, setRemoteUsage]);
 }
