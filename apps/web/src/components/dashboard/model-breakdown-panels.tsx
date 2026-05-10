@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Layers3, Wallet } from "lucide-react";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,9 +20,11 @@ export interface ModelTokenShareEntry {
   label: string;
   providerId: string;
   modelId: string;
-  inputShare: number;
-  outputShare: number;
-  cacheShare: number;
+  tokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheTokens: number;
+  share: number;
 }
 
 export function CostByModelPanel({
@@ -89,47 +92,75 @@ export function ModelTokenSharePanel({
       eyebrow={eyebrow}
       title="Model token share"
       separator
-      footer={
-        <>
-          <LegendPill label="Input" color={TOKEN_COLORS.input} />
-          <LegendPill label="Output" color={TOKEN_COLORS.output} />
-          <LegendPill label="Cache" color={TOKEN_COLORS.cache} />
-        </>
-      }
     >
-      <ScrollArea className="mt-4 min-h-0 flex-1 pr-3">
-        <div className="grid content-start gap-4 pb-1">
-          {entries.map((model) => (
-            <div key={model.label} className="space-y-2">
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                  <ProviderIcon providerId={model.providerId} className="size-3" withTooltip />
-                  {model.providerId}
-                </p>
-                <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                  {getModelDisplayName(model.modelId, model.providerId)}
-                </p>
-              </div>
-              <div className="flex h-4 overflow-hidden rounded-full bg-black/6">
-                <div
-                  style={{ width: `${model.inputShare}%`, background: TOKEN_COLORS.input }}
-                  title={`Input ${model.inputShare.toFixed(1)}%`}
-                />
-                <div
-                  style={{ width: `${model.outputShare}%`, background: TOKEN_COLORS.output }}
-                  title={`Output ${model.outputShare.toFixed(1)}%`}
-                />
-                <div
-                  style={{ width: `${model.cacheShare}%`, background: TOKEN_COLORS.cache }}
-                  title={`Cache ${model.cacheShare.toFixed(1)}%`}
-                />
-              </div>
+      <div className="mt-4 min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={entries} margin={{ top: 8, right: 4, left: -12, bottom: 18 }}>
+            <CartesianGrid vertical={false} stroke="rgba(77, 61, 44, 0.1)" />
+            <XAxis
+              dataKey="modelId"
+              interval={0}
+              tickFormatter={formatModelAxisLabel}
+              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              tickFormatter={(value: number) => formatCompactNumber(value)}
+              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+              tickLine={false}
+              axisLine={false}
+              width={54}
+            />
+            <Tooltip
+              formatter={(value) => [formatCompactNumber(Number(value ?? 0)), "Tokens"]}
+              labelFormatter={(_, payload) => payload?.[0]?.payload.label ?? "Model"}
+              contentStyle={{
+                borderRadius: 20,
+                border: "1px solid var(--border)",
+                background: "var(--panel)",
+                color: "var(--foreground)",
+              }}
+            />
+            <Bar dataKey="inputTokens" name="Input" stackId="tokens" fill={TOKEN_COLORS.input} />
+            <Bar dataKey="outputTokens" name="Output" stackId="tokens" fill={TOKEN_COLORS.output} />
+            <Bar
+              dataKey="cacheTokens"
+              name="Cache"
+              stackId="tokens"
+              fill={TOKEN_COLORS.cache}
+              radius={[8, 8, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-3 grid gap-2">
+        {entries.slice(0, 3).map((model) => (
+          <div key={model.label} className="flex items-center justify-between gap-3 text-xs">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                <ProviderIcon providerId={model.providerId} className="size-3" withTooltip />
+                {model.providerId}
+              </p>
+              <p className="truncate font-semibold text-[var(--foreground)]">
+                {getModelDisplayName(model.modelId, model.providerId)}
+              </p>
             </div>
-          ))}
-        </div>
-      </ScrollArea>
+            <div className="shrink-0 text-right">
+              <p className="font-semibold text-[var(--foreground)]">
+                {formatCompactNumber(model.tokens)}
+              </p>
+              <p className="text-[var(--muted-foreground)]">{model.share.toFixed(1)}%</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </PinnedPanelShell>
   );
+}
+
+function formatModelAxisLabel(modelId: string) {
+  return modelId.length > 10 ? `${modelId.slice(0, 10)}...` : modelId;
 }
 
 function PinnedPanelShell({
@@ -159,15 +190,6 @@ function PinnedPanelShell({
       {separator ? <Separator className="mt-4 opacity-80" /> : null}
       {children}
       {footer ? <div className="mt-4 flex flex-wrap gap-2 pt-1">{footer}</div> : null}
-    </div>
-  );
-}
-
-function LegendPill({ label, color }: { label: string; color: string }) {
-  return (
-    <div className="ui-pill-chip">
-      <span className="size-2.5 rounded-full" style={{ background: color }} />
-      <span>{label}</span>
     </div>
   );
 }

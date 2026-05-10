@@ -11,7 +11,6 @@ import {
   ModelTokenSharePanel,
 } from "@/components/dashboard/model-breakdown-panels";
 import { buildModelBreakdownData } from "@/components/dashboard/model-breakdown-data";
-import { ModelLedgerPanel } from "@/components/dashboard/model-ledger-panel";
 import { PinnedPlaceholderPanel } from "@/components/dashboard/pinned-placeholder-panel";
 import { HorizontalPanelRail } from "@/components/dashboard/horizontal-panel-rail";
 import { TokenBreakdownPanel } from "@/components/dashboard/token-breakdown-panel";
@@ -42,7 +41,7 @@ export function DayBreakdownPanel({
     );
   }
 
-  const { costByModel, modelTokenMix, sortedModels } = buildModelBreakdownData(day.models);
+  const { costByModel, modelTokenShare } = buildModelBreakdownData(day.models);
 
   return (
     <div className="space-y-6">
@@ -82,11 +81,9 @@ export function DayBreakdownPanel({
 
         <CostByModelPanel eyebrow="Pinned spend" entries={costByModel} />
 
-        <ModelTokenSharePanel eyebrow="Pinned share" entries={modelTokenMix} />
+        <ModelTokenSharePanel eyebrow="Pinned share" entries={modelTokenShare} />
         <PinnedPlaceholderPanel />
       </HorizontalPanelRail>
-
-      <ModelLedgerPanel models={sortedModels} />
     </div>
   );
 }

@@ -6,15 +6,18 @@ import type {
 import { getModelDisplayName } from "@/lib/model-display";
 
 export function buildModelBreakdownData(models: ModelBreakdown[]): {
-  sortedModels: ModelBreakdown[];
   costByModel: CostByModelEntry[];
-  modelTokenMix: ModelTokenShareEntry[];
+  modelTokenShare: ModelTokenShareEntry[];
 } {
   const sortedModels = models.toSorted(
     (left: ModelBreakdown, right: ModelBreakdown) => right.cost - left.cost,
   );
 
   const topModels = sortedModels.slice(0, 6);
+  const topTokenModels = models
+    .toSorted((left: ModelBreakdown, right: ModelBreakdown) => right.tokens - left.tokens)
+    .slice(0, 6);
+  const totalTokens = models.reduce((sum, model) => sum + model.tokens, 0);
 
   const costByModel = topModels.map((model: ModelBreakdown) => ({
     label: `${model.providerId} / ${getModelDisplayName(model.modelId, model.providerId)}`,
@@ -24,23 +27,19 @@ export function buildModelBreakdownData(models: ModelBreakdown[]): {
     tokens: model.tokens,
   }));
 
-  const modelTokenMix = topModels.map((model: ModelBreakdown) => {
-    const cache = model.breakdown.cacheRead + model.breakdown.cacheWrite;
-    const total = model.breakdown.input + model.breakdown.output + cache;
-
-    return {
-      label: `${model.providerId} / ${getModelDisplayName(model.modelId, model.providerId)}`,
-      providerId: model.providerId,
-      modelId: model.modelId,
-      inputShare: total > 0 ? (model.breakdown.input / total) * 100 : 0,
-      outputShare: total > 0 ? (model.breakdown.output / total) * 100 : 0,
-      cacheShare: total > 0 ? (cache / total) * 100 : 0,
-    };
-  });
+  const modelTokenShare = topTokenModels.map((model: ModelBreakdown) => ({
+    label: `${model.providerId} / ${getModelDisplayName(model.modelId, model.providerId)}`,
+    providerId: model.providerId,
+    modelId: model.modelId,
+    tokens: model.tokens,
+    inputTokens: model.breakdown.input,
+    outputTokens: model.breakdown.output,
+    cacheTokens: model.breakdown.cacheRead + model.breakdown.cacheWrite,
+    share: totalTokens > 0 ? (model.tokens / totalTokens) * 100 : 0,
+  }));
 
   return {
-    sortedModels,
     costByModel,
-    modelTokenMix,
+    modelTokenShare,
   };
 }
