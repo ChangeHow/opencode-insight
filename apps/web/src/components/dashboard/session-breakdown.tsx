@@ -12,7 +12,6 @@ import {
   ModelTokenSharePanel,
 } from "@/components/dashboard/model-breakdown-panels";
 import { buildModelBreakdownData } from "@/components/dashboard/model-breakdown-data";
-import { ModelLedgerPanel } from "@/components/dashboard/model-ledger-panel";
 import { TokenBreakdownPanel } from "@/components/dashboard/token-breakdown-panel";
 import { formatCompactNumber, formatCurrency, formatLongDateLabel } from "@/lib/format";
 
@@ -23,7 +22,7 @@ export function SessionBreakdownPanel({
   date: string;
   session: SessionBreakdown;
 }) {
-  const { costByModel, modelTokenMix, sortedModels } = buildModelBreakdownData(session.models);
+  const { costByModel, modelTokenShare } = buildModelBreakdownData(session.models);
 
   return (
     <div className="space-y-6">
@@ -66,10 +65,8 @@ export function SessionBreakdownPanel({
       >
         <TokenBreakdownPanel breakdown={session.breakdown} eyebrow="Token mix" />
         <CostByModelPanel eyebrow="Session spend" entries={costByModel} />
-        <ModelTokenSharePanel eyebrow="Model share" entries={modelTokenMix} />
+        <ModelTokenSharePanel eyebrow="Model share" entries={modelTokenShare} />
       </HorizontalPanelRail>
-
-      <ModelLedgerPanel models={sortedModels} />
     </div>
   );
 }
