@@ -33,6 +33,84 @@ interface HeatmapProps {
   onSelect: (date: string) => void;
 }
 
+function HeatmapDayButton({
+  props,
+  dayMap,
+}: {
+  props: DayButtonProps;
+  dayMap: Map<string, HeatmapDay>;
+}) {
+  const dateKey = formatCalendarDate(props.day.date);
+  const entry = dayMap.get(dateKey);
+
+  if (!entry) {
+    return (
+      <DayPickerDayButton
+        {...props}
+        className={cn(
+          "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border border-transparent bg-transparent p-1.5 text-left text-[var(--heat-empty-fg)] outline-none sm:p-2",
+          props.modifiers.outside && "opacity-42",
+        )}
+      >
+        <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--heat-empty-date)] sm:text-[10px]">
+          {dateKey.slice(8)}
+        </span>
+      </DayPickerDayButton>
+    );
+  }
+
+  const isDisabled = props.modifiers.disabled;
+  const isZeroCost = entry.cost === 0;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <DayPickerDayButton
+          {...props}
+          className={cn(
+            "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border p-1.5 text-left outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:p-2",
+            isZeroCost
+              ? "border-transparent bg-transparent text-[var(--heat-empty-fg)]"
+              : intensityClass[entry.intensity],
+            isDisabled
+              ? "cursor-not-allowed opacity-80 saturate-75"
+              : "cursor-pointer hover:-translate-y-0.5",
+            props.modifiers.selected
+              ? isZeroCost
+                ? "border-[var(--accent)]"
+                : "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]"
+              : "border-transparent",
+            props.modifiers.outside && "opacity-48 saturate-75",
+          )}
+        >
+          <span
+            className={cn(
+              "text-[9px] font-semibold uppercase tracking-[0.16em] sm:text-[10px]",
+              isZeroCost && "text-[var(--heat-empty-date)]",
+            )}
+          >
+            {dateKey.slice(8)}
+          </span>
+          <span
+            className={cn(
+              "hidden text-[10px] font-semibold sm:block sm:text-[11px]",
+              isZeroCost ? "text-[var(--heat-empty-fg)]" : spendClass[entry.intensity],
+            )}
+          >
+            {formatCurrency(entry.cost)}
+          </span>
+        </DayPickerDayButton>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="font-semibold">{formatDateLabel(entry.date)}</p>
+        <p>{formatCurrency(entry.cost)} estimated spend</p>
+        <p>{formatCompactNumber(entry.tokens)} tokens</p>
+        <p>{entry.messages} assistant messages</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
   const dayMap = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
   const start = parseInputDate(days[0]?.date ?? "");
@@ -59,77 +137,13 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
     }
   }, [initialMonth, initialMonthKey]);
 
-  function HeatmapDayButton(props: DayButtonProps) {
-    const dateKey = formatCalendarDate(props.day.date);
-    const entry = dayMap.get(dateKey);
-
-    if (!entry) {
-      return (
-        <DayPickerDayButton
-          {...props}
-          className={cn(
-            "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border border-transparent bg-transparent p-1.5 text-left text-[var(--heat-empty-fg)] outline-none sm:p-2",
-            props.modifiers.outside && "opacity-42",
-          )}
-        >
-          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--heat-empty-date)] sm:text-[10px]">
-            {dateKey.slice(8)}
-          </span>
-        </DayPickerDayButton>
-      );
-    }
-
-    const isDisabled = props.modifiers.disabled;
-    const isZeroCost = entry.cost === 0;
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DayPickerDayButton
-            {...props}
-            className={cn(
-              "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border p-1.5 text-left outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:p-2",
-              isZeroCost
-                ? "border-transparent bg-transparent text-[var(--heat-empty-fg)]"
-                : intensityClass[entry.intensity],
-              isDisabled
-                ? "cursor-not-allowed opacity-80 saturate-75"
-                : "cursor-pointer hover:-translate-y-0.5",
-              props.modifiers.selected
-                ? isZeroCost
-                  ? "border-[var(--accent)]"
-                  : "border-[var(--accent)] shadow-[0_10px_30px_rgba(174,85,43,0.18)]"
-                : "border-transparent",
-              props.modifiers.outside && "opacity-48 saturate-75",
-            )}
-          >
-            <span
-              className={cn(
-                "text-[9px] font-semibold uppercase tracking-[0.16em] sm:text-[10px]",
-                isZeroCost && "text-[var(--heat-empty-date)]",
-              )}
-            >
-              {dateKey.slice(8)}
-            </span>
-            <span
-              className={cn(
-                "hidden text-[10px] font-semibold sm:block sm:text-[11px]",
-                isZeroCost ? "text-[var(--heat-empty-fg)]" : spendClass[entry.intensity],
-              )}
-            >
-              {formatCurrency(entry.cost)}
-            </span>
-          </DayPickerDayButton>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="font-semibold">{formatDateLabel(entry.date)}</p>
-          <p>{formatCurrency(entry.cost)} estimated spend</p>
-          <p>{formatCompactNumber(entry.tokens)} tokens</p>
-          <p>{entry.messages} assistant messages</p>
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
+  const DayButtonComponent = useMemo(
+    () =>
+      function DayButtonWrapper(props: DayButtonProps) {
+        return <HeatmapDayButton props={props} dayMap={dayMap} />;
+      },
+    [dayMap],
+  );
 
   return (
     <TooltipProvider>
@@ -225,7 +239,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                   disabled: "opacity-100",
                 }}
                 components={{
-                  DayButton: HeatmapDayButton,
+                  DayButton: DayButtonComponent,
                 }}
               />
             </div>

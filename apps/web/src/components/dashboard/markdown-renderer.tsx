@@ -1,49 +1,11 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAtomValue } from "jotai";
 import { themeAtom } from "@/lib/atoms";
-import { highlight } from "@/lib/shiki";
 import { cn } from "@/lib/utils";
 
-interface CodeBlockProps {
-  lang: string;
-  code: string;
-  shikiTheme: "github-dark" | "github-light";
-}
-
-function CodeBlock({ lang, code, shikiTheme }: CodeBlockProps) {
-  const [html, setHtml] = useState<string | null>(null);
-
-  useEffect(() => {
-    let canceled = false;
-    highlight(code, lang, shikiTheme)
-      .then((result) => {
-        if (!canceled) setHtml(result);
-      })
-      .catch(() => {
-        if (!canceled) setHtml(null);
-      });
-    return () => {
-      canceled = true;
-    };
-  }, [code, lang, shikiTheme]);
-
-  if (html) {
-    return (
-      <div
-        className="overflow-x-auto rounded-[14px] text-xs [&>pre]:p-4"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
-  }
-
-  return (
-    <pre className="overflow-x-auto rounded-[14px] bg-[var(--panel-strong)] p-4 text-xs">
-      <code>{code}</code>
-    </pre>
-  );
-}
+const CodeBlock = lazy(() => import("./code-block").then((m) => ({ default: m.CodeBlock })));
 
 interface MarkdownRendererProps {
   content: string;
@@ -89,7 +51,17 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
                 </code>
               );
             }
-            return <CodeBlock lang={lang} code={code} shikiTheme={resolvedTheme} />;
+            return (
+              <Suspense
+                fallback={
+                  <pre className="overflow-x-auto rounded-[14px] bg-[var(--panel-strong)] p-4 text-xs">
+                    <code>{code}</code>
+                  </pre>
+                }
+              >
+                <CodeBlock lang={lang} code={code} shikiTheme={resolvedTheme} />
+              </Suspense>
+            );
           },
         }}
       >
