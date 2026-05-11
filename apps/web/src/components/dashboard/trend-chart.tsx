@@ -178,13 +178,18 @@ export function TrendChart({
 }
 
 function composeChartData(data: TrendPoint[], lines: CostSeriesLine[]) {
+  const lineMaps = lines.map((line) => ({
+    key: line.key,
+    pointMap: new Map(line.points.map((p) => [p.date, p.cost])),
+  }));
+
   return data.map((point) => {
     const entry: Record<string, number | string> = {
       date: point.date,
     };
 
-    for (const line of lines) {
-      entry[line.key] = line.points.find((item) => item.date === point.date)?.cost ?? 0;
+    for (const { key, pointMap } of lineMaps) {
+      entry[key] = pointMap.get(point.date) ?? 0;
     }
 
     return entry;
@@ -200,14 +205,23 @@ function formatCurrencyCompact(value: number) {
 }
 
 function computeYAxisMax(data: TrendPoint[], lines: CostSeriesLine[]) {
-  const primaryValues =
-    lines.length > 0
-      ? lines.flatMap((line) => line.points.map((point) => point.cost))
-      : data.map((point) => point.cost);
+  let maxValue = 0;
 
-  const values = primaryValues.filter((value) => Number.isFinite(value) && value >= 0);
-
-  const maxValue = Math.max(...values, 0);
+  if (lines.length > 0) {
+    for (const line of lines) {
+      for (const point of line.points) {
+        if (Number.isFinite(point.cost) && point.cost > maxValue) {
+          maxValue = point.cost;
+        }
+      }
+    }
+  } else {
+    for (const point of data) {
+      if (Number.isFinite(point.cost) && point.cost > maxValue) {
+        maxValue = point.cost;
+      }
+    }
+  }
 
   if (maxValue <= 0) {
     return 1;

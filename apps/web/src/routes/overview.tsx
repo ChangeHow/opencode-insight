@@ -67,7 +67,7 @@ export function DashboardPage() {
     () => visibleSeriesLines.filter((line) => selectedSeriesKeys.includes(line.key)),
     [selectedSeriesKeys, visibleSeriesLines],
   );
-  const trendChartKey = `${trend[0]?.date ?? "empty"}:${trend.at(-1)?.date ?? "empty"}:${selectedVisibleLines.map((line) => line.key).join("|")}`;
+  // MemoTrendChart is already memoized; no need for a forced key remount
   function handleSeriesToggle(key: string) {
     setSelectedSeriesKeys((current) => {
       if (current.includes(key)) {
@@ -129,7 +129,6 @@ export function DashboardPage() {
               />
             ) : (
               <MemoTrendChart
-                key={trendChartKey}
                 data={trend}
                 options={visibleSeriesOptions}
                 lines={selectedVisibleLines}

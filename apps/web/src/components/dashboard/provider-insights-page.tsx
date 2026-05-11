@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Activity, Building2, ChevronRight, Wallet } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -134,8 +134,11 @@ export function ProviderInsightsPage({
   selectedProviderId?: string | null;
   onSelectProvider?: (providerId: string) => void;
 }) {
-  const summary = buildSummary(providers);
-  const ledgerProviders = providers.filter((provider) => provider.totalTokens > 0);
+  const summary = useMemo(() => buildSummary(providers), [providers]);
+  const ledgerProviders = useMemo(
+    () => providers.filter((provider) => provider.totalTokens > 0),
+    [providers],
+  );
   const hasLedgerData = ledgerProviders.length > 0;
 
   return (
