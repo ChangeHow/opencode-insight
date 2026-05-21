@@ -94,9 +94,10 @@ export function RemoteUsagePanel({ remote }: { remote: RemoteUsagePayload | null
                 on each source machine.
               </p>
               {remote.status === "stale" ? (
-                <p className="text-xs font-medium text-[var(--accent)]">
-                  Remote sync data is stale{remote.error ? `: ${remote.error}` : "."}
-                </p>
+                <div className="rounded-[16px] border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-700 dark:text-red-300">
+                  Cloudflare remote data is not reachable. Remote sync data is stale
+                  {remote.error ? `: ${remote.error}` : "."}
+                </div>
               ) : null}
             </div>
             <div className="grid grid-cols-3 gap-2 text-right sm:min-w-[24rem]">

@@ -28,6 +28,7 @@ vi.mock("../services/sync/remote.js", () => ({
     rows: [],
     totals: { machines: 0, tokens: 0, pricedTokens: 0, cost: 0, messages: 0 },
   })),
+  pushUsageSnapshot: vi.fn(async () => ({ pushed: true, days: 2 })),
   syncUsageSnapshot: vi.fn(),
 }));
 
@@ -40,6 +41,7 @@ import {
   getDateFilteredData,
 } from "../services/usage/index";
 import { buildMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
+import { getRemoteUsageForRange, pushUsageSnapshot } from "../services/sync/remote";
 
 const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
 const mockRefreshRecentUsageSnapshot = vi.mocked(refreshRecentUsageSnapshot);
@@ -47,6 +49,8 @@ const mockGetRangeData = vi.mocked(getRangeData);
 const mockGetDateFilteredData = vi.mocked(getDateFilteredData);
 const mockBuildMessagePayloads = vi.mocked(buildMessagePayloads);
 const mockInvalidateMessagePayloadCache = vi.mocked(invalidateMessagePayloadCache);
+const mockGetRemoteUsageForRange = vi.mocked(getRemoteUsageForRange);
+const mockPushUsageSnapshot = vi.mocked(pushUsageSnapshot);
 const timeZone = "Asia/Shanghai";
 const syncEnvKeys = ["SYNC_ENDPOINT", "SYNC_TOKEN", "SYNC_MACHINE_ID", "SYNC_MACHINE_LABEL"];
 
@@ -371,6 +375,47 @@ describe("BFF API Routes", () => {
     expect(json).toEqual({
       ok: true,
       scannedAt: "2025-01-20T12:00:00.000Z",
+    });
+  });
+
+  test("POST /api/sync/force refreshes, pushes, and pulls remote usage", async () => {
+    const newSnapshot = makeUsageSnapshot({
+      summary: { scannedAt: "2025-01-20T12:00:00.000Z" },
+    });
+    const remote = {
+      enabled: true,
+      status: "fresh" as const,
+      machines: [],
+      rows: [],
+      totals: { machines: 0, tokens: 0, pricedTokens: 0, cost: 0, messages: 0 },
+      lastFetchedAt: "2025-01-20T12:01:00.000Z",
+    };
+    mockLoadUsageSnapshot.mockResolvedValue(newSnapshot);
+    mockPushUsageSnapshot.mockResolvedValue({ pushed: true, days: 3 });
+    mockGetRemoteUsageForRange.mockResolvedValue(remote);
+
+    const res = await app.request(`/api/sync/force?range=month&timeZone=${timeZone}`, {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockInvalidateMessagePayloadCache).toHaveBeenCalled();
+    expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
+    expect(mockPushUsageSnapshot).toHaveBeenCalledWith(newSnapshot, { force: true });
+    expect(mockGetRemoteUsageForRange).toHaveBeenCalledWith({
+      range: "month",
+      start: undefined,
+      end: undefined,
+      timeZone,
+      force: true,
+    });
+
+    const json = await res.json();
+    expect(json).toEqual({
+      ok: true,
+      scannedAt: "2025-01-20T12:00:00.000Z",
+      push: { pushed: true, days: 3 },
+      remote,
     });
   });
 

@@ -42,7 +42,6 @@ const MODEL_ALIASES: Record<string, string> = {
   "kimi-for-coding": "kimi-k2.5",
   "kimi-k2.5-nvfp4": "kimi-k2.5",
   "kimi-k2-instruct-0905": "kimi-k2.5",
-  "kimi-k2.6": "kimi-k2.6",
   k2p6: "kimi-k2.6",
   "k2-p6": "kimi-k2.6",
 };

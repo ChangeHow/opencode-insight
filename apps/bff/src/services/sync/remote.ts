@@ -19,6 +19,10 @@ export interface RemoteUsageResponse {
   rows: RemoteUsageRow[];
 }
 
+export type UsageSyncPushResult =
+  | { pushed: false; reason: "disabled" | "unchanged" }
+  | { pushed: true; days: number };
+
 function readJsonFile<T>(filePath: string): T | null {
   if (!fs.existsSync(filePath)) {
     return null;
@@ -95,7 +99,10 @@ async function requestJson<T>(url: string, token: string, init?: RequestInit) {
   return (await response.json()) as T;
 }
 
-export async function pushUsageSnapshot(snapshot: UsageSnapshot) {
+export async function pushUsageSnapshot(
+  snapshot: UsageSnapshot,
+  options?: { force?: boolean },
+): Promise<UsageSyncPushResult> {
   const config = getSyncConfig();
   if (!config.enabled || !config.endpoint || !config.token) {
     return { pushed: false, reason: "disabled" };
@@ -103,9 +110,9 @@ export async function pushUsageSnapshot(snapshot: UsageSnapshot) {
 
   const state = readJsonFile<SyncPushState>(PUSH_STATE_FILE) ?? { dayHashes: {} };
   const localData = buildLocalSyncData(snapshot, {
-    mode: state.lastPushedAt ? "window" : "history",
+    mode: options?.force || !state.lastPushedAt ? "history" : "window",
   });
-  const days = selectDaysToPush(localData.days, state.dayHashes);
+  const days = options?.force ? localData.days : selectDaysToPush(localData.days, state.dayHashes);
 
   if (days.length === 0) {
     return { pushed: false, reason: "unchanged" };
@@ -132,7 +139,7 @@ export async function pushUsageSnapshot(snapshot: UsageSnapshot) {
   return { pushed: true, days: days.length };
 }
 
-export async function fetchRemoteUsage() {
+export async function fetchRemoteUsage(options?: { force?: boolean }) {
   const config = getSyncConfig();
   if (!config.enabled || !config.endpoint || !config.token) {
     return buildDisabledPayload();
@@ -140,7 +147,7 @@ export async function fetchRemoteUsage() {
 
   const cached = readJsonFile<RemoteUsagePayload>(REMOTE_CACHE_FILE);
   const now = new Date();
-  if (cached?.lastFetchedAt) {
+  if (!options?.force && cached?.lastFetchedAt) {
     const age = now.getTime() - new Date(cached.lastFetchedAt).getTime();
     if (age >= 0 && age < REMOTE_CACHE_STALE_MS) {
       return cached;
@@ -187,8 +194,9 @@ export async function getRemoteUsageForRange(options: {
   start?: string;
   end?: string;
   timeZone?: string;
+  force?: boolean;
 }) {
-  const remote = await fetchRemoteUsage();
+  const remote = await fetchRemoteUsage({ force: options.force });
   if (!remote.enabled) {
     return remote;
   }

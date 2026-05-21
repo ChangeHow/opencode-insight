@@ -9,9 +9,9 @@ import {
   fetchSeries,
   fetchProviderDashboard,
   fetchProviders,
+  forceRemoteSync,
   refreshSnapshot,
 } from "../lib/api";
-import { makeDashboardSummary } from "./factories";
 
 describe("API Client Functions", () => {
   const mockFetch = vi.fn();
@@ -182,6 +182,26 @@ describe("API Client Functions", () => {
       });
 
       await expect(refreshSnapshot()).rejects.toThrow("Failed to refresh snapshot.");
+    });
+  });
+
+  describe("forceRemoteSync", () => {
+    it("should call POST /api/sync/force with range query", async () => {
+      await forceRemoteSync("month");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `/api/sync/force?timeZone=${encodeURIComponent(timeZone)}&range=month`,
+        { method: "POST" },
+      );
+    });
+
+    it("should throw when force sync response is not ok", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: "Remote unavailable" }),
+      });
+
+      await expect(forceRemoteSync("month")).rejects.toThrow("Remote unavailable");
     });
   });
 });

@@ -197,6 +197,18 @@ export interface RemoteUsagePayload {
   error?: string;
 }
 
+export interface RemoteSyncActionPayload {
+  ok: true;
+  scannedAt: string;
+  push: {
+    pushed: boolean;
+    days?: number;
+    reason?: "disabled" | "unchanged";
+    error?: string;
+  };
+  remote: RemoteUsagePayload;
+}
+
 export interface ProviderDashboardPayload extends DashboardPayload {
   provider: ProviderInsight | null;
 }

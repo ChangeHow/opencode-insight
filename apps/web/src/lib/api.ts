@@ -11,6 +11,7 @@ import type {
   MessageOverviewPayload,
   ProviderDashboardPayload,
   ProviderInsightsPayload,
+  RemoteSyncActionPayload,
   RemoteUsagePayload,
   SessionBreakdown,
   TimeRange,
@@ -136,6 +137,20 @@ export async function refreshSnapshot() {
   if (!response.ok) {
     throw new Error("Failed to refresh snapshot.");
   }
+}
+
+export async function forceRemoteSync(
+  range: TimeRange,
+  customRange?: { start: string; end: string },
+) {
+  const response = await fetch(`/api/sync/force${buildQuery(range, customRange)}`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? "Failed to force remote sync.");
+  }
+  return (await response.json()) as RemoteSyncActionPayload;
 }
 
 export function fetchMessageOverview(date: string, sessionId: string) {
