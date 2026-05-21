@@ -2,9 +2,9 @@ import { memo, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { useAtom } from "jotai";
 import { Link } from "@tanstack/react-router";
-import { Laptop, MoonStar, SunMedium } from "lucide-react";
+import { Cloud, Laptop, MoonStar, SunMedium } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import type { CostSeriesLine } from "@opencode-dashboard/shared";
+import type { CostSeriesLine, RemoteUsagePayload } from "@opencode-dashboard/shared";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { ProviderInsightsPage as ProviderInsightsPanel } from "@/components/dashboard/provider-insights-page";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,11 @@ export function ControlBar({
   setCustomDateRange,
   scannedAt,
   onRefresh,
+  onForceRemoteSync,
   canRefresh = false,
+  remoteUsage,
+  remoteSyncing = false,
+  remoteSyncStatus,
   refreshDisabledReason = "Refresh is only available when the selected range includes today.",
 }: {
   currentView: "overview" | "providers";
@@ -55,7 +59,11 @@ export function ControlBar({
   ) => void;
   scannedAt?: string;
   onRefresh: () => Promise<void>;
+  onForceRemoteSync: () => Promise<void>;
   canRefresh?: boolean;
+  remoteUsage?: RemoteUsagePayload | null;
+  remoteSyncing?: boolean;
+  remoteSyncStatus?: string | null;
   refreshDisabledReason?: string;
 }) {
   const [theme, setTheme] = useAtom(themeAtom);
@@ -112,6 +120,12 @@ export function ControlBar({
             disabledReason={refreshDisabledReason}
             onRefresh={handleRefreshClick}
           />
+          <RemoteSyncButton
+            remote={remoteUsage}
+            syncing={remoteSyncing}
+            status={remoteSyncStatus}
+            onSync={onForceRemoteSync}
+          />
         </div>
       </div>
 
@@ -128,6 +142,54 @@ export function ControlBar({
       </div>
     </div>
   );
+}
+
+function RemoteSyncButton({
+  remote,
+  syncing,
+  status,
+  onSync,
+}: {
+  remote?: RemoteUsagePayload | null;
+  syncing: boolean;
+  status?: string | null;
+  onSync: () => Promise<void>;
+}) {
+  const disabled = syncing || remote?.enabled === false;
+  const label = syncing ? "Syncing" : "Sync Remote";
+  const stateLabel = status ?? getRemoteStateLabel(remote);
+  const button = (
+    <Button variant="outline" size="sm" onClick={onSync} disabled={disabled}>
+      <Cloud className={`size-4 ${syncing ? "animate-pulse" : ""}`} />
+      {label}
+    </Button>
+  );
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {button}
+      <p
+        className={`max-w-[14rem] truncate text-[10px] font-medium ${remote?.status === "stale" ? "text-red-600" : "text-[var(--muted-foreground)]"}`}
+      >
+        {stateLabel}
+      </p>
+    </div>
+  );
+}
+
+function getRemoteStateLabel(remote?: RemoteUsagePayload | null) {
+  if (!remote) {
+    return "Remote loading...";
+  }
+  if (!remote.enabled) {
+    return "Remote disabled";
+  }
+  if (remote.status === "stale") {
+    return remote.error ?? "Remote unavailable";
+  }
+  return remote.lastFetchedAt
+    ? `Pulled ${new Date(remote.lastFetchedAt).toLocaleTimeString("en-US")}`
+    : "Remote ready";
 }
 
 export function MetricPanel({

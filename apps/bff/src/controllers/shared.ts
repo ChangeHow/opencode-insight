@@ -60,6 +60,12 @@ export function refreshSnapshot() {
   return refreshPromise;
 }
 
+export async function forceRefreshSnapshot() {
+  const snapshot = await loadUsageSnapshot({ forceRefresh: true });
+  snapshotPromise = Promise.resolve(snapshot);
+  return snapshot;
+}
+
 function scheduleBackgroundRefresh() {
   if (backgroundRefreshPromise) {
     return backgroundRefreshPromise;
