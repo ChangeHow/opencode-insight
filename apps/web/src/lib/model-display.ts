@@ -36,7 +36,7 @@ const MODEL_NAME_ALIASES: Record<string, string> = {
   "big pickle": "GLM-4.7",
   "big-pickle": "GLM-4.7",
   bigpickle: "GLM-4.7",
-  "glm-5.1": "GLM-5",
+  "glm-5.1": "GLM-5.1",
   "k2-p5": "Kimi K2.5",
   k2p5: "Kimi K2.5",
   k2p6: "Kimi K2.6",
