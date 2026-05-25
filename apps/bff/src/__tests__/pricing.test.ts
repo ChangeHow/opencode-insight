@@ -297,6 +297,38 @@ describe("Pricing Module", () => {
       expect(result.estimatedCost).toBe(0.07);
     });
 
+    it("should price llmbox/gpt models using openai pricing", () => {
+      const dataset = makePricingDataset({
+        "openai/gpt-5": {
+          input_cost_per_token: 0.0000015,
+          output_cost_per_token: 0.00001,
+          cache_read_input_token_cost: 0.00000015,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000 });
+
+      const result = estimateUsageCostFromDataset(dataset, "llmbox/gpt-5", "llmbox", usage);
+
+      expect(result.priced).toBe(true);
+      expect(result.estimatedCost).toBe(0.07);
+    });
+
+    it("should price llmbox/glm models using zai pricing", () => {
+      const dataset = makePricingDataset({
+        "zai/glm-5": {
+          input_cost_per_token: 0.000001,
+          output_cost_per_token: 0.0000032,
+          cache_read_input_token_cost: 0.0000002,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000, cacheRead: 20000 });
+
+      const result = estimateUsageCostFromDataset(dataset, "llmbox/glm-5", "llmbox", usage);
+
+      expect(result.priced).toBe(true);
+      expect(result.estimatedCost).toBe(0.03);
+    });
+
     it("should price zenmux/openai/gpt-5.4-nano by bare model fallback", () => {
       const dataset = makePricingDataset({
         "gpt-5.4-nano": {
