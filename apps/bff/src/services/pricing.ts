@@ -3,12 +3,7 @@ import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TokenBreakdown } from "@opencode-dashboard/shared";
-import {
-  keyProviderTags,
-  matchesProviderHint,
-  primaryProviderTag,
-  providerTags,
-} from "./provider-matching";
+import { matchesProviderHint, primaryProviderTag, providerTags } from "./provider-matching";
 import { roundCost } from "./cost";
 
 const PRICING_URL =
@@ -45,6 +40,11 @@ const MODEL_ALIASES: Record<string, string> = {
   k2p6: "kimi-k2.6",
   "k2-p6": "kimi-k2.6",
 };
+
+const LLMBOX_MODEL_PROVIDER_PREFIXES: Array<[string, string]> = [
+  ["gpt", "openai"],
+  ["glm", "zai"],
+];
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -85,6 +85,21 @@ function normalizeModelName(modelId: string) {
     .replace(/-low$/, "");
 }
 
+function isLlmboxProvider(providerId?: string) {
+  return providerTags(providerId).includes("llmbox");
+}
+
+function llmboxPricingProvider(modelId: string, providerId?: string) {
+  if (!isLlmboxProvider(providerId)) {
+    return providerId;
+  }
+
+  const model = modelId.toLowerCase().replace(/^llmbox\//, "");
+  return (
+    LLMBOX_MODEL_PROVIDER_PREFIXES.find(([prefix]) => model.startsWith(prefix))?.[1] ?? providerId
+  );
+}
+
 // Aggregator routes (openrouter, zenmux, vercel ai gateway, …) wrap model ids
 // as `aggregator/upstream/model`, sometimes with more levels. We progressively
 // peel every known provider/aggregator segment from the head so that a key like
@@ -108,6 +123,7 @@ function iterativelyStripProviderPrefixes(modelId: string) {
     "moonshotai/",
     "minimax/",
     "opencode/",
+    "llmbox/",
   ];
 
   const results: string[] = [];
@@ -287,12 +303,13 @@ export async function getPricingDataset() {
 }
 
 function resolvePricing(dataset: PricingDataset, modelId: string, providerId: string) {
-  const cacheKey = `${providerId}::${modelId}`.toLowerCase();
+  const effectiveProviderId = llmboxPricingProvider(modelId, providerId);
+  const cacheKey = `${effectiveProviderId}::${modelId}`.toLowerCase();
   if (pricingLookupCache.has(cacheKey)) {
     return pricingLookupCache.get(cacheKey) ?? undefined;
   }
 
-  const pricing = findPricing(dataset, modelId, providerId);
+  const pricing = findPricing(dataset, modelId, effectiveProviderId);
   pricingLookupCache.set(cacheKey, pricing ?? null);
   return pricing;
 }
