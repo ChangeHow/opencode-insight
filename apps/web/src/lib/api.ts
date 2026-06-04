@@ -13,7 +13,7 @@ import type {
   ProviderInsightsPayload,
   RemoteSyncActionPayload,
   RemoteUsagePayload,
-  SessionBreakdown,
+  SessionDetailBreakdown,
   TimeRange,
   TrendPoint,
 } from "@opencode-dashboard/shared";
@@ -96,7 +96,7 @@ export function fetchSession(
   sessionId: string,
   customRange?: { start: string; end: string },
 ) {
-  return getJson<SessionBreakdown>(
+  return getJson<SessionDetailBreakdown>(
     `/api/day/${date}/session/${sessionId}${buildQuery(range, customRange)}`,
   );
 }

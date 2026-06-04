@@ -3,6 +3,7 @@ import {
   formatCompactNumber,
   formatCurrency,
   formatDateLabel,
+  formatDuration,
   formatLongDateLabel,
 } from "../lib/format";
 
@@ -48,6 +49,15 @@ describe("Format Functions", () => {
       expect(formatCurrency(0.005)).toBe("$0.01");
       expect(formatCurrency(0.0051)).toBe("$0.01");
       expect(formatCurrency(0.00512)).toBe("$0.01");
+    });
+  });
+
+  describe("formatDuration", () => {
+    it("should format milliseconds as human-readable durations", () => {
+      expect(formatDuration(9_500)).toBe("10 seconds");
+      expect(formatDuration(65_000)).toBe("1 minute 5 seconds");
+      expect(formatDuration(747_032)).toBe("12 minutes 27 seconds");
+      expect(formatDuration(3_900_000)).toBe("1 hour 5 minutes");
     });
   });
 

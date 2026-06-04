@@ -1,3 +1,4 @@
+import { formatDuration as formatDateFnsDuration, intervalToDuration } from "date-fns";
 import { formatDateLabelInTimeZone, getCurrentTimeZone } from "@opencode-dashboard/shared";
 
 export function formatCompactNumber(value: number) {
@@ -14,6 +15,13 @@ export function formatCurrency(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+export function formatDuration(valueMs: number) {
+  const durationMs = Math.max(0, Math.round(valueMs / 1000) * 1000);
+  const duration = intervalToDuration({ start: 0, end: durationMs });
+
+  return formatDateFnsDuration(duration, { zero: false }) || "0 seconds";
 }
 
 export function formatDateLabel(value: string) {

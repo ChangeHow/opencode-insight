@@ -122,6 +122,10 @@ export interface SessionBreakdown {
   models: ModelBreakdown[];
 }
 
+export interface SessionDetailBreakdown extends SessionBreakdown {
+  longestTaskDurationMs: number;
+}
+
 export interface DayBreakdown {
   date: string;
   tokens: number;
