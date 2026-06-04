@@ -20,6 +20,13 @@ vi.mock("../services/messages.js", () => ({
   invalidateMessagePayloadCache: vi.fn(),
 }));
 
+vi.mock("../services/session-tasks.js", () => ({
+  buildSessionDetailBreakdown: vi.fn(async (_dbPath, session) => ({
+    ...session,
+    longestTaskDurationMs: 0,
+  })),
+}));
+
 vi.mock("../services/sync/remote.js", () => ({
   getRemoteUsageForRange: vi.fn(async () => ({
     enabled: false,
@@ -41,6 +48,7 @@ import {
   getDateFilteredData,
 } from "../services/usage/index";
 import { buildMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
+import { buildSessionDetailBreakdown } from "../services/session-tasks";
 import { getRemoteUsageForRange, pushUsageSnapshot } from "../services/sync/remote";
 
 const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
@@ -48,6 +56,7 @@ const mockRefreshRecentUsageSnapshot = vi.mocked(refreshRecentUsageSnapshot);
 const mockGetRangeData = vi.mocked(getRangeData);
 const mockGetDateFilteredData = vi.mocked(getDateFilteredData);
 const mockBuildMessagePayloads = vi.mocked(buildMessagePayloads);
+const mockBuildSessionDetailBreakdown = vi.mocked(buildSessionDetailBreakdown);
 const mockInvalidateMessagePayloadCache = vi.mocked(invalidateMessagePayloadCache);
 const mockGetRemoteUsageForRange = vi.mocked(getRemoteUsageForRange);
 const mockPushUsageSnapshot = vi.mocked(pushUsageSnapshot);
@@ -338,7 +347,8 @@ describe("BFF API Routes", () => {
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json).toEqual(session);
+    expect(json).toEqual({ ...session, longestTaskDurationMs: 0 });
+    expect(mockBuildSessionDetailBreakdown).toHaveBeenCalledWith("/tmp/opencode.db", session);
   });
 
   test("GET /api/day/:date/session/:sessionId returns 404 when session is not found", async () => {

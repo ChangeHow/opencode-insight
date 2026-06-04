@@ -16,6 +16,23 @@ export function formatCurrency(value: number) {
   }).format(value);
 }
 
+export function formatDuration(valueMs: number) {
+  const totalSeconds = Math.max(0, Math.round(valueMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
 export function formatDateLabel(value: string) {
   if (!value) {
     return value || "—";

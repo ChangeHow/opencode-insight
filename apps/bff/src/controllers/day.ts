@@ -1,6 +1,8 @@
 import { Hono } from "hono";
-import type { ApiErrorPayload } from "@opencode-dashboard/shared";
+import type { ApiErrorPayload, SessionDetailBreakdown } from "@opencode-dashboard/shared";
 import { readData } from "./shared";
+import { getDbPath } from "../services/messages";
+import { buildSessionDetailBreakdown } from "../services/session-tasks";
 
 const day = new Hono();
 
@@ -24,7 +26,7 @@ day.get("/api/day/:date/session/:sessionId", async (c) => {
     return c.json<ApiErrorPayload>({ error: "No session found for that date." }, 404);
   }
 
-  return c.json(session);
+  return c.json<SessionDetailBreakdown>(await buildSessionDetailBreakdown(getDbPath(), session));
 });
 
 export { day };

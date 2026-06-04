@@ -1,5 +1,5 @@
 import React from "react";
-import type { SessionBreakdown } from "@opencode-dashboard/shared";
+import type { SessionDetailBreakdown } from "@opencode-dashboard/shared";
 import { Pin } from "lucide-react";
 import {
   DetailSummaryCard,
@@ -13,14 +13,19 @@ import {
 } from "@/components/dashboard/model-breakdown-panels";
 import { buildModelBreakdownData } from "@/components/dashboard/model-breakdown-data";
 import { TokenBreakdownPanel } from "@/components/dashboard/token-breakdown-panel";
-import { formatCompactNumber, formatCurrency, formatLongDateLabel } from "@/lib/format";
+import {
+  formatCompactNumber,
+  formatCurrency,
+  formatDuration,
+  formatLongDateLabel,
+} from "@/lib/format";
 
 export function SessionBreakdownPanel({
   date,
   session,
 }: {
   date: string;
-  session: SessionBreakdown;
+  session: SessionDetailBreakdown;
 }) {
   const { costByModel, modelTokenShare } = buildModelBreakdownData(session.models);
 
@@ -50,6 +55,11 @@ export function SessionBreakdownPanel({
           <InlineStatList>
             <InlineStat label="Input" value={formatCompactNumber(session.breakdown.input)} />
             <InlineStat label="Output" value={formatCompactNumber(session.breakdown.output)} />
+            <InlineStat
+              label="Longest task"
+              value={formatDuration(session.longestTaskDurationMs)}
+              valueClassName="text-lg font-bold"
+            />
             <InlineStat
               label="Estimated cost"
               value={formatCurrency(session.cost)}
