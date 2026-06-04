@@ -11,13 +11,18 @@ function message(
   role: "user" | "assistant",
   createdAt: number,
   completedAt = createdAt,
+  options?: { error?: unknown },
 ) {
   return {
     id,
     session_id: sessionId,
     time_created: createdAt,
     time_updated: completedAt,
-    data: JSON.stringify({ role, time: { created: createdAt, completed: completedAt } }),
+    data: JSON.stringify({
+      role,
+      time: { created: createdAt, completed: completedAt },
+      ...(options?.error === undefined ? {} : { error: options.error }),
+    }),
   };
 }
 
@@ -47,6 +52,25 @@ describe("session task duration", () => {
         message("a2", "child", "assistant", 121_000, 151_000),
         message("u2", "child", "user", 160_000),
         message("a3", "child", "assistant", 161_000, 166_000),
+      ],
+      "parent",
+    );
+
+    expect(duration).toBe(40_000);
+  });
+
+  test("adds same-session assistant time after an assistant error to the previous task", () => {
+    const duration = calculateLongestTaskDuration(
+      [session("parent")],
+      [
+        message("u1", "parent", "user", 0),
+        message("a1", "parent", "assistant", 1_000, 11_000, {
+          error: { name: "MessageAbortedError" },
+        }),
+        message("resume", "parent", "user", 120_000),
+        message("a2", "parent", "assistant", 121_000, 151_000),
+        message("u2", "parent", "user", 160_000),
+        message("a3", "parent", "assistant", 161_000, 166_000),
       ],
       "parent",
     );

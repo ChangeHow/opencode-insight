@@ -19,6 +19,7 @@ interface MessageRow {
 interface ParsedMessage {
   role?: string;
   time?: { created?: number; completed?: number };
+  error?: unknown;
 }
 
 const SESSION_TREE_QUERY = `
@@ -60,6 +61,7 @@ function parseMessage(row: MessageRow) {
     role,
     createdAt,
     completedAt,
+    hasError: data.error !== undefined && data.error !== null,
   };
 }
 
@@ -90,21 +92,25 @@ export function calculateLongestTaskDuration(
   let currentTaskDurationMs = 0;
   let hasCurrentTask = false;
   let longestTaskDurationMs = 0;
+  let previousAssistantHadError = false;
 
   for (const message of messages) {
     if (message.role === "user") {
       if (
         hasCurrentTask &&
-        childSessionIds.has(message.sessionId) &&
-        !seenChildUserSessionIds.has(message.sessionId)
+        ((childSessionIds.has(message.sessionId) &&
+          !seenChildUserSessionIds.has(message.sessionId)) ||
+          previousAssistantHadError)
       ) {
         seenChildUserSessionIds.add(message.sessionId);
+        previousAssistantHadError = false;
         continue;
       }
 
       longestTaskDurationMs = Math.max(longestTaskDurationMs, currentTaskDurationMs);
       currentTaskDurationMs = 0;
       hasCurrentTask = true;
+      previousAssistantHadError = false;
       continue;
     }
 
@@ -113,6 +119,7 @@ export function calculateLongestTaskDuration(
     }
 
     currentTaskDurationMs += Math.max(0, message.completedAt - message.createdAt);
+    previousAssistantHadError = message.hasError;
   }
 
   return Math.max(longestTaskDurationMs, currentTaskDurationMs);
