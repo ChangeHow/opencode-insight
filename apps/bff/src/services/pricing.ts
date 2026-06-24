@@ -3,6 +3,10 @@ import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TokenBreakdown } from "@opencode-dashboard/shared";
+import {
+  fetchModelsDevPricingDataset,
+  loadCachedModelsDevPricingDataset,
+} from "./models-dev-pricing";
 import { matchesProviderHint, primaryProviderTag, providerTags } from "./provider-matching";
 import { roundCost } from "./cost";
 
@@ -12,7 +16,7 @@ const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const CACHE_FILE = path.join(CACHE_DIR, "pricing-litellm.json");
 const TIER_THRESHOLD = 200_000;
 
-interface ModelPricing {
+export interface ModelPricing {
   input_cost_per_token?: number;
   input_cost_per_token_above_200k_tokens?: number;
   output_cost_per_token?: number;
@@ -23,7 +27,7 @@ interface ModelPricing {
   cache_read_input_token_cost_above_200k_tokens?: number;
 }
 
-type PricingDataset = Record<string, ModelPricing>;
+export type PricingDataset = Record<string, ModelPricing>;
 
 const EXCLUDED_LITELLM_PREFIXES = ["github_copilot/"];
 const MODEL_ALIASES: Record<string, string> = {
@@ -157,6 +161,29 @@ function filterLitellmData(data: PricingDataset) {
 
 function mergeDatasets(base: PricingDataset, overrides: PricingDataset) {
   return { ...base, ...overrides };
+}
+
+function hasPositivePricing(pricing?: ModelPricing) {
+  return Boolean(
+    safeNumber(pricing?.input_cost_per_token) ||
+    safeNumber(pricing?.input_cost_per_token_above_200k_tokens) ||
+    safeNumber(pricing?.output_cost_per_token) ||
+    safeNumber(pricing?.output_cost_per_token_above_200k_tokens) ||
+    safeNumber(pricing?.cache_creation_input_token_cost) ||
+    safeNumber(pricing?.cache_creation_input_token_cost_above_200k_tokens) ||
+    safeNumber(pricing?.cache_read_input_token_cost) ||
+    safeNumber(pricing?.cache_read_input_token_cost_above_200k_tokens),
+  );
+}
+
+function mergeFallbackDataset(base: PricingDataset, fallback: PricingDataset) {
+  const merged = { ...base };
+  for (const [key, pricing] of Object.entries(fallback)) {
+    if (!merged[key] || (!hasPositivePricing(merged[key]) && hasPositivePricing(pricing))) {
+      merged[key] = pricing;
+    }
+  }
+  return merged;
 }
 
 function findPricing(
@@ -294,9 +321,15 @@ const pricingLookupCache = new Map<string, ModelPricing | null>();
 
 export async function getPricingDataset() {
   if (!pricingDatasetPromise) {
-    pricingDatasetPromise = fetchPricingDataset()
-      .catch(() => loadCachedDataset())
-      .then((dataset) => mergeDatasets(filterLitellmData(dataset), FALLBACK_PRICING));
+    pricingDatasetPromise = Promise.all([
+      fetchPricingDataset().catch(() => loadCachedDataset()),
+      fetchModelsDevPricingDataset().catch(() => loadCachedModelsDevPricingDataset()),
+    ]).then(([dataset, modelsDevDataset]) =>
+      mergeDatasets(
+        mergeFallbackDataset(filterLitellmData(dataset), modelsDevDataset),
+        FALLBACK_PRICING,
+      ),
+    );
   }
 
   return pricingDatasetPromise;

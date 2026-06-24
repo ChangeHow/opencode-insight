@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { parseModelsDevPricingDataset } from "../services/models-dev-pricing";
 import { estimateUsageCostFromDataset } from "../services/pricing";
 import { makeTokenBreakdown, makePricingDataset } from "./factories";
 
@@ -327,6 +328,57 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       expect(result.estimatedCost).toBe(0.03);
+    });
+
+    it("should price glm-5.2 from models.dev zai fallback for coding-plan providers", () => {
+      const dataset = makePricingDataset({
+        "zai/glm-5.2": {
+          input_cost_per_token: 0.0000014,
+          output_cost_per_token: 0.0000044,
+          cache_read_input_token_cost: 0.00000026,
+          cache_creation_input_token_cost: 0,
+        },
+      });
+      const usage = makeTokenBreakdown({ input: 10000, output: 5000, cacheRead: 20000 });
+
+      const result = estimateUsageCostFromDataset(dataset, "glm-5.2", "zai-coding-plan", usage);
+
+      expect(result.priced).toBe(true);
+      // input: 10000 * 0.0000014 = 0.014
+      // output: 5000 * 0.0000044 = 0.022
+      // cacheRead: 20000 * 0.00000026 = 0.0052
+      expect(result.estimatedCost).toBe(0.04);
+    });
+
+    it("should parse models.dev pricing and skip zero-cost plan entries", () => {
+      const dataset = parseModelsDevPricingDataset(
+        JSON.stringify({
+          zai: {
+            models: {
+              "glm-5.2": {
+                id: "glm-5.2",
+                cost: { input: 1.4, output: 4.4, cache_read: 0.26, cache_write: 0 },
+              },
+            },
+          },
+          "zai-coding-plan": {
+            models: {
+              "glm-5.2": {
+                id: "glm-5.2",
+                cost: { input: 0, output: 0, cache_read: 0, cache_write: 0 },
+              },
+            },
+          },
+        }),
+      );
+
+      expect(dataset["zai/glm-5.2"]).toEqual({
+        input_cost_per_token: 0.0000014,
+        output_cost_per_token: 0.0000044,
+        cache_read_input_token_cost: 0.00000026,
+        cache_creation_input_token_cost: 0,
+      });
+      expect(dataset["zai-coding-plan/glm-5.2"]).toBeUndefined();
     });
 
     it("should price zenmux/openai/gpt-5.4-nano by bare model fallback", () => {
