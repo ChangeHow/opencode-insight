@@ -23,19 +23,21 @@ export function DetailSummaryCard({
     <div className="px-4 sm:px-8 lg:px-10">
       <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 sm:p-6">
         <div className="flex flex-col items-start gap-4 md:flex-row md:justify-between">
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="gap-2">{primaryBadge}</Badge>
               <Badge variant="muted">{secondaryBadge}</Badge>
             </div>
             <div>
               <h2
-                className={`${titleClassName} font-bold tracking-[-0.02em] text-[var(--foreground)]`.trim()}
+                className={`${titleClassName} font-bold tracking-[-0.02em] text-[var(--foreground)] break-words`.trim()}
               >
                 {title}
               </h2>
               {extraMeta}
-              <p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">{description}</p>
+              <p className="mt-2 break-words text-xs leading-5 text-[var(--muted-foreground)]">
+                {description}
+              </p>
             </div>
           </div>
           {stats}
