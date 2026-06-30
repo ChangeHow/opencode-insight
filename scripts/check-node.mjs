@@ -12,8 +12,8 @@ const matches = actualMajor === expectedMajor || actual.startsWith("v" + expecte
 if (!matches) {
   console.error(
     `\n  ❌ Node version mismatch. Expected: v${expectedMajor}.x, got: ${actual}\n` +
-    `     This project requires Node.js ${expected} (see .nvmrc).\n` +
-    `     If you use fnm/nvm, run: fnm use || nvm use\n`
+      `     This project requires Node.js ${expected} (see .nvmrc).\n` +
+      `     If you use fnm/nvm, run: fnm use || nvm use\n`,
   );
   process.exit(1);
 }

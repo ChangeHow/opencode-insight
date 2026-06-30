@@ -10,6 +10,7 @@ import type {
   CostSeriesOption,
   CostSeriesLine,
   ModelBreakdown,
+  SessionDetailBreakdown,
 } from "@opencode-dashboard/shared";
 
 function getTodayDate(): string {
@@ -282,5 +283,27 @@ export function makeMockDayBreakdown(date: string): DayBreakdown {
     messages: 12,
     breakdown,
     models,
+  };
+}
+
+export function makeMockSessionDetailBreakdown(
+  sessionId: string,
+  overrides: Partial<SessionDetailBreakdown> = {},
+): SessionDetailBreakdown {
+  const day = makeMockDayBreakdown("2026-05-10");
+
+  return {
+    sessionId,
+    title: "Untitled session",
+    slug: sessionId,
+    directory: "/workspace/opencode-token-dashboard",
+    tokens: day.tokens,
+    pricedTokens: day.pricedTokens,
+    cost: day.cost,
+    messages: day.messages,
+    breakdown: day.breakdown,
+    models: day.models,
+    longestTaskDurationMs: 9_000_000,
+    ...overrides,
   };
 }

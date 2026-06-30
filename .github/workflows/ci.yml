@@ -47,6 +47,12 @@ jobs:
   e2e:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.58.2-noble
+      options: --ipc=host
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
 
     steps:
       - uses: actions/checkout@v4
@@ -65,9 +71,6 @@ jobs:
 
       - name: Build shared package
         run: pnpm --filter @opencode-dashboard/shared build
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
 
       - name: Run E2E tests
         run: pnpm test:e2e

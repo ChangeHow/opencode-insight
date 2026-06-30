@@ -99,7 +99,7 @@ export function DetailStickyHeader({
 
   return (
     <StickyHeaderShell>
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Link to={backTo} params={backParams} className={detailHeaderLinkClassName}>
             <ChevronLeft className="size-4" />
@@ -119,7 +119,10 @@ export function DetailStickyHeader({
           />
           <ThemeToggleButton theme={theme} onChange={onThemeChange} compact />
         </div>
-        <p className="w-full truncate text-sm font-semibold text-[var(--foreground)] sm:text-base">
+        <p
+          className="w-full min-w-0 truncate text-sm font-semibold text-[var(--foreground)] sm:text-base"
+          title={title}
+        >
           {title}
         </p>
       </div>

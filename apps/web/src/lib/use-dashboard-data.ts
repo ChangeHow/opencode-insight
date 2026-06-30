@@ -80,14 +80,7 @@ export function useDashboardData() {
       setSeriesOptions([]);
       setSeriesLines([]);
       setProviderInsights([]);
-    }, [
-      setHeatmap,
-      setProviderInsights,
-      setSeriesLines,
-      setSeriesOptions,
-      setSummary,
-      setTrend,
-    ]),
+    }, [setHeatmap, setProviderInsights, setSeriesLines, setSeriesOptions, setSummary, setTrend]),
   });
 
   useEffect(() => {
