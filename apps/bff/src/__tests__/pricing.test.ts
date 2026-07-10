@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, afterEach, describe, it, expect, test, vi } from "vitest";
 import { parseModelsDevPricingDataset } from "../services/models-dev-pricing";
-import { estimateUsageCostFromDataset } from "../services/pricing";
+import {
+  estimateUsageCostFromDataset,
+  getPricingDataset,
+  invalidatePricingCache,
+} from "../services/pricing";
 import { makeTokenBreakdown, makePricingDataset } from "./factories";
 
 describe("Pricing Module", () => {
@@ -159,6 +163,34 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       expect(result.estimatedCost).toBe(0.09);
+    });
+
+    test("uses priority rates for fast model aliases", () => {
+      const dataset = makePricingDataset({
+        "openai/gpt-5.6-sol": {
+          input_cost_per_token: 0.000005,
+          output_cost_per_token: 0.00003,
+          cache_read_input_token_cost: 0.0000005,
+        },
+        "gpt-5.6-sol": {
+          input_cost_per_token: 0.000005,
+          output_cost_per_token: 0.00003,
+          cache_read_input_token_cost: 0.0000005,
+          input_cost_per_token_priority: 0.00001,
+          output_cost_per_token_priority: 0.00006,
+          cache_read_input_token_cost_priority: 0.000001,
+        },
+      });
+      const usage = makeTokenBreakdown({
+        input: 1_000_000,
+        output: 1_000_000,
+        cacheRead: 1_000_000,
+      });
+
+      expect(estimateUsageCostFromDataset(dataset, "gpt-5.6-sol-fast", "openai", usage)).toEqual({
+        estimatedCost: 71,
+        priced: true,
+      });
     });
 
     it("should price composer-1.5 via fallback dataset", () => {
@@ -400,6 +432,74 @@ describe("Pricing Module", () => {
       expect(result.priced).toBe(true);
       // 10000 * 0.0000001 + 5000 * 0.0000004 = 0.001 + 0.002 = 0.003, rounded to 2dp => 0
       expect(result.estimatedCost).toBe(0);
+    });
+  });
+
+  describe("Given remote pricing changes", () => {
+    beforeEach(() => {
+      invalidatePricingCache();
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      invalidatePricingCache();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    test("refreshes pricing after the in-memory cache expires", async () => {
+      let liteLlmPricing = {};
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string | URL | Request) =>
+          Response.json(String(input).includes("models.dev") ? {} : liteLlmPricing),
+        ),
+      );
+
+      const usage = makeTokenBreakdown({ input: 1_000_000, output: 1_000_000 });
+      const staleDataset = await getPricingDataset();
+      expect(
+        estimateUsageCostFromDataset(staleDataset, "gpt-5.6-sol", "openai", usage).priced,
+      ).toBe(false);
+
+      liteLlmPricing = {
+        "gpt-5.6-sol": {
+          input_cost_per_token: 0.000005,
+          output_cost_per_token: 0.00003,
+        },
+      };
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
+
+      const refreshedDataset = await getPricingDataset();
+      expect(
+        estimateUsageCostFromDataset(refreshedDataset, "gpt-5.6-sol", "openai", usage),
+      ).toEqual({ estimatedCost: 35, priced: true });
+    });
+
+    test("keeps remote pricing authoritative over static fallbacks", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string | URL | Request) =>
+          Response.json(
+            String(input).includes("models.dev")
+              ? {}
+              : {
+                  "gpt-5.3": {
+                    input_cost_per_token: 0.000001,
+                    output_cost_per_token: 0.000001,
+                  },
+                },
+          ),
+        ),
+      );
+
+      const dataset = await getPricingDataset();
+      const usage = makeTokenBreakdown({ input: 1_000_000, output: 1_000_000 });
+
+      expect(estimateUsageCostFromDataset(dataset, "gpt-5.3", "openai", usage)).toEqual({
+        estimatedCost: 2,
+        priced: true,
+      });
     });
   });
 });
