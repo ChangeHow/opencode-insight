@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TokenBreakdown } from "@opencode-dashboard/shared";
@@ -14,17 +13,23 @@ const PRICING_URL =
   "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const CACHE_FILE = path.join(CACHE_DIR, "pricing-litellm.json");
+const REQUEST_TIMEOUT_MS = 8000;
+const PRICING_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const TIER_THRESHOLD = 200_000;
 
 export interface ModelPricing {
   input_cost_per_token?: number;
   input_cost_per_token_above_200k_tokens?: number;
+  input_cost_per_token_priority?: number;
   output_cost_per_token?: number;
   output_cost_per_token_above_200k_tokens?: number;
+  output_cost_per_token_priority?: number;
   cache_creation_input_token_cost?: number;
   cache_creation_input_token_cost_above_200k_tokens?: number;
+  cache_creation_input_token_cost_priority?: number;
   cache_read_input_token_cost?: number;
   cache_read_input_token_cost_above_200k_tokens?: number;
+  cache_read_input_token_cost_priority?: number;
 }
 
 export type PricingDataset = Record<string, ModelPricing>;
@@ -84,6 +89,7 @@ function normalizeVersionSeparator(modelId: string) {
 function normalizeModelName(modelId: string) {
   return modelId
     .replace(/^antigravity-/, "")
+    .replace(/-fast$/, "")
     .replace(/-thinking$/, "")
     .replace(/-high$/, "")
     .replace(/-low$/, "");
@@ -104,11 +110,6 @@ function llmboxPricingProvider(modelId: string, providerId?: string) {
   );
 }
 
-// Aggregator routes (openrouter, zenmux, vercel ai gateway, …) wrap model ids
-// as `aggregator/upstream/model`, sometimes with more levels. We progressively
-// peel every known provider/aggregator segment from the head so that a key like
-// `openai/gpt-5.1-codex` in the pricing dataset is reachable from the
-// aggregator-prefixed variant.
 function iterativelyStripProviderPrefixes(modelId: string) {
   const knownPrefixes = [
     "openai/",
@@ -152,28 +153,14 @@ function iterativelyStripProviderPrefixes(modelId: string) {
 
 function filterLitellmData(data: PricingDataset) {
   return Object.fromEntries(
-    Object.entries(data).filter(([key]) => {
-      const lower = key.toLowerCase();
-      return !EXCLUDED_LITELLM_PREFIXES.some((prefix) => lower.startsWith(prefix));
-    }),
+    Object.entries(data).filter(
+      ([key]) => !EXCLUDED_LITELLM_PREFIXES.some((prefix) => key.toLowerCase().startsWith(prefix)),
+    ),
   );
-}
-
-function mergeDatasets(base: PricingDataset, overrides: PricingDataset) {
-  return { ...base, ...overrides };
 }
 
 function hasPositivePricing(pricing?: ModelPricing) {
-  return Boolean(
-    safeNumber(pricing?.input_cost_per_token) ||
-    safeNumber(pricing?.input_cost_per_token_above_200k_tokens) ||
-    safeNumber(pricing?.output_cost_per_token) ||
-    safeNumber(pricing?.output_cost_per_token_above_200k_tokens) ||
-    safeNumber(pricing?.cache_creation_input_token_cost) ||
-    safeNumber(pricing?.cache_creation_input_token_cost_above_200k_tokens) ||
-    safeNumber(pricing?.cache_read_input_token_cost) ||
-    safeNumber(pricing?.cache_read_input_token_cost_above_200k_tokens),
-  );
+  return Object.values(pricing ?? {}).some((value) => (safeNumber(value) ?? 0) > 0);
 }
 
 function mergeFallbackDataset(base: PricingDataset, fallback: PricingDataset) {
@@ -186,10 +173,17 @@ function mergeFallbackDataset(base: PricingDataset, fallback: PricingDataset) {
   return merged;
 }
 
+function hasPriorityPricing(pricing: ModelPricing) {
+  return Object.entries(pricing).some(
+    ([key, value]) => key.endsWith("_priority") && (safeNumber(value) ?? 0) > 0,
+  );
+}
+
 function findPricing(
   dataset: PricingDataset,
   modelId: string,
   providerId?: string,
+  requirePriority = false,
 ): ModelPricing | undefined {
   const raw = resolveAlias(modelId).toLowerCase();
   const hints = providerTags(providerId);
@@ -210,17 +204,25 @@ function findPricing(
   for (const variant of variants) {
     for (const [key, pricing] of Object.entries(dataset)) {
       const lowerKey = key.toLowerCase();
-      if (hints.includes(primaryProviderTag(lowerKey) ?? "") && lowerKey.endsWith(`/${variant}`)) {
+      if (
+        (!requirePriority || hasPriorityPricing(pricing)) &&
+        hints.includes(primaryProviderTag(lowerKey) ?? "") &&
+        lowerKey.endsWith(`/${variant}`)
+      ) {
         return pricing;
       }
     }
 
     for (const [key, pricing] of Object.entries(dataset)) {
       const lowerKey = key.toLowerCase();
-      if (lowerKey === variant) {
+      if ((!requirePriority || hasPriorityPricing(pricing)) && lowerKey === variant) {
         return pricing;
       }
-      if (matchesProviderHint(lowerKey, providerId) && lowerKey.endsWith(`/${variant}`)) {
+      if (
+        (!requirePriority || hasPriorityPricing(pricing)) &&
+        matchesProviderHint(lowerKey, providerId) &&
+        lowerKey.endsWith(`/${variant}`)
+      ) {
         return pricing;
       }
     }
@@ -229,7 +231,10 @@ function findPricing(
   for (const variant of variants) {
     for (const [key, pricing] of Object.entries(dataset)) {
       const lowerKey = key.toLowerCase();
-      if (lowerKey.endsWith(`/${variant}`) || lowerKey.includes(variant)) {
+      if (
+        (!requirePriority || hasPriorityPricing(pricing)) &&
+        (lowerKey.endsWith(`/${variant}`) || lowerKey.includes(variant))
+      ) {
         return pricing;
       }
     }
@@ -277,28 +282,33 @@ function computeCost(pricing: ModelPricing, usage: TokenBreakdown) {
   );
 }
 
+function applyPriorityPricing(pricing: ModelPricing, modelId: string) {
+  if (!modelId.toLowerCase().endsWith("-fast")) {
+    return pricing;
+  }
+
+  return {
+    ...pricing,
+    input_cost_per_token:
+      safeNumber(pricing.input_cost_per_token_priority) ?? pricing.input_cost_per_token,
+    output_cost_per_token:
+      safeNumber(pricing.output_cost_per_token_priority) ?? pricing.output_cost_per_token,
+    cache_creation_input_token_cost:
+      safeNumber(pricing.cache_creation_input_token_cost_priority) ??
+      pricing.cache_creation_input_token_cost,
+    cache_read_input_token_cost:
+      safeNumber(pricing.cache_read_input_token_cost_priority) ??
+      pricing.cache_read_input_token_cost,
+  };
+}
+
 async function fetchPricingDataset(): Promise<PricingDataset> {
-  const body = await new Promise<string>((resolve, reject) => {
-    const request = https.get(PRICING_URL, (response) => {
-      if (!response.statusCode || response.statusCode >= 400) {
-        reject(new Error(`Failed to fetch LiteLLM pricing: ${response.statusCode ?? "unknown"}`));
-        response.resume();
-        return;
-      }
+  const response = await fetch(PRICING_URL, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch LiteLLM pricing: ${response.status}`);
+  }
 
-      const chunks: string[] = [];
-      response.setEncoding("utf8");
-      response.on("data", (chunk) => chunks.push(chunk));
-      response.on("end", () => resolve(chunks.join("")));
-    });
-
-    request.setTimeout(8000, () => {
-      request.destroy(new Error("Timed out while fetching LiteLLM pricing."));
-    });
-    request.on("error", reject);
-  });
-
-  const json = JSON.parse(body) as PricingDataset;
+  const json = (await response.json()) as PricingDataset;
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(CACHE_FILE, JSON.stringify(json), "utf8");
   return json;
@@ -317,15 +327,21 @@ function loadCachedDataset() {
 }
 
 let pricingDatasetPromise: Promise<PricingDataset> | null = null;
+let pricingDatasetLoadedAt = 0;
 const pricingLookupCache = new Map<string, ModelPricing | null>();
 
 export async function getPricingDataset() {
-  if (!pricingDatasetPromise) {
+  if (
+    !pricingDatasetPromise ||
+    Date.now() - pricingDatasetLoadedAt >= PRICING_REFRESH_INTERVAL_MS
+  ) {
+    pricingDatasetLoadedAt = Date.now();
+    pricingLookupCache.clear();
     pricingDatasetPromise = Promise.all([
       fetchPricingDataset().catch(() => loadCachedDataset()),
       fetchModelsDevPricingDataset().catch(() => loadCachedModelsDevPricingDataset()),
     ]).then(([dataset, modelsDevDataset]) =>
-      mergeDatasets(
+      mergeFallbackDataset(
         mergeFallbackDataset(filterLitellmData(dataset), modelsDevDataset),
         FALLBACK_PRICING,
       ),
@@ -342,9 +358,13 @@ function resolvePricing(dataset: PricingDataset, modelId: string, providerId: st
     return pricingLookupCache.get(cacheKey) ?? undefined;
   }
 
-  const pricing = findPricing(dataset, modelId, effectiveProviderId);
-  pricingLookupCache.set(cacheKey, pricing ?? null);
-  return pricing;
+  const pricing =
+    (modelId.toLowerCase().endsWith("-fast")
+      ? findPricing(dataset, modelId, effectiveProviderId, true)
+      : undefined) ?? findPricing(dataset, modelId, effectiveProviderId);
+  const effectivePricing = pricing ? applyPriorityPricing(pricing, modelId) : undefined;
+  pricingLookupCache.set(cacheKey, effectivePricing ?? null);
+  return effectivePricing;
 }
 
 export function estimateUsageCostFromDataset(
@@ -375,5 +395,6 @@ export async function estimateUsageCost(
 
 export function invalidatePricingCache() {
   pricingDatasetPromise = null;
+  pricingDatasetLoadedAt = 0;
   pricingLookupCache.clear();
 }
