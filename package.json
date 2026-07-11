@@ -20,7 +20,7 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "doctor": "react-doctor apps/web -y --score --blocking warning",
-    "bench": "pnpm --filter @opencode-dashboard/bff bench",
+    "bench": "pnpm -r --if-present bench",
     "daemon:start": "node ./scripts/daemon.mjs",
     "daemon:stop": "node ./scripts/stop-daemon.mjs",
     "daemon:restart": "node ./scripts/stop-daemon.mjs && node ./scripts/daemon.mjs",

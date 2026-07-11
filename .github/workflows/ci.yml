@@ -92,6 +92,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -102,28 +105,48 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Build shared package
-        run: pnpm --filter @opencode-dashboard/shared build
-
-      - name: Run benchmarks
+      - name: Run current and baseline benchmarks
         env:
           NO_COLOR: 1
         run: |
-          pnpm bench 2>&1 |
-            sed '/^Benchmarking is/d' |
-            sed '/^Breaking changes/d' |
-            sed '/^ RUN /d' |
-            sed '/^ExperimentalWarning:/d' |
-            sed '/^Use `node --trace-warnings`/d' |
-            sed '/^\s*$/d' |
-            tee benchmark-raw.txt
-          node scripts/parse-benchmark.mjs < benchmark-raw.txt > benchmark-results.md
+          set -euo pipefail
+          current_sha=$(git rev-parse HEAD)
+          previous_sha=$(git rev-parse HEAD^)
+          main_sha=$(git rev-parse origin/main)
+          results="$GITHUB_WORKSPACE/benchmark-results"
+          mkdir -p "$results"
+
+          run_benchmarks() {
+            root="$1"
+            label="$2"
+            pnpm --dir "$root" install --frozen-lockfile
+            pnpm --dir "$root" --filter @opencode-dashboard/shared build
+            pnpm --dir "$root" --filter @opencode-dashboard/bff exec vitest bench --run \
+              --outputJson "$results/$label-bff.json"
+            pnpm --dir "$root" --filter @opencode-dashboard/web exec vitest bench --run \
+              --outputJson "$results/$label-web.json"
+          }
+
+          git worktree add --detach "$RUNNER_TEMP/benchmark-previous" "$previous_sha"
+          git worktree add --detach "$RUNNER_TEMP/benchmark-main" "$main_sha"
+          run_benchmarks "$GITHUB_WORKSPACE" current
+          run_benchmarks "$RUNNER_TEMP/benchmark-previous" previous
+          run_benchmarks "$RUNNER_TEMP/benchmark-main" main
+          node scripts/parse-benchmark.mjs \
+            "$results" "$current_sha" "$previous_sha" "$main_sha" \
+            > "$results/report.md"
 
       - name: Write benchmark summary
-        run: cat benchmark-results.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat benchmark-results/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Persist benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmark-results/
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Comment benchmark results on PR
         if: github.event_name == 'pull_request'
@@ -131,4 +154,4 @@ jobs:
         with:
           header: benchmark
           recreate: true
-          path: benchmark-results.md
+          path: benchmark-results/report.md
