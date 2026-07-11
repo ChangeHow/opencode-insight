@@ -7,7 +7,6 @@ import {
   loadCachedModelsDevPricingDataset,
 } from "./models-dev-pricing";
 import { matchesProviderHint, primaryProviderTag, providerTags } from "./provider-matching";
-import { roundCost } from "./cost";
 
 const PRICING_URL =
   "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
@@ -379,7 +378,7 @@ export function estimateUsageCostFromDataset(
   }
 
   return {
-    estimatedCost: roundCost(computeCost(pricing, usage)),
+    estimatedCost: computeCost(pricing, usage),
     priced: true,
   };
 }

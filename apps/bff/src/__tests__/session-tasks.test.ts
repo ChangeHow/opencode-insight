@@ -77,4 +77,37 @@ describe("session task duration", () => {
 
     expect(duration).toBe(40_000);
   });
+
+  test("keeps a task continuous across promoted steer messages", () => {
+    const duration = calculateLongestTaskDuration(
+      [session("parent")],
+      [
+        message("u1", "parent", "user", 0),
+        message("a1", "parent", "assistant", 1_000, 11_000),
+        message("steer", "parent", "user", 12_000),
+        message("a2", "parent", "assistant", 13_000, 43_000),
+        message("u2", "parent", "user", 50_000),
+        message("a3", "parent", "assistant", 51_000, 56_000),
+      ],
+      "parent",
+      new Map([["parent:steer", "steer"]]),
+    );
+
+    expect(duration).toBe(40_000);
+  });
+
+  test("does not double count overlapping subagent work", () => {
+    const duration = calculateLongestTaskDuration(
+      [session("parent"), session("child", "parent", 2_000)],
+      [
+        message("u1", "parent", "user", 0),
+        message("child-u1", "child", "user", 1_000),
+        message("a1", "parent", "assistant", 2_000, 32_000),
+        message("child-a1", "child", "assistant", 5_000, 25_000),
+      ],
+      "parent",
+    );
+
+    expect(duration).toBe(30_000);
+  });
 });

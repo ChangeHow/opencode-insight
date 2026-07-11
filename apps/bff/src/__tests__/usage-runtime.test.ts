@@ -34,24 +34,27 @@ async function createTestDatabase(dbPath: string) {
 function insertSession(
   db: { prepare: (sql: string) => { run: (...params: unknown[]) => unknown } },
   root: string,
+  id = "ses_runtime",
+  parentId: string | null = null,
 ) {
   db.prepare(`
-    INSERT INTO session (id, title, slug, directory)
-    VALUES (?, ?, ?, ?)
-  `).run("ses_runtime", "Runtime session", "runtime-session", root);
+    INSERT INTO session (id, parent_id, title, slug, directory)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, parentId, `${id} title`, `${id}-slug`, root);
 }
 
 function insertAssistantMessage(
   db: { prepare: (sql: string) => { run: (...params: unknown[]) => unknown } },
   id: string,
   createdAt: number,
+  sessionId = "ses_runtime",
 ) {
   db.prepare(`
     INSERT INTO message (id, session_id, time_created, data)
     VALUES (?, ?, ?, ?)
   `).run(
     id,
-    "ses_runtime",
+    sessionId,
     createdAt,
     JSON.stringify({
       id,
@@ -102,6 +105,7 @@ describe("Usage runtime integration", () => {
     db.exec(`
       CREATE TABLE session (
         id TEXT PRIMARY KEY,
+        parent_id TEXT,
         title TEXT NOT NULL,
         slug TEXT,
         directory TEXT NOT NULL
@@ -144,11 +148,53 @@ describe("Usage runtime integration", () => {
     expect(snapshot.messages[0]).toMatchObject({
       id: "msg_assistant",
       sessionId: "ses_runtime",
-      sessionTitle: "Runtime session",
-      sessionSlug: "runtime-session",
+      sessionTitle: "ses_runtime title",
+      sessionSlug: "ses_runtime-slug",
       modelId: "gpt-4o",
       providerId: "openai",
       pricedTokens: 1500,
+    });
+  });
+
+  test("attributes descendant session usage to the primary session once", async () => {
+    const dbPath = path.join(tempRoot, "opencode.db");
+    const db = await createTestDatabase(dbPath);
+    const createdAt = Date.UTC(2026, 2, 27, 12, 0, 0);
+
+    db.exec(`
+      CREATE TABLE session (
+        id TEXT PRIMARY KEY,
+        parent_id TEXT,
+        title TEXT NOT NULL,
+        slug TEXT,
+        directory TEXT NOT NULL
+      );
+      CREATE TABLE message (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        time_created INTEGER NOT NULL,
+        data TEXT NOT NULL
+      );
+    `);
+    insertSession(db, tempRoot, "primary");
+    insertSession(db, tempRoot, "child", "primary");
+    insertSession(db, tempRoot, "grandchild", "child");
+    insertAssistantMessage(db, "primary-message", createdAt, "primary");
+    insertAssistantMessage(db, "child-message", createdAt + 1_000, "child");
+    insertAssistantMessage(db, "grandchild-message", createdAt + 2_000, "grandchild");
+    db.close();
+
+    const snapshot = await loadUsageSnapshot({ forceRefresh: true });
+    const day = snapshot.breakdownByDate.get("2026-03-27");
+
+    expect(snapshot.messages).toHaveLength(3);
+    expect(snapshot.messages.every((message) => message.sessionId === "primary")).toBe(true);
+    expect(snapshot.summary.totalTokens).toBe(4_500);
+    expect(day?.sessions).toHaveLength(1);
+    expect(day?.sessions[0]).toMatchObject({
+      sessionId: "primary",
+      messages: 3,
+      tokens: 4_500,
     });
   });
 
@@ -163,6 +209,7 @@ describe("Usage runtime integration", () => {
     db.exec(`
       CREATE TABLE session (
         id TEXT PRIMARY KEY,
+        parent_id TEXT,
         title TEXT NOT NULL,
         slug TEXT,
         directory TEXT NOT NULL
@@ -176,9 +223,9 @@ describe("Usage runtime integration", () => {
     `);
 
     db.prepare(`
-      INSERT INTO session (id, title, slug, directory)
-      VALUES (?, ?, ?, ?)
-    `).run("ses_runtime", "Runtime session", "runtime-session", tempRoot);
+      INSERT INTO session (id, parent_id, title, slug, directory)
+      VALUES (?, ?, ?, ?, ?)
+    `).run("ses_runtime", null, "Runtime session", "runtime-session", tempRoot);
 
     db.prepare(`
       INSERT INTO message (id, session_id, time_created, data)

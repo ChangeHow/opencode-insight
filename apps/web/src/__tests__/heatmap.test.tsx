@@ -63,9 +63,7 @@ describe("Heatmap", () => {
     );
 
     expect(screen.getByText(/january 2025/i, { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("15").closest("td")?.className).toContain(
-      "size-[var(--heatmap-day-size)]",
-    );
+    expect(screen.getByText("15").closest("td")).toHaveClass("aspect-square", "min-w-0");
   });
 
   it("should show month navigation buttons instead of horizontal scrolling", () => {
@@ -211,14 +209,14 @@ describe("Heatmap", () => {
     const root = container.firstElementChild;
 
     expect(root).not.toBeNull();
-    expect(root).toHaveClass("min-h-[27rem]", "sm:min-h-[32rem]");
+    expect(root).toHaveClass("w-full", "sm:min-h-[32rem]");
 
     for (const scenario of scenarios) {
       rerender(<Heatmap days={scenario.days} selectedDate={null} onSelect={vi.fn()} />);
 
       expect(screen.getByText(scenario.label, { selector: "p" })).toBeInTheDocument();
       expect(container.querySelectorAll("td")).toHaveLength(42);
-      expect(container.firstElementChild).toHaveClass("min-h-[27rem]", "sm:min-h-[32rem]");
+      expect(container.firstElementChild).toHaveClass("w-full", "sm:min-h-[32rem]");
     }
   });
 

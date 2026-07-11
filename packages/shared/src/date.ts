@@ -149,6 +149,10 @@ export function getPresetDateRange(
   const timeZone = options?.timeZone ?? getCurrentTimeZone();
   const end = formatDateInTimeZone(now, timeZone);
 
+  if (range === "all") {
+    return { start: "", end: "" };
+  }
+
   if (range === "7d") {
     return { start: shiftDateKey(end, -6), end };
   }

@@ -149,7 +149,7 @@ export function makeDashboardSummary(overrides?: Partial<DashboardSummary>): Das
       tokens: 50000,
       cost: 1.2,
     },
-    availableRanges: ["month", "3mo", "year"],
+    availableRanges: ["month", "3mo", "year", "all"],
     scannedAt: new Date().toISOString(),
     source: {
       kind: "sqlite",

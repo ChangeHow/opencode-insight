@@ -204,9 +204,11 @@ export async function getRemoteUsageForRange(options: {
   const bounds =
     options.start || options.end
       ? { start: options.start, end: options.end }
-      : getPresetDateRange(options.range ?? "7d", {
-          timeZone: options.timeZone ?? DEFAULT_TIME_ZONE,
-        });
+      : options.range === "all"
+        ? {}
+        : getPresetDateRange(options.range ?? "7d", {
+            timeZone: options.timeZone ?? DEFAULT_TIME_ZONE,
+          });
   const rows = remote.rows.filter(
     (row) => (!bounds.start || row.date >= bounds.start) && (!bounds.end || row.date <= bounds.end),
   );

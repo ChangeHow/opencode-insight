@@ -1,7 +1,7 @@
 import { Activity, CalendarRange, Layers3, Wallet } from "lucide-react";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import type { ProviderDashboardPayload } from "@opencode-dashboard/shared";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
+import { Sparkline } from "@/components/dashboard/sparkline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,24 +16,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  formatCompactNumber,
-  formatCurrency,
-  formatDateLabel,
-  formatDateWithYearLabel,
-} from "@/lib/format";
+import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { getModelDisplayName } from "@/lib/model-display";
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
-}
-
-function formatDateSpan(start: string | undefined, end: string | undefined) {
-  if (!start || !end) {
-    return "Selected range";
-  }
-
-  return `${formatDateWithYearLabel(start)} - ${formatDateWithYearLabel(end)}`;
 }
 
 function DetailMetric({
@@ -48,7 +35,7 @@ function DetailMetric({
   detail: string;
 }) {
   return (
-    <Card className="rounded-[24px]">
+    <Card>
       <CardContent className="space-y-2 p-4 sm:p-5">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           <Icon className="size-3.5" />
@@ -70,7 +57,7 @@ export function ProviderDetailSheet({
   detail,
   loading,
   error,
-  customRange,
+  rangeLabel,
   onRetry,
 }: {
   open: boolean;
@@ -79,7 +66,7 @@ export function ProviderDetailSheet({
   detail: ProviderDashboardPayload | null;
   loading: boolean;
   error: string | null;
-  customRange: { start: string; end: string };
+  rangeLabel: string;
   onRetry: () => void;
 }) {
   const provider = detail?.provider ?? null;
@@ -92,7 +79,7 @@ export function ProviderDetailSheet({
       <SheetContent>
         <SheetHeader>
           <div className="flex items-start gap-4 pr-10">
-            <div className="flex size-13 items-center justify-center rounded-[18px] border border-[var(--border)] bg-[var(--panel-strong)]">
+            <div className="flex size-13 items-center justify-center rounded-[4px] border border-[var(--border)] bg-[var(--panel-strong)]">
               <ProviderIcon
                 providerId={provider?.providerId ?? providerId ?? "unknown"}
                 className="size-7"
@@ -105,7 +92,7 @@ export function ProviderDetailSheet({
               <SheetTitle>{provider?.providerId ?? providerId ?? "Provider"}</SheetTitle>
               <SheetDescription>
                 {provider
-                  ? `${formatCurrency(provider.totalCost)} across ${formatDateSpan(customRange.start, customRange.end)}`
+                  ? `${formatCurrency(provider.totalCost)} across ${rangeLabel}`
                   : "Inspect spend, coverage, and model mix for a single provider."}
               </SheetDescription>
             </div>
@@ -187,35 +174,15 @@ export function ProviderDetailSheet({
                     </p>
                   </div>
                   <div className="h-52 rounded-[22px] border border-[var(--border)] bg-[var(--chart-surface)] p-4 sm:h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={detail.trend}>
-                        <XAxis
-                          dataKey="date"
-                          tickFormatter={formatDateLabel}
-                          stroke="var(--muted-foreground)"
-                          fontSize={11}
-                        />
-                        <Tooltip
-                          cursor={{ stroke: "rgba(174, 85, 43, 0.18)", strokeWidth: 1 }}
-                          contentStyle={{
-                            borderRadius: 18,
-                            border: "1px solid var(--border)",
-                            background: "var(--panel)",
-                            color: "var(--foreground)",
-                          }}
-                          formatter={(value) => [formatCurrency(Number(value ?? 0)), "Spend"]}
-                          labelFormatter={(label) => formatDateWithYearLabel(String(label))}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="cost"
-                          stroke="var(--accent)"
-                          strokeWidth={2.5}
-                          dot={false}
-                          activeDot={{ r: 4 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <Sparkline
+                      points={detail.trend.map((point) => ({
+                        date: point.date,
+                        value: point.cost,
+                      }))}
+                      label={`${provider.providerId} daily spend`}
+                      accent="var(--accent)"
+                      className="h-full w-full"
+                    />
                   </div>
                 </CardContent>
               </Card>

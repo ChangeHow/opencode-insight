@@ -49,8 +49,8 @@ function normalize(value: string) {
 
 // Pre-sort keys by length (desc) so "githubcopilot" is preferred over "copilot"
 // when a provider id matches both. Computed once at module load.
-const SORTED_ICON_KEYS = Object.keys(PROVIDER_ICONS).sort((a, b) => b.length - a.length);
-const SORTED_ALIAS_KEYS = Object.keys(PROVIDER_ALIASES).sort((a, b) => b.length - a.length);
+const SORTED_ICON_KEYS = Object.keys(PROVIDER_ICONS).toSorted((a, b) => b.length - a.length);
+const SORTED_ALIAS_KEYS = Object.keys(PROVIDER_ALIASES).toSorted((a, b) => b.length - a.length);
 
 function resolveProviderIcon(providerId: string): IconComponent | null {
   const key = normalize(providerId);

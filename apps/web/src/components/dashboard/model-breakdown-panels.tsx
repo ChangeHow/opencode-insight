@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Layers3, Wallet } from "lucide-react";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { TOKEN_COLORS } from "@/lib/chart-colors";
 import { formatCompactNumber, formatCurrency } from "@/lib/format";
 import { getModelDisplayName } from "@/lib/model-display";
-import { TOKEN_COLORS } from "./token-breakdown-panel";
 
 export interface CostByModelEntry {
   label: string;
@@ -93,74 +92,56 @@ export function ModelTokenSharePanel({
       title="Model token share"
       separator
     >
-      <div className="mt-4 min-h-0 flex-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={entries} margin={{ top: 8, right: 4, left: -12, bottom: 18 }}>
-            <CartesianGrid vertical={false} stroke="rgba(77, 61, 44, 0.1)" />
-            <XAxis
-              dataKey="modelId"
-              interval={0}
-              tickFormatter={formatModelAxisLabel}
-              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              tickFormatter={(value: number) => formatCompactNumber(value)}
-              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-              tickLine={false}
-              axisLine={false}
-              width={54}
-            />
-            <Tooltip
-              formatter={(value) => [formatCompactNumber(Number(value ?? 0)), "Tokens"]}
-              labelFormatter={(_, payload) => payload?.[0]?.payload.label ?? "Model"}
-              contentStyle={{
-                borderRadius: 20,
-                border: "1px solid var(--border)",
-                background: "var(--panel)",
-                color: "var(--foreground)",
-              }}
-            />
-            <Bar dataKey="inputTokens" name="Input" stackId="tokens" fill={TOKEN_COLORS.input} />
-            <Bar dataKey="outputTokens" name="Output" stackId="tokens" fill={TOKEN_COLORS.output} />
-            <Bar
-              dataKey="cacheTokens"
-              name="Cache"
-              stackId="tokens"
-              fill={TOKEN_COLORS.cache}
-              radius={[8, 8, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="mt-3 grid gap-2">
-        {entries.slice(0, 3).map((model) => (
-          <div key={model.label} className="flex items-center justify-between gap-3 text-xs">
-            <div className="min-w-0">
-              <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                <ProviderIcon providerId={model.providerId} className="size-3" withTooltip />
-                {model.providerId}
-              </p>
-              <p className="truncate font-semibold text-[var(--foreground)]">
-                {getModelDisplayName(model.modelId, model.providerId)}
-              </p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="font-semibold text-[var(--foreground)]">
-                {formatCompactNumber(model.tokens)}
-              </p>
-              <p className="text-[var(--muted-foreground)]">{model.share.toFixed(1)}%</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      <ScrollArea className="mt-4 min-h-0 flex-1 pr-3">
+        <div className="grid gap-4 pb-1">
+          {entries.map((model) => {
+            const classifiedTokens = model.inputTokens + model.outputTokens + model.cacheTokens;
+            return (
+              <div key={model.label} className="grid gap-2 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                      <ProviderIcon providerId={model.providerId} className="size-3" withTooltip />
+                      {model.providerId}
+                    </p>
+                    <p className="truncate font-semibold text-[var(--foreground)]">
+                      {getModelDisplayName(model.modelId, model.providerId)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-semibold text-[var(--foreground)]">
+                      {formatCompactNumber(model.tokens)}
+                    </p>
+                    <p className="text-[var(--muted-foreground)]">{model.share.toFixed(1)}%</p>
+                  </div>
+                </div>
+                <div className="flex h-3 overflow-hidden bg-[var(--panel-strong)]">
+                  <span
+                    style={{
+                      width: `${classifiedTokens > 0 ? (model.inputTokens / classifiedTokens) * 100 : 0}%`,
+                      background: TOKEN_COLORS.input,
+                    }}
+                  />
+                  <span
+                    style={{
+                      width: `${classifiedTokens > 0 ? (model.outputTokens / classifiedTokens) * 100 : 0}%`,
+                      background: TOKEN_COLORS.output,
+                    }}
+                  />
+                  <span
+                    style={{
+                      width: `${classifiedTokens > 0 ? (model.cacheTokens / classifiedTokens) * 100 : 0}%`,
+                      background: TOKEN_COLORS.cache,
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </ScrollArea>
     </PinnedPanelShell>
   );
-}
-
-function formatModelAxisLabel(modelId: string) {
-  return modelId.length > 10 ? `${modelId.slice(0, 10)}...` : modelId;
 }
 
 function PinnedPanelShell({
@@ -179,7 +160,7 @@ function PinnedPanelShell({
   separator?: boolean;
 }) {
   return (
-    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 md:h-full md:w-[32rem] md:min-w-[32rem] md:p-6">
+    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-5 md:h-full md:w-[32rem] md:min-w-[32rem] md:p-6">
       <div className="space-y-2">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           {icon}

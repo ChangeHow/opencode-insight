@@ -10,9 +10,8 @@ import {
   summaryAtom,
 } from "@/lib/atoms";
 import { forceRemoteSync, refreshSnapshot } from "@/lib/api";
-import { isTodayInputDate } from "@/lib/date-range";
+import { ControlBar } from "@/components/dashboard/dashboard-toolbar";
 import { DashboardPageLayout, StickyHeaderShell } from "@/routes/layout";
-import { ControlBar } from "@/routes/shared";
 
 export function ListLayoutShell({
   currentView,
@@ -22,14 +21,13 @@ export function ListLayoutShell({
   children: ReactNode;
 }) {
   const [range, setRange] = useAtom(rangeAtom);
-  const [customDateRange, setCustomDateRange] = useAtom(customDateRangeAtom);
+  const customDateRange = useAtomValue(customDateRangeAtom);
   const summary = useAtomValue(summaryAtom);
   const [remoteUsage, setRemoteUsage] = useAtom(remoteUsageAtom);
   const error = useAtomValue(errorAtom);
   const bumpRefresh = useSetAtom(bumpDashboardRefreshAtom);
   const [remoteSyncing, setRemoteSyncing] = useState(false);
   const [remoteSyncStatus, setRemoteSyncStatus] = useState<string | null>(null);
-  const canRefresh = isTodayInputDate(customDateRange.end);
 
   async function handleRefresh() {
     await refreshSnapshot();
@@ -71,12 +69,10 @@ export function ListLayoutShell({
             currentView={currentView}
             range={range}
             setRange={setRange}
-            customDateRange={customDateRange}
-            setCustomDateRange={setCustomDateRange}
             scannedAt={summary?.scannedAt}
             onRefresh={handleRefresh}
             onForceRemoteSync={handleForceRemoteSync}
-            canRefresh={canRefresh}
+            canRefresh
             remoteUsage={remoteUsage}
             remoteSyncing={remoteSyncing}
             remoteSyncStatus={remoteSyncStatus}
@@ -86,16 +82,11 @@ export function ListLayoutShell({
     >
       {error ? (
         <div className="px-4 sm:px-8 lg:px-10">
-          <div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-red-700">
+          <div
+            role="alert"
+            className="border border-[var(--danger)] bg-[var(--danger-soft)] p-5 text-sm text-[var(--danger)]"
+          >
             {error}
-          </div>
-        </div>
-      ) : null}
-      {remoteUsage?.enabled && remoteUsage.status === "stale" ? (
-        <div className="px-4 sm:px-8 lg:px-10">
-          <div className="rounded-[28px] border border-red-500/40 bg-red-500/10 p-5 text-sm font-medium text-red-700 dark:text-red-300">
-            Cloudflare remote data is not reachable. Showing stale or empty remote data
-            {remoteUsage.error ? `: ${remoteUsage.error}` : "."}
           </div>
         </div>
       ) : null}

@@ -1,14 +1,7 @@
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Layers3 } from "lucide-react";
 import type { TokenBreakdown } from "@opencode-dashboard/shared";
+import { TOKEN_COLORS } from "@/lib/chart-colors";
 import { formatCompactNumber } from "@/lib/format";
-
-export const TOKEN_COLORS = {
-  input: "var(--metric-violet)",
-  output: "var(--metric-orange)",
-  reasoning: "var(--metric-gold)",
-  cache: "var(--metric-green)",
-};
 
 function buildTokenBreakdown(breakdown: TokenBreakdown) {
   const items = [
@@ -45,9 +38,15 @@ export function TokenBreakdownPanel({
 }) {
   const tokenBreakdown = buildTokenBreakdown(breakdown);
   const totalTokens = tokenBreakdown.reduce((sum, item) => sum + item.value, 0);
+  let cursor = 0;
+  const segments = tokenBreakdown.map((item) => {
+    const start = cursor;
+    cursor += item.share;
+    return `${item.color} ${start}% ${cursor}%`;
+  });
 
   return (
-    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 md:h-full md:w-[38rem] md:min-w-[38rem] md:p-6">
+    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-5 md:h-full md:w-[38rem] md:min-w-[38rem] md:p-6">
       <div className="space-y-2">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           <Layers3 className="size-3.5" />
@@ -56,32 +55,19 @@ export function TokenBreakdownPanel({
         <h3 className="text-xl font-semibold text-[var(--foreground)]">{title}</h3>
       </div>
       <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 md:items-center lg:flex-row">
-        <div className="relative h-52 min-w-0 flex-1 lg:w-56 lg:flex-none">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={tokenBreakdown}
-                dataKey="value"
-                nameKey="label"
-                innerRadius={52}
-                outerRadius={92}
-                paddingAngle={2}
-              >
-                {tokenBreakdown.map((entry) => (
-                  <Cell key={entry.label} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value) => [formatCompactNumber(Number(value ?? 0)), "Tokens"]}
-                contentStyle={{
-                  borderRadius: 20,
-                  border: "1px solid var(--border)",
-                  background: "var(--panel)",
-                  color: "var(--foreground)",
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="relative mx-auto size-48 shrink-0 lg:size-52">
+          <div
+            role="img"
+            aria-label="Token breakdown chart"
+            className="absolute inset-0 rounded-full"
+            style={{
+              background:
+                segments.length > 0
+                  ? `conic-gradient(${segments.join(", ")})`
+                  : "var(--panel-strong)",
+            }}
+          />
+          <div className="absolute inset-10 rounded-full border border-[var(--border)] bg-[var(--panel)]" />
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
               Total
@@ -95,7 +81,7 @@ export function TokenBreakdownPanel({
           {tokenBreakdown.map((entry) => (
             <div key={entry.label} className="ui-pill-card">
               <div className="flex items-center gap-2">
-                <span className="size-2.5 rounded-full" style={{ background: entry.color }} />
+                <span className="size-2.5 rounded-[2px]" style={{ background: entry.color }} />
                 <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   {entry.label}
                 </span>

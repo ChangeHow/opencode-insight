@@ -1,9 +1,6 @@
-import { useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
+import { useMemo } from "react";
 import { Activity, Building2, ChevronRight, Wallet } from "lucide-react";
-import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { ProviderInsight } from "@opencode-dashboard/shared";
-import { ProviderLedgerMobileCard } from "@/components/dashboard/provider-ledger-mobile-card";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,49 +10,6 @@ import { getModelDisplayName } from "@/lib/model-display";
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
-}
-
-type TrendTooltipProps = {
-  active?: boolean;
-  payload?: ReadonlyArray<{ value?: unknown; payload?: { date?: string } }>;
-  coordinate?: { x: number; y: number };
-  container: HTMLDivElement | null;
-};
-
-function TrendTooltip({ active, payload, coordinate, container }: TrendTooltipProps) {
-  if (!active || !payload?.length || !coordinate || !container || typeof document === "undefined") {
-    return null;
-  }
-
-  const rect = container.getBoundingClientRect();
-  const pointX = rect.left + coordinate.x;
-  const pointY = rect.top + coordinate.y;
-  const placeBelow = pointY < 72;
-  const left = Math.min(Math.max(pointX, 108), window.innerWidth - 108);
-  const date = payload[0]?.payload?.date;
-  const value = Number(payload[0]?.value ?? 0);
-
-  return createPortal(
-    <div
-      className="pointer-events-none fixed z-[100] min-w-[148px] rounded-[12px] border border-[var(--border)] bg-[var(--tooltip-surface)] px-3 py-2 text-[12px] text-[var(--foreground)] shadow-[0_10px_24px_rgba(63,44,20,0.12)]"
-      style={{
-        left,
-        top: pointY + (placeBelow ? 12 : -12),
-        transform: `translate(-50%, ${placeBelow ? "0" : "-100%"})`,
-      }}
-    >
-      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
-        {date ? formatDateLabel(date) : "Unknown date"}
-      </div>
-      <div className="mt-1.5 flex items-center justify-between gap-3">
-        <span className="text-[11px] text-[var(--muted-foreground)]">Spend</span>
-        <span className="text-sm font-semibold text-[var(--foreground)]">
-          {formatCurrency(value)}
-        </span>
-      </div>
-    </div>,
-    document.body,
-  );
 }
 
 function buildSummary(providers: ProviderInsight[]) {
@@ -83,32 +37,55 @@ function buildSummary(providers: ProviderInsight[]) {
 }
 
 function ProviderTrend({ provider }: { provider: ProviderInsight }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
   if (provider.trend.length === 0) {
-    return <div className="ml-auto h-8 w-44 rounded-full bg-black/5" />;
+    return (
+      <div
+        role="img"
+        aria-label={`No daily spend trend for ${provider.providerId}`}
+        className="h-8 w-full min-w-28 rounded-[6px] bg-black/5 md:ml-auto md:w-44"
+      />
+    );
   }
 
+  const width = 176;
+  const height = 32;
+  const costs = provider.trend.map((point) => point.cost);
+  const min = Math.min(...costs);
+  const max = Math.max(...costs);
+  const spread = max - min;
+  const points = provider.trend.map((point, index) => ({
+    x: provider.trend.length === 1 ? width / 2 : (index / (provider.trend.length - 1)) * width,
+    y: spread === 0 ? height / 2 : height - 2 - ((point.cost - min) / spread) * (height - 4),
+  }));
+  const path = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+    .join(" ");
+  const description = provider.trend
+    .map((point) => `${formatDateLabel(point.date)} ${formatCurrency(point.cost)}`)
+    .join(", ");
+
   return (
-    <div ref={containerRef} className="relative ml-auto h-8 w-44 overflow-visible">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={provider.trend} margin={{ top: 6, right: 6, bottom: 6, left: 6 }}>
-          <Tooltip
-            allowEscapeViewBox={{ x: true, y: true }}
-            cursor={{ stroke: "rgba(174, 85, 43, 0.18)", strokeWidth: 1 }}
-            content={(props) => <TrendTooltip {...props} container={containerRef.current} />}
-            wrapperStyle={{ visibility: "hidden" }}
-          />
-          <Line
-            type="monotone"
-            dataKey="cost"
+    <div className="h-8 w-full min-w-28 md:ml-auto md:w-44">
+      <svg
+        role="img"
+        aria-label={`Daily spend trend for ${provider.providerId}`}
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-full w-full overflow-visible"
+      >
+        <title>{description}</title>
+        {points.length === 1 ? (
+          <circle cx={points[0]?.x} cy={points[0]?.y} r="2" fill="var(--accent)" />
+        ) : (
+          <path
+            d={path}
+            fill="none"
             stroke="var(--accent)"
-            strokeWidth={2.2}
-            dot={false}
-            activeDot={false}
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-        </LineChart>
-      </ResponsiveContainer>
+        )}
+      </svg>
     </div>
   );
 }
@@ -154,7 +131,7 @@ export function ProviderInsightsPage({
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
+        <Card className="rounded-[18px]">
           <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Wallet className="size-3.5" />
@@ -171,7 +148,7 @@ export function ProviderInsightsPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-[18px]">
           <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Building2 className="size-3.5" />
@@ -184,7 +161,7 @@ export function ProviderInsightsPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-[18px]">
           <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Activity className="size-3.5" />
@@ -199,7 +176,7 @@ export function ProviderInsightsPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-[18px]">
           <CardContent className="space-y-2 p-4 sm:p-5">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               <Building2 className="size-3.5" />
@@ -213,7 +190,7 @@ export function ProviderInsightsPage({
         </Card>
       </div>
 
-      <Card>
+      <Card className="rounded-[18px]">
         <CardContent className="p-5 sm:p-6">
           <div className="space-y-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
@@ -231,11 +208,11 @@ export function ProviderInsightsPage({
           {loading ? (
             <div className="mt-5 space-y-2">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-12 animate-pulse rounded-[14px] bg-black/5" />
+                <div key={index} className="h-12 animate-pulse rounded-[10px] bg-black/5" />
               ))}
             </div>
           ) : !hasLedgerData ? (
-            <div className="mt-6 rounded-[20px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-5 py-7">
+            <div className="mt-6 rounded-[14px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-5 py-7">
               <p className="text-lg font-semibold text-[var(--foreground)]">{emptyTitle}</p>
               <p className="mt-2 max-w-2xl text-sm text-[var(--muted-foreground)]">
                 {emptyDescription}
@@ -247,132 +224,148 @@ export function ProviderInsightsPage({
               ) : null}
             </div>
           ) : (
-            <>
-              <div className="mt-5 space-y-3 md:hidden">
-                {ledgerProviders.map((provider) => (
-                  <ProviderLedgerMobileCard
-                    key={provider.providerId}
-                    provider={provider}
-                    selected={selectedProviderId === provider.providerId}
-                    onSelect={onSelectProvider}
-                    coverage={formatPercent(provider.pricingCoverage)}
-                    topModel={
-                      provider.topModel
-                        ? `Top model ${getModelDisplayName(provider.topModel.modelId, provider.providerId)} (${formatCurrency(provider.topModel.cost)})`
-                        : "Top model —"
-                    }
-                    trend={<ProviderTrend provider={provider} />}
-                  />
-                ))}
-              </div>
-
-              <div className="mt-5 hidden overflow-visible pb-2 md:block">
-                <div className="w-full overflow-x-auto whitespace-nowrap">
-                  <table className="min-w-full border-collapse text-left">
-                    <thead>
-                      <tr className="border-b border-[var(--border)]">
-                        <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Provider
-                        </th>
-                        <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Trend
-                        </th>
-                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Spend
-                        </th>
-                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Tokens
-                        </th>
-                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Messages
-                        </th>
-                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Coverage
-                        </th>
-                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Active days
-                        </th>
-                        <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Models
-                        </th>
-                        <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                          Top model
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ledgerProviders.map((provider) => (
-                        <tr
-                          key={provider.providerId}
-                          className={`border-b border-[var(--border)]/70 transition last:border-b-0 ${selectedProviderId === provider.providerId ? "bg-[var(--panel-strong)]/75" : ""}`}
-                        >
-                          <td className="px-3 py-3">
-                            {onSelectProvider ? (
-                              <button
-                                type="button"
-                                className="inline-flex max-w-[14rem] cursor-pointer items-center gap-2 rounded-full px-2 py-1 text-left transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)] outline-none"
-                                onClick={() => onSelectProvider(provider.providerId)}
-                              >
-                                <ProviderIcon providerId={provider.providerId} className="size-4" />
-                                <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                                  {provider.providerId}
-                                </span>
-                                <ChevronRight className="size-4 shrink-0 text-[var(--muted-foreground)]" />
-                              </button>
-                            ) : (
-                              <div className="inline-flex max-w-[14rem] items-center gap-2">
-                                <ProviderIcon providerId={provider.providerId} className="size-4" />
-                                <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                                  {provider.providerId}
-                                </span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-3">
-                            <ProviderTrend provider={provider} />
-                          </td>
-                          <td className="px-3 py-3 text-right text-sm font-semibold text-[var(--foreground)]">
-                            {formatCurrency(provider.totalCost)}
-                          </td>
-                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                            {formatCompactNumber(provider.totalTokens)}
-                          </td>
-                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                            {provider.totalMessages}
-                          </td>
-                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                            {formatPercent(provider.pricingCoverage)}
-                          </td>
-                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                            {provider.activeDays}
-                          </td>
-                          <td className="px-3 py-3 text-right text-sm text-[var(--muted-foreground)]">
-                            {provider.modelCount}
-                          </td>
-                          <td className="px-3 py-3 text-sm text-[var(--muted-foreground)]">
-                            {provider.topModel ? (
-                              <span className="inline-flex items-center gap-2">
-                                <span className="truncate">
-                                  {getModelDisplayName(
-                                    provider.topModel.modelId,
-                                    provider.providerId,
-                                  )}
-                                </span>
-                                <span className="text-[11px] opacity-75">
-                                  {formatCurrency(provider.topModel.cost)}
-                                </span>
+            <div className="mt-5 overflow-visible pb-2">
+              <div className="w-full overflow-x-auto md:whitespace-nowrap">
+                <table className="block min-w-full border-collapse text-left md:table">
+                  <thead className="sr-only md:not-sr-only md:table-header-group">
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Provider
+                      </th>
+                      <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Trend
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Spend
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Tokens
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Messages
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Coverage
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Active days
+                      </th>
+                      <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Models
+                      </th>
+                      <th className="px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Top model
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="grid gap-3 md:table-row-group">
+                    {ledgerProviders.map((provider) => (
+                      <tr
+                        key={provider.providerId}
+                        className={`grid grid-cols-2 gap-x-4 gap-y-3 rounded-[14px] border p-4 transition md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 md:last:border-b-0 ${selectedProviderId === provider.providerId ? "border-[var(--accent)] bg-[var(--panel-strong)]/75 md:bg-[var(--panel-strong)]/75" : "border-[var(--border)] bg-[var(--panel-strong)]/60 md:bg-transparent"}`}
+                      >
+                        <td className="col-span-2 p-0 md:table-cell md:px-3 md:py-3">
+                          {onSelectProvider ? (
+                            <button
+                              type="button"
+                              className="inline-flex max-w-[14rem] cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1 text-left outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+                              onClick={() => onSelectProvider(provider.providerId)}
+                            >
+                              <ProviderIcon providerId={provider.providerId} className="size-4" />
+                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                                {provider.providerId}
                               </span>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                              <ChevronRight className="size-4 shrink-0 text-[var(--muted-foreground)]" />
+                            </button>
+                          ) : (
+                            <div className="inline-flex max-w-[14rem] items-center gap-2">
+                              <ProviderIcon providerId={provider.providerId} className="size-4" />
+                              <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                                {provider.providerId}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="col-span-2 p-0 md:table-cell md:w-[18rem] md:px-3 md:py-3">
+                          <span className="mb-1 block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Daily spend trend
+                          </span>
+                          <ProviderTrend provider={provider} />
+                        </td>
+                        <td className="p-0 md:table-cell md:px-3 md:py-3 md:text-right">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Spend
+                          </span>
+                          <span className="text-sm font-semibold text-[var(--foreground)]">
+                            {formatCurrency(provider.totalCost)}
+                          </span>
+                        </td>
+                        <td className="p-0 md:table-cell md:px-3 md:py-3 md:text-right">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Tokens
+                          </span>
+                          <span className="text-sm text-[var(--muted-foreground)]">
+                            {formatCompactNumber(provider.totalTokens)}
+                          </span>
+                        </td>
+                        <td className="p-0 md:table-cell md:px-3 md:py-3 md:text-right">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Messages
+                          </span>
+                          <span className="text-sm text-[var(--muted-foreground)]">
+                            {provider.totalMessages}
+                          </span>
+                        </td>
+                        <td className="p-0 md:table-cell md:px-3 md:py-3 md:text-right">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Coverage
+                          </span>
+                          <span className="text-sm text-[var(--muted-foreground)]">
+                            {formatPercent(provider.pricingCoverage)}
+                          </span>
+                        </td>
+                        <td className="p-0 md:table-cell md:px-3 md:py-3 md:text-right">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Active days
+                          </span>
+                          <span className="text-sm text-[var(--muted-foreground)]">
+                            {provider.activeDays}
+                          </span>
+                        </td>
+                        <td className="p-0 md:table-cell md:px-3 md:py-3 md:text-right">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Models
+                          </span>
+                          <span className="text-sm text-[var(--muted-foreground)]">
+                            {provider.modelCount}
+                          </span>
+                        </td>
+                        <td className="col-span-2 p-0 md:table-cell md:px-3 md:py-3">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-[var(--muted-foreground)] md:hidden">
+                            Top model
+                          </span>
+                          {provider.topModel ? (
+                            <span className="inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                              <span className="truncate">
+                                {getModelDisplayName(
+                                  provider.topModel.modelId,
+                                  provider.providerId,
+                                )}
+                              </span>
+                              <span className="text-[11px] opacity-75">
+                                {formatCurrency(provider.topModel.cost)}
+                              </span>
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

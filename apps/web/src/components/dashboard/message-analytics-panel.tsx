@@ -1,21 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Activity, BarChart2, MessageSquare, Wrench } from "lucide-react";
+import { Sparkline } from "@/components/dashboard/sparkline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TOKEN_COLORS } from "@/lib/chart-colors";
 import { formatCompactNumber } from "@/lib/format";
 import {
   messageDistributionAtom,
+  messageAnalyticsErrorAtom,
   messageOverviewAtom,
   messagesAtom,
   messagesLoadingAtom,
@@ -27,72 +19,108 @@ import {
 import { fetchMessageAnalytics, fetchMessages } from "@/lib/api";
 import { MessageList } from "./message-list";
 
-const TOKEN_COLORS = {
-  input: "var(--metric-violet)",
-  output: "var(--metric-orange)",
-  reasoning: "var(--metric-gold)",
-  cacheRead: "var(--metric-green)",
-  cacheWrite: "var(--metric-teal, var(--metric-green))",
-};
-
 interface MessageAnalyticsPanelProps {
   date: string;
   sessionId: string;
 }
 
 export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanelProps) {
-  const [overview, setOverview] = useAtom(messageOverviewAtom);
-  const [distribution, setDistribution] = useAtom(messageDistributionAtom);
+  const [, setOverview] = useAtom(messageOverviewAtom);
+  const [, setDistribution] = useAtom(messageDistributionAtom);
+  const [analyticsError, setAnalyticsError] = useAtom(messageAnalyticsErrorAtom);
   const [messages, setMessages] = useAtom(messagesAtom);
   const [messagesTotal, setMessagesTotal] = useAtom(messagesTotalAtom);
   const [messagesPage, setMessagesPage] = useAtom(messagesPageAtom);
   const [messagesLoading, setMessagesLoading] = useAtom(messagesLoadingAtom);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const messagesRequestRef = useRef(0);
 
   // Load overview + distribution on mount, using session-level cache
   useEffect(() => {
     let canceled = false;
 
+    const requestId = ++messagesRequestRef.current;
+    setAnalyticsError(null);
+    setMessageError(null);
+    setMessages([]);
+    setMessagesTotal(0);
+    setMessagesPage(0);
+    setMessagesLoading(true);
+
     const cached = getMessageSessionCache(sessionId);
     if (cached) {
       setOverview(cached.overview);
       setDistribution(cached.distribution);
-      return;
+    } else {
+      setOverview(null);
+      setDistribution(null);
+
+      void fetchMessageAnalytics(date, sessionId)
+        .then(({ overview: ov, distribution: dist }) => {
+          if (!canceled) {
+            setOverview(ov);
+            setDistribution(dist);
+            setMessageSessionCache(sessionId, ov, dist);
+          }
+        })
+        .catch((error: unknown) => {
+          if (!canceled) {
+            setAnalyticsError(
+              error instanceof Error ? error.message : "Failed to load message analytics.",
+            );
+          }
+        });
     }
 
-    setOverview(null);
-    setDistribution(null);
-    setMessages([]);
-    setMessagesTotal(0);
-    setMessagesPage(0);
-
-    void fetchMessageAnalytics(date, sessionId)
-      .then(({ overview: ov, distribution: dist }) => {
-        if (!canceled) {
-          setOverview(ov);
-          setDistribution(dist);
-          setMessageSessionCache(sessionId, ov, dist);
+    void fetchMessages(date, sessionId, 0)
+      .then((result) => {
+        if (canceled || requestId !== messagesRequestRef.current) return;
+        setMessages(result.messages);
+        setMessagesTotal(result.total);
+        setMessagesPage(0);
+      })
+      .catch((error: unknown) => {
+        if (!canceled && requestId === messagesRequestRef.current) {
+          setMessageError(error instanceof Error ? error.message : "Failed to load conversation.");
         }
       })
-      .catch(() => {
-        /* silently ignore */
+      .finally(() => {
+        if (!canceled && requestId === messagesRequestRef.current) {
+          setMessagesLoading(false);
+        }
       });
 
     return () => {
       canceled = true;
     };
-  }, [date, sessionId]);
+  }, [
+    date,
+    sessionId,
+    setAnalyticsError,
+    setDistribution,
+    setMessages,
+    setMessagesLoading,
+    setMessagesPage,
+    setMessagesTotal,
+    setOverview,
+  ]);
 
   async function loadMessages(page: number) {
+    const requestId = ++messagesRequestRef.current;
+    setMessageError(null);
     setMessagesLoading(true);
     try {
       const result = await fetchMessages(date, sessionId, page);
+      if (requestId !== messagesRequestRef.current) return;
       setMessages((prev) => (page === 0 ? result.messages : [...prev, ...result.messages]));
       setMessagesTotal(result.total);
       setMessagesPage(page);
-    } catch {
-      // silently ignore
+    } catch (error) {
+      setMessageError(error instanceof Error ? error.message : "Failed to load conversation.");
     } finally {
-      setMessagesLoading(false);
+      if (requestId === messagesRequestRef.current) {
+        setMessagesLoading(false);
+      }
     }
   }
 
@@ -107,123 +135,99 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
   }
 
   return (
-    <div className="mx-auto w-full max-w-[54rem] rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-5 sm:p-6">
+    <div
+      data-testid="conversation-workspace"
+      className="mx-auto w-full max-w-[64rem] border-t border-[var(--border)] pt-8 pb-6"
+    >
       <div className="mb-5 space-y-2">
-        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-          <Activity className="size-3.5" />
-          Message analytics
+        <p className="metric-label">
+          <MessageSquare className="size-3.5" />
+          Session detail
         </p>
-        <h3 className="text-xl font-semibold text-[var(--foreground)]">Session breakdown</h3>
+        <h3 className="text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
+          Transcript
+        </h3>
+        <p className="text-sm text-[var(--muted-foreground)]">
+          Messages, tool activity, and usage metrics in chronological order.
+        </p>
       </div>
 
-      <Tabs defaultValue="overview" onValueChange={handleTabChange}>
+      <Tabs defaultValue="messages" onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="h-10 px-2 text-[11px] sm:text-xs">
-            <Activity className="mr-1.5 hidden size-3 sm:inline" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="distribution" className="h-10 px-2 text-[11px] sm:text-xs">
-            <BarChart2 className="mr-1.5 hidden size-3 sm:inline" />
-            Token Distribution
-          </TabsTrigger>
           <TabsTrigger value="messages" className="h-10 px-2 text-[11px] sm:text-xs">
             <MessageSquare className="mr-1.5 hidden size-3 sm:inline" />
-            Messages
-            {overview ? (
+            Transcript
+            {messagesTotal > 0 ? (
               <span className="ml-1.5 rounded-full bg-[var(--panel-strong)] px-1.5 py-0.5 text-[10px]">
-                {overview.totalMessages}
+                {messagesTotal}
               </span>
             ) : null}
           </TabsTrigger>
+          <TabsTrigger value="overview" className="h-10 px-2 text-[11px] sm:text-xs">
+            <Activity className="mr-1.5 hidden size-3 sm:inline" />
+            Metrics
+          </TabsTrigger>
+          <TabsTrigger value="distribution" className="h-10 px-2 text-[11px] sm:text-xs">
+            <BarChart2 className="mr-1.5 hidden size-3 sm:inline" />
+            Token profile
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview">
-          <OverviewTab />
-        </TabsContent>
-
-        <TabsContent value="distribution">
-          <DistributionTab />
-        </TabsContent>
 
         <TabsContent value="messages">
           <MessageList
             messages={messages}
             total={messagesTotal}
             loading={messagesLoading}
+            error={messageError}
+            onRetry={() => void loadMessages(0)}
             onLoadMore={handleLoadMore}
           />
+        </TabsContent>
+
+        <TabsContent value="overview">
+          <OverviewTab error={analyticsError} />
+        </TabsContent>
+
+        <TabsContent value="distribution">
+          <DistributionTab error={analyticsError} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function OverviewTab() {
+function OverviewTab({ error }: { error: string | null }) {
   const overview = useAtomValue(messageOverviewAtom);
+
+  if (error) {
+    return <AnalyticsError message={error} />;
+  }
 
   if (!overview) {
     return <LoadingPlaceholder />;
   }
 
-  const timelineData = overview.timeline.map((pt) => ({
-    idx: pt.messageIndex,
-    cumulativeTokens: pt.cumulativeTokens,
-    role: pt.role,
-  }));
-
   const topTools = overview.toolUsage.slice(0, 10);
 
   return (
     <div className="space-y-6">
-      {/* Timeline chart */}
       <div>
         <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">
           Cumulative tokens over messages
         </p>
-        <div className="h-44 sm:h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={timelineData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis
-                dataKey="idx"
-                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                label={{
-                  value: "Message #",
-                  position: "insideBottom",
-                  offset: -2,
-                  fontSize: 10,
-                  fill: "var(--muted-foreground)",
-                }}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                tickFormatter={(v: number) => formatCompactNumber(v)}
-              />
-              <Tooltip
-                formatter={
-                  ((value: number) => [formatCompactNumber(value), "Cumulative tokens"]) as any
-                }
-                labelFormatter={((label: number) => `Message #${label}`) as any}
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 12,
-                  background: "var(--panel)",
-                  border: "1px solid var(--border)",
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="cumulativeTokens"
-                stroke="var(--metric-violet)"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="h-44 border border-[var(--border)] bg-[var(--chart-surface)] p-4 sm:h-48">
+          <Sparkline
+            points={overview.timeline.map((point) => ({
+              date: `Message ${point.messageIndex}`,
+              value: point.cumulativeTokens,
+            }))}
+            label="Cumulative tokens over messages"
+            accent="var(--metric-violet)"
+            className="h-full w-full"
+          />
         </div>
       </div>
 
-      {/* Tool usage */}
       {topTools.length > 0 ? (
         <div>
           <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-[var(--muted-foreground)]">
@@ -239,9 +243,9 @@ function OverviewTab() {
                 >
                   {t.tool}
                 </p>
-                <div className="flex-1 h-2.5 overflow-hidden rounded-full bg-black/6">
+                <div className="h-2.5 flex-1 overflow-hidden bg-black/6">
                   <div
-                    className="h-full rounded-full"
+                    className="h-full"
                     style={{
                       width: `${Math.max((t.count / (topTools[0]?.count ?? 1)) * 100, 2)}%`,
                       background: TOKEN_COLORS.input,
@@ -260,8 +264,12 @@ function OverviewTab() {
   );
 }
 
-function DistributionTab() {
+function DistributionTab({ error }: { error: string | null }) {
   const distribution = useAtomValue(messageDistributionAtom);
+
+  if (error) {
+    return <AnalyticsError message={error} />;
+  }
 
   if (!distribution) {
     return <LoadingPlaceholder />;
@@ -276,52 +284,60 @@ function DistributionTab() {
     cacheWrite: pt.tokens.cacheWrite,
     role: pt.role,
   }));
+  const maxTokens = Math.max(
+    ...data.map((point) =>
+      (["input", "output", "reasoning", "cacheRead", "cacheWrite"] as const).reduce(
+        (total, key) => total + point[key],
+        0,
+      ),
+    ),
+    1,
+  );
 
   return (
     <div>
       <p className="mb-3 text-xs font-semibold text-[var(--muted-foreground)]">
         Token breakdown per message
       </p>
-      <div className="h-56 sm:h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="idx" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
-            <YAxis
-              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-              tickFormatter={(v: number) => formatCompactNumber(v)}
-            />
-            <Tooltip
-              formatter={
-                ((value: number, name: string) => [formatCompactNumber(value), name]) as any
-              }
-              labelFormatter={((label: number) => `Message #${label}`) as any}
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 12,
-                background: "var(--panel)",
-                border: "1px solid var(--border)",
-              }}
-            />
-            <Bar dataKey="input" stackId="a" fill={TOKEN_COLORS.input} name="Input" />
-            <Bar dataKey="output" stackId="a" fill={TOKEN_COLORS.output} name="Output" />
-            <Bar dataKey="reasoning" stackId="a" fill={TOKEN_COLORS.reasoning} name="Reasoning" />
-            <Bar dataKey="cacheRead" stackId="a" fill={TOKEN_COLORS.cacheRead} name="Cache Read" />
-            <Bar
-              dataKey="cacheWrite"
-              stackId="a"
-              fill={TOKEN_COLORS.cacheWrite}
-              name="Cache Write"
-              radius={[3, 3, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+      <div
+        role="img"
+        aria-label="Token breakdown per message"
+        className="flex h-56 items-end gap-1 overflow-x-auto border border-[var(--border)] bg-[var(--chart-surface)] p-3 sm:h-64"
+      >
+        {data.map((point) => {
+          const total =
+            point.input + point.output + point.reasoning + point.cacheRead + point.cacheWrite;
+          return (
+            <div
+              key={point.idx}
+              className="flex h-full min-w-2 flex-1 items-end"
+              title={`Message ${point.idx}: ${formatCompactNumber(total)} tokens`}
+            >
+              <div
+                className="flex w-full flex-col-reverse"
+                style={{ height: `${(total / maxTokens) * 100}%` }}
+              >
+                {(["input", "output", "reasoning", "cacheRead", "cacheWrite"] as const).map(
+                  (key) => (
+                    <span
+                      key={key}
+                      style={{
+                        height: `${total > 0 ? (point[key] / total) * 100 : 0}%`,
+                        background: TOKEN_COLORS[key],
+                      }}
+                    />
+                  ),
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(["input", "output", "reasoning", "cacheRead", "cacheWrite"] as const).map((key) => (
           <div key={key} className="ui-pill-chip py-1.5">
-            <span className="size-2.5 rounded-full" style={{ background: TOKEN_COLORS[key] }} />
+            <span className="size-2.5 rounded-[2px]" style={{ background: TOKEN_COLORS[key] }} />
             <span className="capitalize">
               {key === "cacheRead" ? "Cache Read" : key === "cacheWrite" ? "Cache Write" : key}
             </span>
@@ -334,4 +350,16 @@ function DistributionTab() {
 
 function LoadingPlaceholder() {
   return <div className="h-40 animate-pulse rounded-[18px] bg-[var(--panel-strong)]" />;
+}
+
+function AnalyticsError({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-[18px] border border-[var(--destructive)]/30 bg-[var(--destructive)]/5 p-4 text-sm"
+    >
+      <p className="font-semibold text-[var(--foreground)]">Unable to load message analytics.</p>
+      <p className="mt-1 text-[var(--muted-foreground)]">{message}</p>
+    </div>
+  );
 }

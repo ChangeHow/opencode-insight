@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import { customDateRangeAtom, detailLoadingAtom, errorAtom, themeAtom } from "@/lib/atoms";
-import { canRefreshDetailDate } from "@/lib/date-range";
+import { detailLoadingAtom, errorAtom, themeAtom } from "@/lib/atoms";
+import { isTodayInputDate } from "@/lib/date-range";
 import { DashboardPageLayout, DetailStickyHeader } from "@/routes/layout";
 
 export function DetailLayoutShell({
@@ -22,10 +22,9 @@ export function DetailLayoutShell({
   children: ReactNode;
 }) {
   const [theme, setTheme] = useAtom(themeAtom);
-  const customDateRange = useAtomValue(customDateRangeAtom);
   const error = useAtomValue(errorAtom);
   const loading = useAtomValue(detailLoadingAtom);
-  const canRefresh = canRefreshDetailDate(date, customDateRange.end);
+  const canRefresh = isTodayInputDate(date);
 
   return (
     <DashboardPageLayout

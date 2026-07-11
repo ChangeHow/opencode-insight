@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatCompactNumber,
+  formatCompactDuration,
   formatCurrency,
   formatDateLabel,
   formatDuration,
@@ -58,6 +59,12 @@ describe("Format Functions", () => {
       expect(formatDuration(65_000)).toBe("1 minute 5 seconds");
       expect(formatDuration(747_032)).toBe("12 minutes 27 seconds");
       expect(formatDuration(3_900_000)).toBe("1 hour 5 minutes");
+    });
+
+    it("should keep metric durations compact", () => {
+      expect(formatCompactDuration(9_500)).toBe("10s");
+      expect(formatCompactDuration(65_000)).toBe("1m 5s");
+      expect(formatCompactDuration(13_896_000)).toBe("3h 51m");
     });
   });
 

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import type { ProviderDashboardPayload } from "@opencode-dashboard/shared";
 import { ListLayoutShell } from "@/components/dashboard/list-layout-shell";
 import { ProviderDetailSheet } from "@/components/dashboard/provider-detail-sheet";
+import { ProviderInsightsPage } from "@/components/dashboard/provider-insights-page";
 import {
   providerInsightsAtom,
   rangeAtom,
@@ -12,8 +13,8 @@ import {
 } from "@/lib/atoms";
 import { fetchProviderDashboard } from "@/lib/api";
 import { getPresetDateRange } from "@/lib/date-range";
+import { formatDateSpan } from "@/lib/format";
 import { useProviderInsightsData } from "@/lib/use-provider-insights-data";
-import { formatDateSpan, MemoProviderInsightsPanel } from "./shared";
 
 export function ProvidersPage() {
   useProviderInsightsData();
@@ -23,26 +24,35 @@ export function ProvidersPage() {
   const providers = useAtomValue(providerInsightsAtom);
   const summary = useAtomValue(summaryAtom);
   const loading = useAtomValue(loadingAtom);
+  const presetDateRange = getPresetDateRange(range);
+  const rangeLabel =
+    range === "all"
+      ? "All retained history"
+      : formatDateSpan(presetDateRange.start, presetDateRange.end);
   const [activeProviderId, setActiveProviderId] = useState<string | null>(null);
   const [providerDetail, setProviderDetail] = useState<ProviderDashboardPayload | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const detailRequestRef = useRef(0);
 
   const loadProviderDetail = useCallback(
     async (providerId: string) => {
+      const requestId = ++detailRequestRef.current;
       setDetailLoading(true);
       setDetailError(null);
 
       try {
         const detail = await fetchProviderDashboard(providerId, range, customDateRange);
+        if (requestId !== detailRequestRef.current) return;
         setProviderDetail(detail);
-      } catch (detailError) {
+      } catch (error) {
+        if (requestId !== detailRequestRef.current) return;
         setProviderDetail(null);
-        setDetailError(
-          detailError instanceof Error ? detailError.message : "Failed to load provider detail.",
-        );
+        setDetailError(error instanceof Error ? error.message : "Failed to load provider detail.");
       } finally {
-        setDetailLoading(false);
+        if (requestId === detailRequestRef.current) {
+          setDetailLoading(false);
+        }
       }
     },
     [customDateRange, range],
@@ -65,14 +75,14 @@ export function ProvidersPage() {
   return (
     <ListLayoutShell currentView="providers">
       <div className="px-4 sm:px-8 lg:px-10">
-        <MemoProviderInsightsPanel
+        <ProviderInsightsPage
           providers={providers}
           loading={loading}
-          rangeLabel={formatDateSpan(customDateRange.start, customDateRange.end)}
+          rangeLabel={rangeLabel}
           emptyActionLabel="Reset to 7d"
           onEmptyAction={() => {
             setRange("7d");
-            setCustomDateRange(getPresetDateRange("7d"));
+            setCustomDateRange({ start: "", end: "" });
           }}
           selectedProviderId={providerDetail?.provider?.providerId ?? activeProviderId}
           onSelectProvider={handleProviderSelect}
@@ -83,6 +93,7 @@ export function ProvidersPage() {
         open={activeProviderId !== null}
         onOpenChange={(open) => {
           if (!open) {
+            detailRequestRef.current += 1;
             setActiveProviderId(null);
             setProviderDetail(null);
             setDetailError(null);
@@ -92,7 +103,7 @@ export function ProvidersPage() {
         detail={providerDetail}
         loading={detailLoading}
         error={detailError}
-        customRange={customDateRange}
+        rangeLabel={rangeLabel}
         onRetry={() => {
           if (activeProviderId) {
             void loadProviderDetail(activeProviderId);

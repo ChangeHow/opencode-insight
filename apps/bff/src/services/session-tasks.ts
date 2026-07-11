@@ -22,6 +22,12 @@ interface ParsedMessage {
   error?: unknown;
 }
 
+interface SessionInputRow {
+  id: string;
+  session_id: string;
+  delivery: "steer" | "queue";
+}
+
 const SESSION_TREE_QUERY = `
   WITH RECURSIVE session_tree(id, parent_id, time_created, depth) AS (
     SELECT id, parent_id, time_created, 0
@@ -75,10 +81,31 @@ function buildMessageQuery(sessionCount: number) {
   `;
 }
 
+function activeDuration(intervals: Array<{ start: number; end: number }>) {
+  const ordered = intervals.toSorted((a, b) => a.start - b.start || a.end - b.end);
+  let total = 0;
+  let currentStart = 0;
+  let currentEnd = 0;
+
+  for (const interval of ordered) {
+    if (interval.end <= interval.start) continue;
+    if (currentEnd === 0 || interval.start > currentEnd) {
+      total += currentEnd - currentStart;
+      currentStart = interval.start;
+      currentEnd = interval.end;
+    } else {
+      currentEnd = Math.max(currentEnd, interval.end);
+    }
+  }
+
+  return total + currentEnd - currentStart;
+}
+
 export function calculateLongestTaskDuration(
   sessions: SessionTreeRow[],
   rows: MessageRow[],
   rootSessionId: string,
+  deliveryByMessage = new Map<string, "steer" | "queue">(),
 ) {
   const childSessionIds = new Set(
     sessions.filter((session) => session.id !== rootSessionId).map((session) => session.id),
@@ -89,26 +116,28 @@ export function calculateLongestTaskDuration(
     .filter((message): message is NonNullable<ReturnType<typeof parseMessage>> => message !== null)
     .toSorted((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
 
-  let currentTaskDurationMs = 0;
+  let currentTaskIntervals: Array<{ start: number; end: number }> = [];
   let hasCurrentTask = false;
   let longestTaskDurationMs = 0;
   let previousAssistantHadError = false;
 
   for (const message of messages) {
     if (message.role === "user") {
+      const delivery = deliveryByMessage.get(`${message.sessionId}:${message.id}`);
       if (
         hasCurrentTask &&
-        ((childSessionIds.has(message.sessionId) &&
-          !seenChildUserSessionIds.has(message.sessionId)) ||
-          previousAssistantHadError)
+        (delivery === "steer" ||
+          (childSessionIds.has(message.sessionId) &&
+            !seenChildUserSessionIds.has(message.sessionId)) ||
+          (delivery === undefined && previousAssistantHadError))
       ) {
         seenChildUserSessionIds.add(message.sessionId);
         previousAssistantHadError = false;
         continue;
       }
 
-      longestTaskDurationMs = Math.max(longestTaskDurationMs, currentTaskDurationMs);
-      currentTaskDurationMs = 0;
+      longestTaskDurationMs = Math.max(longestTaskDurationMs, activeDuration(currentTaskIntervals));
+      currentTaskIntervals = [];
       hasCurrentTask = true;
       previousAssistantHadError = false;
       continue;
@@ -118,11 +147,30 @@ export function calculateLongestTaskDuration(
       continue;
     }
 
-    currentTaskDurationMs += Math.max(0, message.completedAt - message.createdAt);
+    currentTaskIntervals.push({ start: message.createdAt, end: message.completedAt });
     previousAssistantHadError = message.hasError;
   }
 
-  return Math.max(longestTaskDurationMs, currentTaskDurationMs);
+  return Math.max(longestTaskDurationMs, activeDuration(currentTaskIntervals));
+}
+
+async function readSessionInputDeliveries(dbPath: string, sessionIds: string[]) {
+  try {
+    const placeholders = sessionIds.map(() => "?").join(", ");
+    const rows = await querySqliteRows<SessionInputRow>(
+      dbPath,
+      `SELECT id, session_id, delivery
+       FROM session_input
+       WHERE session_id IN (${placeholders})
+         AND promoted_seq IS NOT NULL
+         AND delivery IN ('steer', 'queue')`,
+      sessionIds,
+      "Failed to query session input deliveries",
+    );
+    return new Map(rows.map((row) => [`${row.session_id}:${row.id}`, row.delivery]));
+  } catch {
+    return new Map<string, "steer" | "queue">();
+  }
 }
 
 export async function buildSessionDetailBreakdown(
@@ -145,9 +193,18 @@ export async function buildSessionDetailBreakdown(
     sessions.map((item) => item.id),
     "Failed to query session task messages",
   );
+  const deliveryByMessage = await readSessionInputDeliveries(
+    dbPath,
+    sessions.map((item) => item.id),
+  );
 
   return {
     ...session,
-    longestTaskDurationMs: calculateLongestTaskDuration(sessions, rows, session.sessionId),
+    longestTaskDurationMs: calculateLongestTaskDuration(
+      sessions,
+      rows,
+      session.sessionId,
+      deliveryByMessage,
+    ),
   } satisfies SessionDetailBreakdown;
 }

@@ -312,6 +312,7 @@ export function makeUsageSnapshot(options?: {
       month: defaultTrend,
       "3mo": defaultTrend,
       year: defaultTrend,
+      all: defaultTrend,
       ...options?.trendByRange,
     },
     breakdownByDate,

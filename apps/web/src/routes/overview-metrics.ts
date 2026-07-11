@@ -64,7 +64,7 @@ function findTopModel(options: CostSeriesOption[], remote: RemoteUsagePayload | 
     });
   }
   for (const row of remote?.rows ?? []) {
-    const key = `${row.providerId}:${row.modelId}`;
+    const key = `${row.providerId}/${row.modelId}`;
     const current = byKey.get(key) ?? {
       providerId: row.providerId,
       modelId: row.modelId,
@@ -97,9 +97,12 @@ export function buildCombinedOverviewMetrics(input: {
   const remotePricedTokens = input.remote?.totals.pricedTokens ?? 0;
   const remoteMessages = input.remote?.totals.messages ?? 0;
   const combinedTrend = buildCombinedTrend(input.trend, input.remote);
-  const activeDates = combinedTrend
-    .filter((point) => point.tokens > 0 || point.cost > 0 || point.messages > 0)
-    .map((point) => point.date);
+  const activeDates: string[] = [];
+  for (const point of combinedTrend) {
+    if (point.tokens > 0 || point.cost > 0 || point.messages > 0) {
+      activeDates.push(point.date);
+    }
+  }
   const remoteActiveDays = new Set(input.remote?.rows.map((row) => row.date) ?? []).size;
   const activeDays = activeDates.length;
   const averageTokens = activeDays > 0 ? (localTokens + remoteTokens) / activeDays : 0;

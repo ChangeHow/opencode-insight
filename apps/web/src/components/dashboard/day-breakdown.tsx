@@ -1,4 +1,3 @@
-import React from "react";
 import { Pin } from "lucide-react";
 import type { DayBreakdown } from "@opencode-dashboard/shared";
 import {
@@ -11,7 +10,6 @@ import {
   ModelTokenSharePanel,
 } from "@/components/dashboard/model-breakdown-panels";
 import { buildModelBreakdownData } from "@/components/dashboard/model-breakdown-data";
-import { PinnedPlaceholderPanel } from "@/components/dashboard/pinned-placeholder-panel";
 import { HorizontalPanelRail } from "@/components/dashboard/horizontal-panel-rail";
 import { TokenBreakdownPanel } from "@/components/dashboard/token-breakdown-panel";
 import { formatCompactNumber, formatCurrency, formatLongDateLabel } from "@/lib/format";
@@ -82,7 +80,6 @@ export function DayBreakdownPanel({
         <CostByModelPanel eyebrow="Pinned spend" entries={costByModel} />
 
         <ModelTokenSharePanel eyebrow="Pinned share" entries={modelTokenShare} />
-        <PinnedPlaceholderPanel />
       </HorizontalPanelRail>
     </div>
   );

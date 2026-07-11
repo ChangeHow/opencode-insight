@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, RefreshCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ThemeToggleButton } from "./shared";
+import { ChevronLeft } from "lucide-react";
+import { HeaderRefreshButton, ThemeToggleButton } from "@/components/dashboard/dashboard-toolbar";
 
 function useStuck(): [React.RefObject<HTMLDivElement | null>, boolean] {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -85,7 +83,7 @@ export function DetailStickyHeader({
 }) {
   const [refreshing, setRefreshing] = useState(false);
   const detailHeaderLinkClassName =
-    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
+    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-[var(--interactive-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
 
   async function handleRefreshClick() {
     if (!onRefresh || refreshing || !canRefresh) return;
@@ -127,41 +125,5 @@ export function DetailStickyHeader({
         </p>
       </div>
     </StickyHeaderShell>
-  );
-}
-
-export function HeaderRefreshButton({
-  canRefresh,
-  refreshing,
-  disabledReason,
-  onRefresh,
-}: {
-  canRefresh: boolean;
-  refreshing: boolean;
-  disabledReason: string;
-  onRefresh: () => void | Promise<void>;
-}) {
-  const button = (
-    <Button variant="outline" size="sm" onClick={onRefresh} disabled={!canRefresh || refreshing}>
-      <RefreshCcw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-      Refresh
-    </Button>
-  );
-
-  if (canRefresh) {
-    return button;
-  }
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>{button}</span>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{disabledReason}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
   );
 }

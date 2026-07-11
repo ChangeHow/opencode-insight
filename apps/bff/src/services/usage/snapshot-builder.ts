@@ -59,6 +59,12 @@ export function buildSnapshot(
     month: buildTrend(heatmap, "month", DEFAULT_TIME_ZONE),
     "3mo": buildTrend(heatmap, "3mo", DEFAULT_TIME_ZONE),
     year: buildTrend(heatmap, "year", DEFAULT_TIME_ZONE),
+    all: heatmap.map(({ date, tokens, cost, messages: messageCount }) => ({
+      date,
+      tokens,
+      cost,
+      messages: messageCount,
+    })),
   } satisfies Record<TimeRange, TrendPoint[]>;
 
   return {
@@ -84,7 +90,7 @@ export function buildSnapshot(
             cost: roundCost(topModel.cost),
           }
         : null,
-      availableRanges: ["7d", "month", "3mo", "year"],
+      availableRanges: ["7d", "month", "3mo", "year", "all"],
       scannedAt: new Date().toISOString(),
       source: { kind: sourceKind, paths },
     },
