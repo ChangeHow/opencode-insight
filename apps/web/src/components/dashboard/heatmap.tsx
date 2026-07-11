@@ -48,7 +48,7 @@ function HeatmapDayButton({
       <DayPickerDayButton
         {...props}
         className={cn(
-          "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border border-transparent bg-transparent p-1.5 text-left text-[var(--heat-empty-fg)] outline-none sm:p-2",
+          "group relative flex size-full flex-col items-start justify-between rounded-[8px] border border-transparent bg-transparent p-1.5 text-left text-[var(--heat-empty-fg)] outline-none sm:p-2",
           props.modifiers.outside && "opacity-42",
         )}
       >
@@ -68,13 +68,13 @@ function HeatmapDayButton({
         <DayPickerDayButton
           {...props}
           className={cn(
-            "group relative flex size-full flex-col items-start justify-between rounded-[calc(var(--heatmap-day-size)/4)] border p-1.5 text-left outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:p-2",
+            "group relative flex size-full flex-col items-start justify-between rounded-[8px] border p-1.5 text-left outline-none transition duration-200 [container-type:inline-size] focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:p-2",
             isZeroCost
               ? "border-transparent bg-transparent text-[var(--heat-empty-fg)]"
               : intensityClass[entry.intensity],
             isDisabled
               ? "cursor-not-allowed opacity-80 saturate-75"
-              : "cursor-pointer hover:-translate-y-0.5",
+              : "cursor-pointer hover:border-[var(--accent)]",
             props.modifiers.selected
               ? isZeroCost
                 ? "border-[var(--accent)]"
@@ -93,7 +93,7 @@ function HeatmapDayButton({
           </span>
           <span
             className={cn(
-              "hidden text-[10px] font-semibold sm:block sm:text-[11px]",
+              "-mx-1.5 hidden w-[calc(100%+0.75rem)] whitespace-nowrap text-[clamp(0.5rem,30cqw,0.6875rem)] leading-none font-semibold tabular-nums sm:-mx-2 sm:block sm:w-[calc(100%+1rem)]",
               isZeroCost ? "text-[var(--heat-empty-fg)]" : spendClass[entry.intensity],
             )}
           >
@@ -129,6 +129,22 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
   const nextMonth = addMonths(month, 1);
   const canGoPrevious = startMonth ? !isBefore(previousMonth, startMonth) : true;
   const canGoNext = endMonth ? !isAfter(nextMonth, endMonth) : true;
+  const monthKey = format(month, "yyyy-MM");
+  const monthSummary = useMemo(
+    () =>
+      days.reduce(
+        (summary, day) => {
+          if (!day.date.startsWith(monthKey) || day.messages === 0) return summary;
+          return {
+            activeDays: summary.activeDays + 1,
+            tokens: summary.tokens + day.tokens,
+            cost: summary.cost + day.cost,
+          };
+        },
+        { activeDays: 0, tokens: 0, cost: 0 },
+      ),
+    [days, monthKey],
+  );
 
   useEffect(() => {
     if (previousInitialMonthKeyRef.current !== initialMonthKey) {
@@ -147,23 +163,27 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
 
   return (
     <TooltipProvider>
-      <div className="flex min-h-[27rem] min-w-0 flex-col space-y-4 sm:min-h-[32rem]">
+      <div className="flex w-full min-w-0 flex-col space-y-4 sm:min-h-[32rem]">
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
-              Daily ledger
+              Daily activity
             </p>
-            <h2 className="mt-2 font-[Newsreader_Variable] text-3xl text-[var(--foreground)]">
-              Calendar
+            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+              Activity calendar
             </h2>
+            <p className="mt-1 text-[10px] text-[var(--muted-foreground)]">
+              {monthSummary.activeDays} active / {formatCompactNumber(monthSummary.tokens)} tokens /{" "}
+              {formatCurrency(monthSummary.cost)}
+            </p>
           </div>
-          <div className="hidden items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[var(--muted-foreground)] sm:flex">
+          <div className="hidden items-center gap-2 text-[11px] whitespace-nowrap uppercase tracking-[0.16em] text-[var(--muted-foreground)] xl:flex">
             <span>Quiet</span>
             {[0, 1, 2, 3, 4].map((intensity) => (
               <span
                 key={intensity}
                 className={cn(
-                  "size-3 rounded-full",
+                  "size-3 rounded-[4px]",
                   intensityClass[intensity as keyof typeof intensityClass],
                 )}
               />
@@ -172,15 +192,15 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
           </div>
         </div>
 
-        <div className="rounded-[24px] bg-[var(--chart-surface)]/55 p-4">
+        <div className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--chart-surface)]/55 p-2 sm:p-4">
           <div className="flex items-start justify-center">
-            <div className="w-full max-w-[42rem] min-w-0 px-1 sm:px-2">
+            <div className="w-full max-w-[42rem] min-w-0">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="size-10 rounded-full p-0"
+                  className="size-10 p-0"
                   onClick={() => setMonth(previousMonth)}
                   disabled={!canGoPrevious}
                   aria-label="Previous month"
@@ -194,7 +214,7 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="size-10 rounded-full p-0"
+                  className="size-10 p-0"
                   onClick={() => setMonth(nextMonth)}
                   disabled={!canGoNext}
                   aria-label="Next month"
@@ -220,20 +240,20 @@ export function Heatmap({ days, selectedDate, onSelect }: HeatmapProps) {
                   const entry = dayMap.get(dateKey);
                   return !entry || entry.messages === 0;
                 }}
-                className="w-full [--heatmap-day-gap:0.625rem] [--heatmap-day-size:2.625rem] sm:[--heatmap-day-gap:0.75rem] sm:[--heatmap-day-size:3.75rem]"
+                className="w-full [--heatmap-day-gap:0.25rem] sm:[--heatmap-day-gap:0.75rem]"
                 classNames={{
-                  root: "mx-auto w-fit min-w-fit",
-                  months: "flex w-fit",
-                  month: "flex w-fit flex-col gap-4",
+                  root: "mx-auto w-full",
+                  months: "flex w-full",
+                  month: "flex w-full flex-col gap-4",
                   month_caption: "hidden",
                   caption_label: "hidden",
                   nav: "hidden",
                   weekdays: "grid grid-cols-7 gap-[var(--heatmap-day-gap)]",
                   weekday:
-                    "flex h-7 w-[var(--heatmap-day-size)] items-center justify-center rounded-md text-center text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]",
+                    "flex h-7 min-w-0 items-center justify-center text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--muted-foreground)] sm:text-[10px] sm:tracking-[0.16em]",
                   weeks: "mt-2 flex flex-col gap-[var(--heatmap-day-gap)]",
                   week: "grid grid-cols-7 gap-[var(--heatmap-day-gap)]",
-                  day: "size-[var(--heatmap-day-size)] p-0",
+                  day: "aspect-square min-w-0 p-0",
                   day_button: "size-full",
                   hidden: "invisible",
                   disabled: "opacity-100",

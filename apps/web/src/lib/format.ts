@@ -1,20 +1,27 @@
 import { formatDuration as formatDateFnsDuration, intervalToDuration } from "date-fns";
 import { formatDateLabelInTimeZone, getCurrentTimeZone } from "@opencode-dashboard/shared";
 
+const compactIntegerFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 0,
+});
+const compactDecimalFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 export function formatCompactNumber(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: value >= 1000 ? 1 : 0,
-  }).format(value);
+  return (value >= 1000 ? compactDecimalFormatter : compactIntegerFormatter).format(value);
 }
 
 export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  return currencyFormatter.format(value);
 }
 
 export function formatDuration(valueMs: number) {
@@ -22,6 +29,16 @@ export function formatDuration(valueMs: number) {
   const duration = intervalToDuration({ start: 0, end: durationMs });
 
   return formatDateFnsDuration(duration, { zero: false }) || "0 seconds";
+}
+
+export function formatCompactDuration(valueMs: number) {
+  const totalSeconds = Math.max(0, Math.round(valueMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${totalSeconds % 60}s`;
+  return `${totalSeconds}s`;
 }
 
 export function formatDateLabel(value: string) {
@@ -76,4 +93,10 @@ export function formatDateWithYearLabel(value: string) {
       getCurrentTimeZone(),
     ) ?? value
   );
+}
+
+export function formatDateSpan(start?: string, end?: string) {
+  return start && end
+    ? `${formatDateWithYearLabel(start)} - ${formatDateWithYearLabel(end)}`
+    : "Selected range";
 }

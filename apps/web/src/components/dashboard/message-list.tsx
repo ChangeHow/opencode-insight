@@ -6,6 +6,8 @@ interface MessageListProps {
   messages: MessageDetail[];
   total: number;
   loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   onLoadMore: () => void;
 }
 
@@ -19,12 +21,30 @@ function totalTokenCount(msg: MessageDetail): number {
   );
 }
 
-export function MessageList({ messages, total, loading, onLoadMore }: MessageListProps) {
+export function MessageList({
+  messages,
+  total,
+  loading,
+  error,
+  onRetry,
+  onLoadMore,
+}: MessageListProps) {
   if (loading && messages.length === 0) {
     return <div className="h-40 animate-pulse rounded-[18px] bg-[var(--panel-strong)]" />;
   }
 
   if (messages.length === 0 && !loading) {
+    if (error) {
+      return (
+        <div role="alert" className="rounded-[10px] bg-[var(--danger-soft)] p-4 text-sm">
+          <p className="font-semibold text-[var(--danger)]">Unable to load this conversation.</p>
+          <p className="mt-1 text-[var(--muted-foreground)]">{error}</p>
+          <Button className="mt-3" variant="outline" size="sm" onClick={onRetry}>
+            Retry
+          </Button>
+        </div>
+      );
+    }
     return (
       <p className="py-8 text-center text-sm text-[var(--muted-foreground)]">No messages found.</p>
     );
@@ -39,7 +59,7 @@ export function MessageList({ messages, total, loading, onLoadMore }: MessageLis
   });
 
   return (
-    <div className="detail-scrollbar max-h-[70vh] space-y-1 overflow-y-auto pr-1">
+    <div>
       {messages.map((msg, i) => (
         <MessageItem key={msg.id} message={msg} cumulativeTokens={cumulativeTokens[i]} />
       ))}

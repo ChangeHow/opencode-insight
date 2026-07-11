@@ -16,6 +16,7 @@ import type { RawMessage, SerializedUsageSnapshot, SourceKind, UsageSnapshot } f
 
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const SNAPSHOT_CACHE_FILE = path.join(CACHE_DIR, "usage-snapshot.json");
+const SNAPSHOT_SCHEMA_VERSION = 3;
 const FAST_REFRESH_WINDOW_DAYS = 2;
 const PROVIDER_ALIASES: Record<string, string> = {
   zhipu: "zai-coding-plan",
@@ -173,6 +174,7 @@ function resolveRefreshedSourceKind(
 
 function serializeSnapshot(snapshot: UsageSnapshot): SerializedUsageSnapshot {
   return {
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     summary: snapshot.summary,
     messages: snapshot.messages,
     heatmap: snapshot.heatmap,
@@ -205,6 +207,9 @@ function readSnapshotCache(dbPath: string, legacyDir: string) {
     const cached = JSON.parse(
       fs.readFileSync(SNAPSHOT_CACHE_FILE, "utf8"),
     ) as SerializedUsageSnapshot;
+    if (cached.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
+      return null;
+    }
     const missingSessionShape = cached.breakdownByDate.some((day) => !("sessions" in day));
     if (missingSessionShape) {
       return null;

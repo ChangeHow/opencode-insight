@@ -1,13 +1,4 @@
 import { useMemo, useState } from "react";
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ChevronDown, LineChart as LineChartIcon } from "lucide-react";
 import type { CostSeriesLine, CostSeriesOption, TrendPoint } from "@opencode-dashboard/shared";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,6 +14,12 @@ const SERIES_COLORS = [
   "var(--metric-green)",
   "var(--metric-orange)",
 ];
+const METRICS = [
+  { key: "cost" as const, label: "Spend", noun: "spend" },
+  { key: "tokens" as const, label: "Tokens", noun: "token" },
+  { key: "messages" as const, label: "Messages", noun: "message" },
+];
+type MetricKey = (typeof METRICS)[number]["key"];
 
 export function TrendChart({
   data,
@@ -38,89 +35,118 @@ export function TrendChart({
   onToggle: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const chartData = useMemo(() => composeChartData(data, lines), [data, lines]);
-  const yAxisMax = useMemo(() => computeYAxisMax(data, lines), [data, lines]);
+  const [metric, setMetric] = useState<MetricKey>("cost");
+  const yAxisMax = useMemo(() => computeYAxisMax(data, lines, metric), [data, lines, metric]);
+  const selectedKeySet = useMemo(() => new Set(selectedKeys), [selectedKeys]);
+  const colorByKey = useMemo(
+    () =>
+      new Map(
+        options.map((option, index) => [option.key, SERIES_COLORS[index % SERIES_COLORS.length]]),
+      ),
+    [options],
+  );
+  const chartLines = useMemo(
+    () => buildChartLines(data, lines, yAxisMax, metric),
+    [data, lines, metric, yAxisMax],
+  );
+  const metricConfig = METRICS.find((item) => item.key === metric) ?? METRICS[0];
 
   return (
     <div className="flex h-full min-w-0 flex-col space-y-4">
-      <div className="space-y-2">
+      <div className="flex flex-col gap-3">
         <div className="space-y-2">
           <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
             <LineChartIcon className="size-3.5" />
-            Spend curves
+            Usage trend
           </p>
           <h2 className="text-xl font-semibold text-[var(--foreground)]">
-            Model and provider lines
+            Spend, tokens, and messages over time
           </h2>
           <p className="text-xs leading-5 text-[var(--muted-foreground)]">
-            Toggle up to four model and provider pairs. The chart rescales to emphasize the selected
-            spend patterns.
+            Compare up to four model and provider pairs without leaving the timeline.
           </p>
         </div>
+        <div
+          role="group"
+          aria-label="Chart metric"
+          className="grid w-full grid-cols-3 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] p-1"
+        >
+          {METRICS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={metric === item.key}
+              onClick={() => setMetric(item.key)}
+              className={cn(
+                "h-8 min-w-0 rounded-[6px] px-2 text-[10px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                metric === item.key
+                  ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="min-h-72 min-w-0 flex-1 w-full sm:min-h-84">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
-            <CartesianGrid vertical={false} stroke="rgba(77, 61, 44, 0.08)" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(value) => value.slice(5)}
-              tickLine={false}
-              axisLine={false}
+      <div className="relative min-h-72 w-full min-w-0 flex-1 rounded-[10px] border border-[var(--border)] bg-[var(--chart-surface)] p-3 sm:min-h-84">
+        <div className="absolute inset-x-3 top-2 flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
+          <span>{formatMetricValue(yAxisMax, metric)}</span>
+          <span>{chartLines.length} lines</span>
+        </div>
+        <svg
+          role="img"
+          aria-label={`Daily ${metricConfig.noun} lines`}
+          viewBox="0 0 720 280"
+          preserveAspectRatio="none"
+          className="h-full min-h-64 w-full pt-5"
+        >
+          <title>{`Daily ${metricConfig.noun} lines`}</title>
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1="0"
+              x2="720"
+              y1={ratio * 280}
+              y2={ratio * 280}
+              stroke="var(--chart-grid)"
+              vectorEffect="non-scaling-stroke"
             />
-            <YAxis
-              domain={[0, yAxisMax]}
-              tickCount={5}
-              tickFormatter={formatCurrencyCompact}
-              tickLine={false}
-              axisLine={false}
-              width={52}
+          ))}
+          {chartLines.map((line) => (
+            <path
+              key={line.key}
+              d={line.path}
+              fill="none"
+              stroke={colorByKey.get(line.key) ?? "var(--chart)"}
+              strokeWidth="2.5"
+              strokeLinecap="square"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
             />
-            <Tooltip
-              cursor={{ stroke: "rgba(174, 85, 43, 0.2)", strokeWidth: 1 }}
-              contentStyle={{
-                borderRadius: 20,
-                border: "1px solid var(--border)",
-                background: "var(--panel)",
-                color: "var(--foreground)",
-              }}
-              formatter={(value, name) => [
-                typeof value === "number" ? formatCurrency(value) : value,
-                name,
-              ]}
-              labelFormatter={(label) => label}
-            />
-            {lines.map((line, index) => (
-              <Line
-                key={line.key}
-                type="monotone"
-                dataKey={line.key}
-                name={line.label}
-                stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
-                strokeWidth={2.75}
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+          ))}
+        </svg>
+        <div className="absolute inset-x-3 bottom-2 flex justify-between text-[10px] text-[var(--muted-foreground)]">
+          <span>{data[0]?.date.slice(5) ?? "Start"}</span>
+          <span>{data.at(-1)?.date.slice(5) ?? "End"}</span>
+        </div>
       </div>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex h-10 w-full items-center justify-between gap-3 rounded-[18px] border border-[var(--border)] bg-[var(--panel)] px-3 text-sm font-medium text-[var(--foreground)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="flex h-10 w-full items-center justify-between gap-3 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] px-3 text-sm font-medium text-[var(--foreground)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <span className="truncate text-left">
               {selectedKeys.length > 0
                 ? `${selectedKeys.length} selected: ${options
-                    .filter((option) => selectedKeys.includes(option.key))
+                    .filter((option) => selectedKeySet.has(option.key))
                     .slice(0, 2)
                     .map((option) => option.label)
                     .join(", ")}${selectedKeys.length > 2 ? "..." : ""}`
                 : "Choose model and provider lines"}
             </span>
-            <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+            <span className="flex items-center gap-2 text-[10px] whitespace-nowrap uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
               {open ? "Close" : "Select"}
               <ChevronDown
                 className={cn("size-4 transition-transform", open ? "rotate-180" : "")}
@@ -132,13 +158,14 @@ export function TrendChart({
           <div className="max-h-64 overflow-y-auto pr-1">
             <div className="space-y-2">
               {options.map((option) => {
-                const active = selectedKeys.includes(option.key);
+                const active = selectedKeySet.has(option.key);
 
                 return (
                   <label
                     key={option.key}
+                    aria-label={`Toggle ${option.label}`}
                     className={cn(
-                      "flex cursor-pointer items-start justify-between gap-3 rounded-[16px] border px-3 py-2.5 transition",
+                      "flex cursor-pointer items-start justify-between gap-3 rounded-[8px] border px-3 py-2.5 transition",
                       active
                         ? "border-transparent bg-[var(--accent-soft)]"
                         : "border-[var(--border)] bg-white/40 hover:bg-black/5",
@@ -177,23 +204,29 @@ export function TrendChart({
   );
 }
 
-function composeChartData(data: TrendPoint[], lines: CostSeriesLine[]) {
-  const lineMaps = lines.map((line) => ({
+function buildChartLines(
+  data: TrendPoint[],
+  lines: CostSeriesLine[],
+  yAxisMax: number,
+  metric: MetricKey,
+) {
+  const dateIndex = new Map(data.map((point, index) => [point.date, index]));
+  const source =
+    lines.length > 0
+      ? lines
+      : [{ key: "total", label: "Total spend", points: data, providerId: "", modelId: "" }];
+
+  return source.map((line) => ({
     key: line.key,
-    pointMap: new Map(line.points.map((p) => [p.date, p.cost])),
+    path: line.points
+      .map((point, index) => {
+        const datePosition = dateIndex.get(point.date) ?? index;
+        const x = data.length === 1 ? 360 : (datePosition / Math.max(data.length - 1, 1)) * 720;
+        const y = 280 - Math.min(Math.max(point[metric] / yAxisMax, 0), 1) * 280;
+        return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(" "),
   }));
-
-  return data.map((point) => {
-    const entry: Record<string, number | string> = {
-      date: point.date,
-    };
-
-    for (const { key, pointMap } of lineMaps) {
-      entry[key] = pointMap.get(point.date) ?? 0;
-    }
-
-    return entry;
-  });
 }
 
 function formatCurrencyCompact(value: number) {
@@ -204,21 +237,25 @@ function formatCurrencyCompact(value: number) {
   return formatCurrency(value);
 }
 
-function computeYAxisMax(data: TrendPoint[], lines: CostSeriesLine[]) {
+function formatMetricValue(value: number, metric: MetricKey) {
+  return metric === "cost" ? formatCurrencyCompact(value) : formatCompactNumber(value);
+}
+
+function computeYAxisMax(data: TrendPoint[], lines: CostSeriesLine[], metric: MetricKey) {
   let maxValue = 0;
 
   if (lines.length > 0) {
     for (const line of lines) {
       for (const point of line.points) {
-        if (Number.isFinite(point.cost) && point.cost > maxValue) {
-          maxValue = point.cost;
+        if (Number.isFinite(point[metric]) && point[metric] > maxValue) {
+          maxValue = point[metric];
         }
       }
     }
   } else {
     for (const point of data) {
-      if (Number.isFinite(point.cost) && point.cost > maxValue) {
-        maxValue = point.cost;
+      if (Number.isFinite(point[metric]) && point[metric] > maxValue) {
+        maxValue = point[metric];
       }
     }
   }

@@ -48,6 +48,7 @@ export interface UsageSnapshot {
 }
 
 export interface SerializedUsageSnapshot {
+  schemaVersion: number;
   summary: DashboardSummary;
   messages: RawMessage[];
   heatmap: HeatmapDay[];

@@ -5,6 +5,7 @@
   "bin": {
     "opendash": "./scripts/opendash.mjs"
   },
+  "type": "module",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "dev:web": "cd apps/web && pnpm dev",
@@ -18,6 +19,7 @@
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
+    "doctor": "react-doctor apps/web -y --score --blocking warning",
     "bench": "pnpm --filter @opencode-dashboard/bff bench",
     "daemon:start": "node ./scripts/daemon.mjs",
     "daemon:stop": "node ./scripts/stop-daemon.mjs",
@@ -38,6 +40,7 @@
     "lint-staged": "^16.4.0",
     "oxfmt": "^0.42.0",
     "oxlint": "^1.57.0",
+    "react-doctor": "0.7.4",
     "typescript": "^5.9.2"
   },
   "lint-staged": {

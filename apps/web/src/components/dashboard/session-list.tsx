@@ -104,7 +104,7 @@ export function SessionListPanel({
   );
 }
 
-export function SessionCard({ date, session }: { date: string; session: SessionBreakdown }) {
+function SessionCard({ date, session }: { date: string; session: SessionBreakdown }) {
   const topModel = session.models.length > 0 ? session.models[0] : null;
 
   return (

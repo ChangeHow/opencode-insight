@@ -20,14 +20,14 @@ export function Calendar({
       classNames={{
         root: "relative",
         months: "relative flex flex-col gap-5 sm:flex-row sm:gap-6",
-        month: "flex w-[17.5rem] flex-col gap-4",
+        month: "flex w-full flex-col gap-4 sm:w-[17.5rem]",
         month_caption: "relative flex h-9 items-center justify-center",
         caption_label: "text-sm font-semibold text-[var(--foreground)]",
         nav: "absolute inset-x-0 top-0 flex items-center justify-between px-3",
         button_previous:
-          "inline-flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-black/5",
+          "inline-flex size-8 items-center justify-center rounded-[8px] border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-[var(--interactive-hover)]",
         button_next:
-          "inline-flex size-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-black/5",
+          "inline-flex size-8 items-center justify-center rounded-[8px] border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-[var(--interactive-hover)]",
         month_grid: "w-full border-collapse",
         weekdays: "flex w-full",
         weekday:
@@ -36,7 +36,7 @@ export function Calendar({
         week: "flex w-full",
         day: "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected].rdp-range_end)]:rounded-r-xl [&:has([aria-selected].rdp-range_start)]:rounded-l-xl [&:has([aria-selected].rdp-range_middle)]:rounded-none",
         day_button:
-          "inline-flex size-9 items-center justify-center rounded-xl text-sm text-[var(--foreground)] outline-none transition hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          "inline-flex size-9 items-center justify-center rounded-[8px] text-sm text-[var(--foreground)] outline-none transition hover:bg-[var(--interactive-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
         selected: "bg-[var(--accent)] text-[var(--accent-foreground)]",
         today: "",
         outside: "text-[var(--muted-foreground)] opacity-45",

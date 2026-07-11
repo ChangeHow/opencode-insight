@@ -13,7 +13,7 @@ describe("cn (className utility)", () => {
 
   it("ignores falsy values (undefined, null, false)", () => {
     expect(cn("foo", undefined, "bar")).toBe("foo bar");
-    expect(cn("foo", false && "hidden", "bar")).toBe("foo bar");
+    expect(cn("foo", false, "bar")).toBe("foo bar");
   });
 
   it("returns empty string when no arguments are provided", () => {

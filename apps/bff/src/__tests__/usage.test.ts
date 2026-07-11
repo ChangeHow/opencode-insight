@@ -296,6 +296,26 @@ describe("Usage Module", () => {
     });
   });
 
+  describe("getRangeData with all history", () => {
+    test("should include activity outside the current year", () => {
+      const today = getTodayDate();
+      const historical = "2024-01-15";
+      const snapshot = makeUsageSnapshot({
+        heatmap: [makeHeatmapDay(historical), makeHeatmapDay(today)],
+        breakdownByDate: new Map([
+          [historical, makeDayBreakdown(historical)],
+          [today, makeDayBreakdown(today)],
+        ]),
+      });
+
+      const result = getRangeData(snapshot, "all");
+
+      expect(result.heatmap.map((day) => day.date)).toContain(historical);
+      expect(result.heatmap.map((day) => day.date)).toContain(today);
+      expect(result.summary.activeDays).toBe(2);
+    });
+  });
+
   describe("getDateFilteredData with end date", () => {
     test("should filter out later dates", () => {
       const today = getTodayDate();

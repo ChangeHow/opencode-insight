@@ -9,9 +9,9 @@ function generateTrendData(days: number): TrendPoint[] {
     date.setDate(date.getDate() + i);
     data.push({
       date: date.toISOString().split("T")[0],
-      cost: Math.random() * 100,
-      tokens: Math.floor(Math.random() * 1_000_000),
-      messages: Math.floor(Math.random() * 100),
+      cost: ((i * 37) % 1000) / 10,
+      tokens: (i * 104_729) % 1_000_000,
+      messages: (i * 43) % 100,
     });
   }
   return data;
@@ -25,9 +25,9 @@ function generateLines(count: number, days: number): CostSeriesLine[] {
       date.setDate(date.getDate() + dayIndex);
       return {
         date: date.toISOString().split("T")[0],
-        cost: Math.random() * 100,
-        tokens: Math.floor(Math.random() * 1_000_000),
-        messages: Math.floor(Math.random() * 100),
+        cost: ((lineIndex * 101 + dayIndex * 37) % 1000) / 10,
+        tokens: (lineIndex * 65_537 + dayIndex * 104_729) % 1_000_000,
+        messages: (lineIndex * 17 + dayIndex * 43) % 100,
       };
     });
     return {

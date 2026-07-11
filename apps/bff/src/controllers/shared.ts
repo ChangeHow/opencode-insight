@@ -18,7 +18,13 @@ let refreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
 let backgroundRefreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
 
 export function parseRange(value: string | undefined): TimeRange {
-  if (value === "7d" || value === "month" || value === "3mo" || value === "year") {
+  if (
+    value === "7d" ||
+    value === "month" ||
+    value === "3mo" ||
+    value === "year" ||
+    value === "all"
+  ) {
     return value;
   }
   return "7d";

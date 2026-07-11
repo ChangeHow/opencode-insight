@@ -10,24 +10,18 @@ import type {
   CostSeriesOption,
   CostSeriesLine,
   ModelBreakdown,
+  MessageListPayload,
+  ProviderDashboardPayload,
+  RemoteUsagePayload,
   SessionDetailBreakdown,
 } from "@opencode-dashboard/shared";
 
-function getTodayDate(): string {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
+const FIXED_NOW = new Date("2026-07-11T12:00:00.000Z");
 
 function getRelativeDate(daysOffset: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + daysOffset);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const date = new Date(FIXED_NOW);
+  date.setUTCDate(date.getUTCDate() + daysOffset);
+  return date.toISOString().slice(0, 10);
 }
 
 export function makeMockSummary(): DashboardSummary {
@@ -51,8 +45,8 @@ export function makeMockSummary(): DashboardSummary {
       tokens: 150000,
       cost: 5.25,
     },
-    availableRanges: ["month", "3mo", "year"],
-    scannedAt: new Date().toISOString(),
+    availableRanges: ["month", "3mo", "year", "all"],
+    scannedAt: FIXED_NOW.toISOString(),
     source: {
       kind: "sqlite",
       paths: ["/path/to/cursor.db"],
@@ -73,7 +67,7 @@ export function makeMockHeatmap(): HeatmapDay[] {
     );
     const weekIndex = Math.floor(daysSinceStart / 7);
 
-    const tokens = 8000 + Math.floor(Math.random() * 12000);
+    const tokens = 8000 + ((i * 7919) % 12000);
     const cost = tokens * 0.00003;
     const messages = Math.floor(tokens / 800);
 
@@ -103,7 +97,7 @@ export function makeMockTrend(): TrendPoint[] {
 
   for (let i = 6; i >= 0; i--) {
     const date = getRelativeDate(-i);
-    const tokens = 8000 + Math.floor(Math.random() * 12000);
+    const tokens = 8000 + ((i * 7919) % 12000);
     const cost = tokens * 0.00003;
     const messages = Math.floor(tokens / 800);
 
@@ -232,6 +226,51 @@ export function makeMockDashboard(): DashboardPayload {
   };
 }
 
+export function makeMockProviderDashboard(providerId: string): ProviderDashboardPayload {
+  const dashboard = makeMockDashboard();
+  const provider = dashboard.providers.find((item) => item.providerId === providerId) ?? null;
+  return {
+    ...dashboard,
+    provider,
+    trend: provider?.trend ?? [],
+    series: {
+      options: dashboard.series.options.filter((option) => option.providerId === providerId),
+      lines: dashboard.series.lines.filter((line) => line.providerId === providerId),
+    },
+  };
+}
+
+export function makeMockRemoteUsage(): RemoteUsagePayload {
+  return {
+    enabled: true,
+    status: "fresh",
+    machines: [{ id: "studio-mac", label: "Studio Mac" }],
+    rows: [
+      {
+        machineId: "studio-mac",
+        machineLabel: "Studio Mac",
+        date: getRelativeDate(-1),
+        updatedAt: FIXED_NOW.toISOString(),
+        providerId: "anthropic",
+        modelId: "claude-3-5-sonnet-20241022",
+        tokens: 80_000,
+        pricedTokens: 78_000,
+        cost: 2.8,
+        messages: 96,
+        breakdown: {
+          input: 48_000,
+          output: 16_000,
+          cacheRead: 10_000,
+          cacheWrite: 2_000,
+          reasoning: 4_000,
+        },
+      },
+    ],
+    totals: { machines: 1, tokens: 80_000, pricedTokens: 78_000, cost: 2.8, messages: 96 },
+    lastFetchedAt: FIXED_NOW.toISOString(),
+  };
+}
+
 export function makeMockDayBreakdown(date: string): DayBreakdown {
   const tokens = 12000;
   const breakdown: TokenBreakdown = {
@@ -283,6 +322,7 @@ export function makeMockDayBreakdown(date: string): DayBreakdown {
     messages: 12,
     breakdown,
     models,
+    sessions: [],
   };
 }
 
@@ -305,5 +345,63 @@ export function makeMockSessionDetailBreakdown(
     models: day.models,
     longestTaskDurationMs: 9_000_000,
     ...overrides,
+  };
+}
+
+export function makeMockMessageList(): MessageListPayload {
+  const startedAt = Date.parse("2026-07-11T11:00:00.000Z");
+  return {
+    total: 2,
+    page: 0,
+    pageSize: 50,
+    messages: [
+      {
+        id: "message-user",
+        role: "user",
+        createdAt: startedAt,
+        completedAt: startedAt + 1_000,
+        cost: 0,
+        tokens: { input: 42, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+        parts: [
+          {
+            type: "text",
+            text: "Review the dashboard and explain the main performance bottleneck.",
+            time: { start: startedAt, end: startedAt + 1_000 },
+          },
+        ],
+      },
+      {
+        id: "message-assistant",
+        role: "assistant",
+        createdAt: startedAt + 2_000,
+        completedAt: startedAt + 16_000,
+        modelId: "claude-3-5-sonnet-20241022",
+        providerId: "anthropic",
+        cost: 0.08,
+        tokens: { input: 1200, output: 480, reasoning: 220, cacheRead: 800, cacheWrite: 0 },
+        parts: [
+          {
+            type: "reasoning",
+            text: "Inspect the render tree and compare mobile and desktop component mounts.",
+            time: { start: startedAt + 2_000, end: startedAt + 6_000 },
+          },
+          {
+            type: "tool",
+            callId: "tool-1",
+            toolName: "read",
+            status: "completed",
+            title: "Read provider dashboard",
+            input: { filePath: "apps/web/src/routes/providers.tsx" },
+            output: "Provider dashboard source loaded.",
+            time: { start: startedAt + 6_000, end: startedAt + 7_500 },
+          },
+          {
+            type: "text",
+            text: "## Finding\n\nThe provider page mounted duplicate chart trees at each breakpoint. Rendering one responsive tree removes the largest avoidable UI cost.",
+            time: { start: startedAt + 8_000, end: startedAt + 16_000 },
+          },
+        ],
+      },
+    ],
   };
 }

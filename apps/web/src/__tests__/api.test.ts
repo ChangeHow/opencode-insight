@@ -45,6 +45,14 @@ describe("API Client Functions", () => {
         `/api/summary?timeZone=${encodeURIComponent(timeZone)}&start=2025-01-01&end=2025-01-31`,
       );
     });
+
+    it("should request all retained history without synthetic date bounds", async () => {
+      await fetchSummary("all", { start: "", end: "" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `/api/summary?timeZone=${encodeURIComponent(timeZone)}&range=all`,
+      );
+    });
   });
 
   describe("fetchHeatmap", () => {

@@ -7,6 +7,7 @@ import type {
 
 export const messageOverviewAtom = atom<MessageOverviewPayload | null>(null);
 export const messageDistributionAtom = atom<MessageDistributionPayload | null>(null);
+export const messageAnalyticsErrorAtom = atom<string | null>(null);
 export const messagesAtom = atom<MessageDetail[]>([]);
 export const messagesTotalAtom = atom(0);
 export const messagesPageAtom = atom(0);

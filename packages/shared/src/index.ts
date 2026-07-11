@@ -1,4 +1,4 @@
-export type TimeRange = "7d" | "month" | "3mo" | "year";
+export type TimeRange = "7d" | "month" | "3mo" | "year" | "all";
 
 export interface TokenBreakdown {
   input: number;

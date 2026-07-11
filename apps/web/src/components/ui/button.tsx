@@ -4,14 +4,15 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[8px] text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
   {
     variants: {
       variant: {
         default: "bg-[var(--accent)] px-4 py-2 text-[var(--accent-foreground)] hover:opacity-90",
-        ghost: "bg-transparent px-3 py-2 text-[var(--foreground)] hover:bg-black/5",
+        ghost:
+          "bg-transparent px-3 py-2 text-[var(--foreground)] hover:bg-[var(--interactive-hover)]",
         outline:
-          "border border-[var(--border)] bg-transparent px-4 py-2 text-[var(--foreground)] hover:bg-black/5",
+          "border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-[var(--foreground)] hover:border-[var(--accent)] hover:bg-[var(--interactive-hover)]",
       },
       size: {
         default: "h-10",
@@ -41,4 +42,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = "Button";
 
-export { Button, buttonVariants };
+export { Button };

@@ -7,6 +7,17 @@ import { querySqliteRows } from "../sqlite";
 import type { RawMessage } from "./types";
 
 const SQLITE_USAGE_QUERY = `
+  WITH RECURSIVE session_owner(id, root_id, root_title, root_slug, root_directory) AS (
+    SELECT id, id, title, slug, directory
+    FROM session
+    WHERE parent_id IS NULL
+
+    UNION ALL
+
+    SELECT child.id, owner.root_id, owner.root_title, owner.root_slug, owner.root_directory
+    FROM session child
+    JOIN session_owner owner ON child.parent_id = owner.id
+  )
   SELECT
     m.id,
     m.time_created,
@@ -18,12 +29,13 @@ const SQLITE_USAGE_QUERY = `
     json_extract(m.data, '$.tokens.reasoning') AS reasoning_tokens,
     json_extract(m.data, '$.tokens.cache.read') AS cache_read_tokens,
     json_extract(m.data, '$.tokens.cache.write') AS cache_write_tokens,
-    s.id AS session_id,
-    s.title AS session_title,
-    s.slug AS session_slug,
-    s.directory AS session_directory
+    COALESCE(owner.root_id, s.id) AS session_id,
+    COALESCE(owner.root_title, s.title) AS session_title,
+    COALESCE(owner.root_slug, s.slug) AS session_slug,
+    COALESCE(owner.root_directory, s.directory) AS session_directory
   FROM message m
   JOIN session s ON s.id = m.session_id
+  LEFT JOIN session_owner owner ON owner.id = s.id
   WHERE json_extract(m.data, '$.role') = 'assistant'
     AND json_extract(m.data, '$.modelID') IS NOT NULL
 `;

@@ -56,7 +56,7 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       // Base rates: 50000 * 0.000003 + 25000 * 0.000015 = 0.15 + 0.375 = 0.525
-      expect(result.estimatedCost).toBe(0.53);
+      expect(result.estimatedCost).toBeCloseTo(0.525, 12);
     });
   });
 
@@ -77,7 +77,7 @@ describe("Pricing Module", () => {
       // Next 50k input: 50000 * 0.000002 = 0.1
       // Output under 200k: 100000 * 0.000015 = 1.5
       // Total: 0.6 + 0.1 + 1.5 = 2.2
-      expect(result.estimatedCost).toBe(2.2);
+      expect(result.estimatedCost).toBeCloseTo(2.2, 12);
     });
   });
 
@@ -104,7 +104,7 @@ describe("Pricing Module", () => {
       // Cache read: 50000 * 0.0000003 = 0.015
       // Cache write: 20000 * 0.00000375 = 0.075
       // Total: 0.03 + 0.075 + 0.015 + 0.075 = 0.195
-      expect(result.estimatedCost).toBe(0.2);
+      expect(result.estimatedCost).toBeCloseTo(0.195, 12);
     });
   });
 
@@ -124,7 +124,7 @@ describe("Pricing Module", () => {
       expect(result.priced).toBe(true);
       // Cursor override rates: input 0.00000175, output 0.000014
       // 10000 * 0.00000175 + 5000 * 0.000014 = 0.0175 + 0.07 = 0.0875
-      expect(result.estimatedCost).toBe(0.09);
+      expect(result.estimatedCost).toBeCloseTo(0.0875, 12);
     });
   });
 
@@ -146,7 +146,7 @@ describe("Pricing Module", () => {
       // output: 5000 * 0.000004 = 0.02
       // cacheRead: 20000 * 0.00000024 = 0.0048
       // Total: 0.012 + 0.02 + 0.0048 = 0.0368
-      expect(result.estimatedCost).toBe(0.04);
+      expect(result.estimatedCost).toBeCloseTo(0.0368, 12);
     });
 
     it("should price gpt-5.3-codex via fallback dataset", () => {
@@ -162,7 +162,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "gpt-5.3-codex", "cursor", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBe(0.09);
+      expect(result.estimatedCost).toBeCloseTo(0.0875, 12);
     });
 
     test("uses priority rates for fast model aliases", () => {
@@ -207,7 +207,7 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       // 10000 * 0.0000035 + 5000 * 0.0000175 = 0.035 + 0.0875 = 0.1225
-      expect(result.estimatedCost).toBe(0.12);
+      expect(result.estimatedCost).toBeCloseTo(0.1225, 12);
     });
 
     it("should prefer zai pricing for zai-coding-plan over openrouter matches", () => {
@@ -228,7 +228,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "glm-5", "zai-coding-plan", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBe(0.23);
+      expect(result.estimatedCost).toBeCloseTo(0.232, 12);
     });
 
     it("should price glm-5.1 using glm-5 alias for zai providers", () => {
@@ -244,7 +244,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "glm-5.1", "zai-coding-plan", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBe(0.03);
+      expect(result.estimatedCost).toBeCloseTo(0.03, 12);
     });
 
     it("should price k2p5 via kimi-for-coding as kimi-k2.5", () => {
@@ -266,7 +266,7 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       // 10000 * 0.0000006 + 5000 * 0.000003 + 20000 * 0.0000001 = 0.006 + 0.015 + 0.002 = 0.023
-      expect(result.estimatedCost).toBe(0.02);
+      expect(result.estimatedCost).toBeCloseTo(0.023, 12);
     });
 
     it("should price k2p6 via kimi-for-coding as kimi-k2.6", () => {
@@ -283,7 +283,7 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       // 10000 * 9e-7 + 5000 * 3.9e-6 + 20000 * 1.5e-7 = 0.009 + 0.0195 + 0.003 = 0.0315
-      expect(result.estimatedCost).toBe(0.03);
+      expect(result.estimatedCost).toBeCloseTo(0.0315, 12);
     });
 
     it("should price zenmux/openai/gpt-5.1-codex via openai/gpt-5.1-codex", () => {
@@ -305,7 +305,7 @@ describe("Pricing Module", () => {
 
       expect(result.priced).toBe(true);
       // 10000 * 0.000002 + 5000 * 0.00001 = 0.02 + 0.05 = 0.07
-      expect(result.estimatedCost).toBe(0.07);
+      expect(result.estimatedCost).toBeCloseTo(0.07, 12);
     });
 
     it("should price openrouter/openai/gpt-5 via openai/gpt-5 after prefix strip", () => {
@@ -326,8 +326,8 @@ describe("Pricing Module", () => {
       );
 
       expect(result.priced).toBe(true);
-      // 10000 * 0.0000015 + 5000 * 0.00001 = 0.015 + 0.05 = 0.065, rounded to 2dp => 0.07
-      expect(result.estimatedCost).toBe(0.07);
+      // 10000 * 0.0000015 + 5000 * 0.00001 = 0.015 + 0.05 = 0.065
+      expect(result.estimatedCost).toBeCloseTo(0.065, 12);
     });
 
     it("should price llmbox/gpt models using openai pricing", () => {
@@ -343,7 +343,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "llmbox/gpt-5", "llmbox", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBe(0.07);
+      expect(result.estimatedCost).toBeCloseTo(0.065, 12);
     });
 
     it("should price llmbox/glm models using zai pricing", () => {
@@ -359,7 +359,7 @@ describe("Pricing Module", () => {
       const result = estimateUsageCostFromDataset(dataset, "llmbox/glm-5", "llmbox", usage);
 
       expect(result.priced).toBe(true);
-      expect(result.estimatedCost).toBe(0.03);
+      expect(result.estimatedCost).toBeCloseTo(0.03, 12);
     });
 
     it("should price glm-5.2 from models.dev zai fallback for coding-plan providers", () => {
@@ -379,7 +379,7 @@ describe("Pricing Module", () => {
       // input: 10000 * 0.0000014 = 0.014
       // output: 5000 * 0.0000044 = 0.022
       // cacheRead: 20000 * 0.00000026 = 0.0052
-      expect(result.estimatedCost).toBe(0.04);
+      expect(result.estimatedCost).toBeCloseTo(0.0412, 12);
     });
 
     it("should parse models.dev pricing and skip zero-cost plan entries", () => {
@@ -430,8 +430,8 @@ describe("Pricing Module", () => {
       );
 
       expect(result.priced).toBe(true);
-      // 10000 * 0.0000001 + 5000 * 0.0000004 = 0.001 + 0.002 = 0.003, rounded to 2dp => 0
-      expect(result.estimatedCost).toBe(0);
+      // 10000 * 0.0000001 + 5000 * 0.0000004 = 0.001 + 0.002 = 0.003
+      expect(result.estimatedCost).toBeCloseTo(0.003, 12);
     });
   });
 

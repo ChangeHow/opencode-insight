@@ -71,7 +71,7 @@ export function SessionDetailPage() {
     >
       {loading ? (
         <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
-          <div className="rounded-[28px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">
+          <div className="rounded-[12px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">
             Loading session detail...
           </div>
         </div>

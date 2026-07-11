@@ -50,6 +50,10 @@ describe("Date Range Functions", () => {
 
       expect(result).toEqual(getSharedPresetDateRange("year"));
     });
+
+    it("should leave all history unbounded", () => {
+      expect(getPresetDateRange("all")).toEqual({ start: "", end: "" });
+    });
   });
 
   describe("parseInputDate", () => {

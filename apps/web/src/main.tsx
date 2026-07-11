@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import { useAtomValue } from "jotai";
 import {
@@ -10,43 +10,65 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import { themeAtom } from "@/lib/atoms";
-import { DashboardPage } from "@/routes/overview";
-import { ProvidersPage } from "@/routes/providers";
-import { DetailPage } from "@/routes/detail/page";
-import { SessionDetailPage } from "@/routes/detail/session";
 import "./styles.css";
 
-const rootRoute = createRootRoute({
-  component: () => {
-    const theme = useAtomValue(themeAtom);
+const DashboardPage = lazy(() =>
+  import("@/routes/overview").then((module) => ({ default: module.DashboardPage })),
+);
+const ProvidersPage = lazy(() =>
+  import("@/routes/providers").then((module) => ({ default: module.ProvidersPage })),
+);
+const DetailPage = lazy(() =>
+  import("@/routes/detail/page").then((module) => ({ default: module.DetailPage })),
+);
+const SessionDetailPage = lazy(() =>
+  import("@/routes/detail/session").then((module) => ({ default: module.SessionDetailPage })),
+);
 
-    React.useEffect(() => {
-      const media = window.matchMedia("(prefers-color-scheme: dark)");
+function RootRouteComponent() {
+  const theme = useAtomValue(themeAtom);
 
-      const applyTheme = () => {
-        const resolvedTheme = theme === "system" ? (media.matches ? "dark" : "light") : theme;
-        document.documentElement.dataset.theme = resolvedTheme;
-      };
+  React.useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
 
-      applyTheme();
+    const applyTheme = () => {
+      const resolvedTheme = theme === "system" ? (media.matches ? "dark" : "light") : theme;
+      document.documentElement.dataset.theme = resolvedTheme;
+      document.documentElement.style.colorScheme = resolvedTheme;
+    };
 
-      if (theme !== "system") {
-        return;
+    applyTheme();
+
+    if (theme !== "system") return;
+
+    media.addEventListener("change", applyTheme);
+    return () => media.removeEventListener("change", applyTheme);
+  }, [theme]);
+
+  return (
+    <Suspense
+      fallback={
+        <div role="status" className="grid min-h-screen place-items-center bg-[var(--background)]">
+          <span className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+            Loading telemetry
+          </span>
+        </div>
       }
+    >
+      <Outlet />
+    </Suspense>
+  );
+}
 
-      media.addEventListener("change", applyTheme);
-      return () => media.removeEventListener("change", applyTheme);
-    }, [theme]);
-
-    return <Outlet />;
-  },
+const rootRoute = createRootRoute({
+  component: RootRouteComponent,
 });
 
 const dashboardLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "dashboard",
   component: () => (
-    <main className="min-h-screen overflow-x-clip bg-[var(--background)] text-[var(--foreground)]">
+    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <Outlet />
     </main>
   ),

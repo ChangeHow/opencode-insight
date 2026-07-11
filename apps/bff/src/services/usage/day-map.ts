@@ -155,6 +155,10 @@ export function getRangeData(
   timeZone = DEFAULT_TIME_ZONE,
   providerId?: string,
 ): RangeData {
+  if (range === "all") {
+    return getDateFilteredData(snapshot, undefined, undefined, modelKeys, timeZone, providerId);
+  }
+
   const { start, end } = getPresetBounds(range, timeZone);
   const sourceByDate = getSourceByDate(snapshot, timeZone, providerId);
   const byDate = new Map<string, DayBreakdown>();
