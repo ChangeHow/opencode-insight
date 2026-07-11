@@ -90,15 +90,9 @@ export function fetchDay(
   return getJson<DayBreakdown>(`/api/day/${date}${buildQuery(range, customRange)}`);
 }
 
-export function fetchSession(
-  range: TimeRange,
-  date: string,
-  sessionId: string,
-  customRange?: { start: string; end: string },
-) {
-  return getJson<SessionDetailBreakdown>(
-    `/api/day/${date}/session/${sessionId}${buildQuery(range, customRange)}`,
-  );
+export function fetchSession(sessionId: string) {
+  const params = new URLSearchParams({ timeZone: getCurrentTimeZone(), range: "all" });
+  return getJson<SessionDetailBreakdown>(`/api/session/${sessionId}?${params.toString()}`);
 }
 
 export function fetchSeries(
@@ -153,24 +147,20 @@ export async function forceRemoteSync(
   return (await response.json()) as RemoteSyncActionPayload;
 }
 
-export function fetchMessageOverview(date: string, sessionId: string) {
-  return getJson<MessageOverviewPayload>(`/api/day/${date}/session/${sessionId}/message/overview`);
+export function fetchMessageOverview(sessionId: string) {
+  return getJson<MessageOverviewPayload>(`/api/session/${sessionId}/message/overview`);
 }
 
-export function fetchMessageDistribution(date: string, sessionId: string) {
-  return getJson<MessageDistributionPayload>(
-    `/api/day/${date}/session/${sessionId}/message/distribution`,
-  );
+export function fetchMessageDistribution(sessionId: string) {
+  return getJson<MessageDistributionPayload>(`/api/session/${sessionId}/message/distribution`);
 }
 
-export function fetchMessageAnalytics(date: string, sessionId: string) {
-  return getJson<MessageAnalyticsPayload>(
-    `/api/day/${date}/session/${sessionId}/message/analytics`,
-  );
+export function fetchMessageAnalytics(sessionId: string) {
+  return getJson<MessageAnalyticsPayload>(`/api/session/${sessionId}/message/analytics`);
 }
 
-export function fetchMessages(date: string, sessionId: string, page = 0, pageSize = 50) {
+export function fetchMessages(sessionId: string, page = 0, pageSize = 50) {
   return getJson<MessageListPayload>(
-    `/api/day/${date}/session/${sessionId}/message?page=${page}&pageSize=${pageSize}`,
+    `/api/session/${sessionId}/message?page=${page}&pageSize=${pageSize}`,
   );
 }

@@ -14,6 +14,7 @@ export function HorizontalPanelRail({
 }) {
   return (
     <div
+      data-horizontal-panel-rail
       className={cn(
         stackOnMobile
           ? "w-full overflow-x-visible overflow-y-visible md:overflow-x-auto md:overflow-y-hidden"

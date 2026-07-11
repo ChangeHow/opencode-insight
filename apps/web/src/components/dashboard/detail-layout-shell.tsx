@@ -1,30 +1,22 @@
 import type { ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { detailLoadingAtom, errorAtom, themeAtom } from "@/lib/atoms";
-import { isTodayInputDate } from "@/lib/date-range";
 import { DashboardPageLayout, DetailStickyHeader } from "@/routes/layout";
 
 export function DetailLayoutShell({
   backTo,
   backParams,
   backLabel,
-  title,
-  date,
-  onRefresh,
   children,
 }: {
   backTo: "/overview" | "/detail/$date";
   backParams?: { date: string };
   backLabel: string;
-  title: string;
-  date: string;
-  onRefresh: () => Promise<void>;
   children: ReactNode;
 }) {
   const [theme, setTheme] = useAtom(themeAtom);
   const error = useAtomValue(errorAtom);
   const loading = useAtomValue(detailLoadingAtom);
-  const canRefresh = isTodayInputDate(date);
 
   return (
     <DashboardPageLayout
@@ -34,11 +26,8 @@ export function DetailLayoutShell({
           backTo={backTo}
           backParams={backParams}
           backLabel={backLabel}
-          title={title}
           theme={theme}
           onThemeChange={setTheme}
-          canRefresh={canRefresh}
-          onRefresh={onRefresh}
         />
       }
     >

@@ -1,14 +1,9 @@
-import { CalendarDays, Clock3, Coins, Folder, MessageSquare, Shapes } from "lucide-react";
+import { Clock3, Coins, Folder, MessageSquare, Shapes } from "lucide-react";
 import type { SessionDetailBreakdown } from "@opencode-dashboard/shared";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { TOKEN_COLORS } from "@/lib/chart-colors";
 import { cn } from "@/lib/utils";
-import {
-  formatCompactDuration,
-  formatCompactNumber,
-  formatCurrency,
-  formatLongDateLabel,
-} from "@/lib/format";
+import { formatCompactDuration, formatCompactNumber, formatCurrency } from "@/lib/format";
 import { getModelDisplayName } from "@/lib/model-display";
 
 const TOKEN_PARTS = [
@@ -19,13 +14,7 @@ const TOKEN_PARTS = [
   { key: "cacheWrite" as const, label: "Cache write", color: TOKEN_COLORS.cacheWrite },
 ];
 
-export function SessionBreakdownPanel({
-  date,
-  session,
-}: {
-  date: string;
-  session: SessionDetailBreakdown;
-}) {
+export function SessionBreakdownPanel({ session }: { session: SessionDetailBreakdown }) {
   const classifiedTokens = TOKEN_PARTS.reduce(
     (total, part) => total + session.breakdown[part.key],
     0,
@@ -39,10 +28,7 @@ export function SessionBreakdownPanel({
       <div data-testid="session-overview" className="mx-auto max-w-[64rem] py-5 sm:py-6">
         <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="metric-label">
-              <CalendarDays className="size-4" />
-              {formatLongDateLabel(date)}
-            </p>
+            <p className="metric-label">Entire session</p>
             <h2
               id="session-overview-title"
               className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-[var(--foreground)]"

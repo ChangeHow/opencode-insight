@@ -55,11 +55,8 @@ describe("detail navigation and session list", () => {
       <DetailStickyHeader
         backTo="/overview"
         backLabel="Back to overview"
-        title="Daily spend detail"
         theme="system"
         onThemeChange={() => {}}
-        canRefresh
-        onRefresh={async () => {}}
       />,
     );
 

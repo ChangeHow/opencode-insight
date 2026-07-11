@@ -105,8 +105,8 @@ const dayDetailRoute = createRoute({
 });
 
 const sessionDetailRoute = createRoute({
-  getParentRoute: () => detailLayoutRoute,
-  path: "/$date/$session",
+  getParentRoute: () => dashboardLayoutRoute,
+  path: "/sessions/$session",
   component: SessionDetailPage,
 });
 
@@ -115,7 +115,8 @@ const routeTree = rootRoute.addChildren([
     indexRoute,
     overviewRoute,
     providersRoute,
-    detailLayoutRoute.addChildren([dayDetailRoute, sessionDetailRoute]),
+    sessionDetailRoute,
+    detailLayoutRoute.addChildren([dayDetailRoute]),
   ]),
 ]);
 

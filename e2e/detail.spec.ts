@@ -9,41 +9,6 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date("2026-07-11T12:00:00.000Z") });
   await page.route("**/api/day/**", async (route) => {
     const url = route.request().url();
-    const sessionMatch = url.match(/\/api\/day\/([^/]+)\/session\/([^/?]+)/);
-
-    if (url.includes("/message/analytics")) {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          overview: { timeline: [], toolUsage: [], totalMessages: 0 },
-          distribution: { points: [], totalMessages: 0 },
-        }),
-      });
-      return;
-    }
-
-    if (/\/message(?:\?|$)/.test(url)) {
-      await route.fulfill({ json: makeMockMessageList() });
-      return;
-    }
-
-    if (sessionMatch) {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(
-          makeMockSessionDetailBreakdown(decodeURIComponent(sessionMatch[2] ?? "session"), {
-            title:
-              "Session with an intentionally long title that should truncate in the sticky header instead of overflowing the viewport",
-            directory:
-              "/data/users/opencode/worktree/very-long-directory-name-without-natural-breaks/feature-detail-header-overflow-regression-check",
-          }),
-        ),
-      });
-      return;
-    }
-
     const match = url.match(/\/api\/day\/([^?]+)/);
     const date = match ? match[1] : "2026-07-11";
 
@@ -53,51 +18,80 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify(makeMockDayBreakdown(date)),
     });
   });
+  await page.route("**/api/session/**", async (route) => {
+    const url = route.request().url();
+    const sessionMatch = url.match(/\/api\/session\/([^/?]+)/);
+    const sessionId = decodeURIComponent(sessionMatch?.[1] ?? "session");
+
+    if (url.includes("/message/analytics")) {
+      await route.fulfill({
+        json: {
+          overview: { timeline: [], toolUsage: [], totalMessages: 0 },
+          distribution: { points: [], totalMessages: 0 },
+        },
+      });
+      return;
+    }
+    if (/\/message(?:\?|$)/.test(url)) {
+      await route.fulfill({ json: makeMockMessageList() });
+      return;
+    }
+    await route.fulfill({
+      json: makeMockSessionDetailBreakdown(sessionId, {
+        title:
+          "Session with an intentionally long title that should truncate in the sticky header instead of overflowing the viewport",
+        directory:
+          "/data/users/opencode/worktree/very-long-directory-name-without-natural-breaks/feature-detail-header-overflow-regression-check",
+      }),
+    });
+  });
 });
 
 test.describe("Detail Page", () => {
-  test("scroll panels should start at the first panel (scrollLeft === 0)", async ({ page }) => {
+  test("day detail panels should align with the summary card on large screens", async ({
+    page,
+  }) => {
     await page.goto("/detail/2026-05-10");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(page.getByText("Daily spend detail for 2026-05-10")).toBeVisible({
+    await expect(page.getByText("Sun, May 10, 2026")).toBeVisible({
       timeout: 10_000,
     });
 
-    const scrollContainers = page.locator("[class*='overflow-x-auto']");
-    const count = await scrollContainers.count();
+    const rail = page.locator("[data-horizontal-panel-rail]");
+    const firstPanel = rail.locator(":scope > div > div").first();
+    const summary = page.locator("[data-detail-summary-card]");
+    const [railPosition, firstPanelBox, summaryBox] = await Promise.all([
+      rail.evaluate((element) => element.scrollLeft),
+      firstPanel.boundingBox(),
+      summary.boundingBox(),
+    ]);
 
-    expect(count).toBeGreaterThan(0);
-
-    for (let i = 0; i < count; i++) {
-      const container = scrollContainers.nth(i);
-      const scrollLeft = await container.evaluate((el) => (el as HTMLElement).scrollLeft);
-      expect(scrollLeft).toBe(0);
-    }
+    expect(railPosition).toBe(0);
+    expect(firstPanelBox?.x).toBeCloseTo(summaryBox?.x ?? 0, 0);
   });
 
-  test("session detail header should truncate long text without horizontal overflow", async ({
+  test("session detail should not overflow horizontally with long text", async ({
     page,
     isMobile,
   }) => {
     test.skip(!isMobile, "Mobile regression runs in the mobile project");
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/detail/2026-05-10/overflow-session");
+    await page.goto("/sessions/overflow-session");
     await page.waitForLoadState("domcontentloaded");
 
-    const stickyTitle = page.getByText(/Session with an intentionally long title/).first();
-    await expect(stickyTitle).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Session with an intentionally long title/).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     const hasHorizontalOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );
     expect(hasHorizontalOverflow).toBe(false);
-
-    await expect(stickyTitle).toHaveCSS("text-overflow", "ellipsis");
   });
 
   test("renders the conversation as the primary session workspace", async ({ page }) => {
-    await page.goto("/detail/2026-05-10/conversation-session");
+    await page.goto("/sessions/conversation-session");
 
     await expect(page.getByTestId("conversation-workspace")).toBeVisible();
     await expect(page.getByTestId("session-overview")).toHaveCSS("border-bottom-width", "0px");

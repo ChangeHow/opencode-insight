@@ -70,7 +70,7 @@ describe("MessageAnalyticsPanel", () => {
 
     const { rerender } = render(
       <Provider store={store}>
-        <MessageAnalyticsPanel date="2026-07-10" sessionId="session-a" />
+        <MessageAnalyticsPanel sessionId="session-a" />
       </Provider>,
     );
 
@@ -85,7 +85,7 @@ describe("MessageAnalyticsPanel", () => {
 
     rerender(
       <Provider store={store}>
-        <MessageAnalyticsPanel date="2026-07-10" sessionId="session-b" />
+        <MessageAnalyticsPanel sessionId="session-b" />
       </Provider>,
     );
 
@@ -108,17 +108,15 @@ describe("MessageAnalyticsPanel", () => {
 
     const { rerender } = render(
       <Provider store={store}>
-        <MessageAnalyticsPanel date="2026-07-10" sessionId="session-a" />
+        <MessageAnalyticsPanel sessionId="session-a" />
       </Provider>,
     );
 
-    await waitFor(() =>
-      expect(mockFetchMessages).toHaveBeenCalledWith("2026-07-10", "session-a", 0),
-    );
+    await waitFor(() => expect(mockFetchMessages).toHaveBeenCalledWith("session-a", 0));
 
     rerender(
       <Provider store={store}>
-        <MessageAnalyticsPanel date="2026-07-10" sessionId="session-b" />
+        <MessageAnalyticsPanel sessionId="session-b" />
       </Provider>,
     );
     await waitFor(() => expect(store.get(messageOverviewAtom)?.totalMessages).toBe(2));
@@ -139,7 +137,7 @@ describe("MessageAnalyticsPanel", () => {
 
     render(
       <Provider store={createStore()}>
-        <MessageAnalyticsPanel date="2026-07-10" sessionId="session-a" />
+        <MessageAnalyticsPanel sessionId="session-a" />
       </Provider>,
     );
 

@@ -20,11 +20,10 @@ import { fetchMessageAnalytics, fetchMessages } from "@/lib/api";
 import { MessageList } from "./message-list";
 
 interface MessageAnalyticsPanelProps {
-  date: string;
   sessionId: string;
 }
 
-export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanelProps) {
+export function MessageAnalyticsPanel({ sessionId }: MessageAnalyticsPanelProps) {
   const [, setOverview] = useAtom(messageOverviewAtom);
   const [, setDistribution] = useAtom(messageDistributionAtom);
   const [analyticsError, setAnalyticsError] = useAtom(messageAnalyticsErrorAtom);
@@ -55,7 +54,7 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
       setOverview(null);
       setDistribution(null);
 
-      void fetchMessageAnalytics(date, sessionId)
+      void fetchMessageAnalytics(sessionId)
         .then(({ overview: ov, distribution: dist }) => {
           if (!canceled) {
             setOverview(ov);
@@ -72,7 +71,7 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
         });
     }
 
-    void fetchMessages(date, sessionId, 0)
+    void fetchMessages(sessionId, 0)
       .then((result) => {
         if (canceled || requestId !== messagesRequestRef.current) return;
         setMessages(result.messages);
@@ -94,7 +93,6 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
       canceled = true;
     };
   }, [
-    date,
     sessionId,
     setAnalyticsError,
     setDistribution,
@@ -110,7 +108,7 @@ export function MessageAnalyticsPanel({ date, sessionId }: MessageAnalyticsPanel
     setMessageError(null);
     setMessagesLoading(true);
     try {
-      const result = await fetchMessages(date, sessionId, page);
+      const result = await fetchMessages(sessionId, page);
       if (requestId !== messagesRequestRef.current) return;
       setMessages((prev) => (page === 0 ? result.messages : [...prev, ...result.messages]));
       setMessagesTotal(result.total);

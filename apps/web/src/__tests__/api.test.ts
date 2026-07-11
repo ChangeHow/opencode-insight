@@ -116,11 +116,11 @@ describe("API Client Functions", () => {
   });
 
   describe("fetchSession", () => {
-    it("should build /api/day/{date}/session/{sessionId} URL correctly", async () => {
-      await fetchSession("month", "2025-01-15", "ses_abc");
+    it("should build /api/session/{sessionId} URL correctly", async () => {
+      await fetchSession("ses_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `/api/day/2025-01-15/session/ses_abc?timeZone=${encodeURIComponent(timeZone)}&range=month`,
+        `/api/session/ses_abc?timeZone=${encodeURIComponent(timeZone)}&range=all`,
       );
     });
   });
