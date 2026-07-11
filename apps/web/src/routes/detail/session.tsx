@@ -1,32 +1,17 @@
 import { useEffect } from "react";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import { useParams } from "@tanstack/react-router";
 import { MessageAnalyticsPanel } from "@/components/dashboard/message-analytics-panel";
 import { SessionBreakdownPanel } from "@/components/dashboard/session-breakdown";
 import { DetailLayoutShell } from "@/components/dashboard/detail-layout-shell";
-import {
-  customDateRangeAtom,
-  detailLoadingAtom,
-  errorAtom,
-  rangeAtom,
-  sessionAtom,
-} from "@/lib/atoms";
-import { fetchSession, refreshSnapshot } from "@/lib/api";
+import { detailLoadingAtom, errorAtom, sessionAtom } from "@/lib/atoms";
+import { fetchSession } from "@/lib/api";
 
 export function SessionDetailPage() {
-  const { date, session: sessionId } = useParams({ from: "/dashboard/detail/$date/$session" });
-  const range = useAtomValue(rangeAtom);
-  const customDateRange = useAtomValue(customDateRangeAtom);
+  const { session: sessionId } = useParams({ from: "/dashboard/sessions/$session" });
   const [session, setSession] = useAtom(sessionAtom);
   const [loading, setLoading] = useAtom(detailLoadingAtom);
   const [, setError] = useAtom(errorAtom);
-
-  async function handleRefresh() {
-    await refreshSnapshot();
-    const data = await fetchSession(range, date, sessionId, customDateRange);
-    setSession(data);
-    setError(null);
-  }
 
   useEffect(() => {
     let canceled = false;
@@ -34,7 +19,7 @@ export function SessionDetailPage() {
 
     async function loadSession() {
       try {
-        const data = await fetchSession(range, date, sessionId, customDateRange);
+        const data = await fetchSession(sessionId);
         if (!canceled) {
           setSession(data);
           setError(null);
@@ -58,17 +43,10 @@ export function SessionDetailPage() {
     return () => {
       canceled = true;
     };
-  }, [customDateRange, date, range, sessionId, setError, setLoading, setSession]);
+  }, [sessionId, setError, setLoading, setSession]);
 
   return (
-    <DetailLayoutShell
-      backTo="/detail/$date"
-      backParams={{ date }}
-      backLabel="Back to day"
-      title={`Session: ${session?.title || sessionId}`}
-      date={date}
-      onRefresh={handleRefresh}
-    >
+    <DetailLayoutShell backTo="/overview" backLabel="Back to overview">
       {loading ? (
         <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
           <div className="rounded-[12px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">
@@ -77,9 +55,9 @@ export function SessionDetailPage() {
         </div>
       ) : session ? (
         <>
-          <SessionBreakdownPanel date={date} session={session} />
+          <SessionBreakdownPanel session={session} />
           <div className="px-4 sm:px-8 lg:px-10">
-            <MessageAnalyticsPanel date={date} sessionId={sessionId} />
+            <MessageAnalyticsPanel sessionId={sessionId} />
           </div>
         </>
       ) : null}

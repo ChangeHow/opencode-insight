@@ -73,7 +73,7 @@ export function DayBreakdownPanel({
 
       <HorizontalPanelRail
         stackOnMobile
-        contentClassName="gap-4 px-4 sm:px-8 md:h-[26rem] md:gap-6 lg:px-10"
+        contentClassName="gap-4 px-4 sm:px-8 md:h-[26rem] md:gap-6 md:px-[max(2rem,calc((100vw-54rem)/2))]"
       >
         <TokenBreakdownPanel breakdown={day.breakdown} />
 

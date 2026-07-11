@@ -104,13 +104,13 @@ export function SessionListPanel({
   );
 }
 
-function SessionCard({ date, session }: { date: string; session: SessionBreakdown }) {
+function SessionCard({ date: _date, session }: { date: string; session: SessionBreakdown }) {
   const topModel = session.models.length > 0 ? session.models[0] : null;
 
   return (
     <Link
-      to="/detail/$date/$session"
-      params={{ date, session: session.sessionId }}
+      to="/sessions/$session"
+      params={{ session: session.sessionId }}
       className="group grid gap-4 rounded-[22px] border border-[var(--border)] bg-[var(--panel-strong)] p-4 transition hover:border-[var(--accent)] hover:bg-[var(--panel-strong)]/80 sm:grid-cols-[1.5fr_1fr_1fr_1fr_auto]"
     >
       <div className="min-w-0">

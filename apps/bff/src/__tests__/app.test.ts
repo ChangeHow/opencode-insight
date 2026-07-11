@@ -25,6 +25,15 @@ vi.mock("../services/session-tasks.js", () => ({
     ...session,
     longestTaskDurationMs: 0,
   })),
+  mergeSessionBreakdowns: vi.fn((days, sessionId) => {
+    for (const day of days) {
+      const session = day.sessions.find(
+        (item: { sessionId: string }) => item.sessionId === sessionId,
+      );
+      if (session) return session;
+    }
+    return undefined;
+  }),
 }));
 
 vi.mock("../services/sync/remote.js", () => ({
@@ -335,7 +344,7 @@ describe("BFF API Routes", () => {
     });
   });
 
-  test("GET /api/day/:date/session/:sessionId returns session breakdown when session exists", async () => {
+  test("GET /api/session/:sessionId returns session breakdown when session exists", async () => {
     const session = makeSessionBreakdown("ses_abc");
     const dayData = makeDayBreakdown("2025-01-15", { sessions: [session] });
     const rangeData = makeRangeData({
@@ -343,7 +352,7 @@ describe("BFF API Routes", () => {
     });
     mockGetRangeData.mockReturnValue(rangeData);
 
-    const res = await app.request("/api/day/2025-01-15/session/ses_abc?range=month");
+    const res = await app.request("/api/session/ses_abc?range=month");
 
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -351,19 +360,19 @@ describe("BFF API Routes", () => {
     expect(mockBuildSessionDetailBreakdown).toHaveBeenCalledWith("/tmp/opencode.db", session);
   });
 
-  test("GET /api/day/:date/session/:sessionId returns 404 when session is not found", async () => {
+  test("GET /api/session/:sessionId returns 404 when session is not found", async () => {
     const dayData = makeDayBreakdown("2025-01-15", { sessions: [] });
     const rangeData = makeRangeData({
       byDate: new Map([["2025-01-15", dayData]]),
     });
     mockGetRangeData.mockReturnValue(rangeData);
 
-    const res = await app.request("/api/day/2025-01-15/session/ses_missing?range=month");
+    const res = await app.request("/api/session/ses_missing?range=month");
 
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json).toEqual({
-      error: "No session found for that date.",
+      error: "No session found.",
     });
   });
 
@@ -445,14 +454,10 @@ describe("BFF API Routes", () => {
       }),
     });
 
-    const analyticsRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/analytics");
-    const overviewRes = await app.request("/api/day/2025-01-15/session/ses_abc/message/overview");
-    const distributionRes = await app.request(
-      "/api/day/2025-01-15/session/ses_abc/message/distribution",
-    );
-    const listRes = await app.request(
-      "/api/day/2025-01-15/session/ses_abc/message?page=1&pageSize=25",
-    );
+    const analyticsRes = await app.request("/api/session/ses_abc/message/analytics");
+    const overviewRes = await app.request("/api/session/ses_abc/message/overview");
+    const distributionRes = await app.request("/api/session/ses_abc/message/distribution");
+    const listRes = await app.request("/api/session/ses_abc/message?page=1&pageSize=25");
 
     expect(analyticsRes.status).toBe(200);
     expect(overviewRes.status).toBe(200);

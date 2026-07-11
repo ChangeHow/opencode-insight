@@ -1,4 +1,9 @@
-import type { SessionDetailBreakdown } from "@opencode-dashboard/shared";
+import type {
+  DayBreakdown,
+  SessionBreakdown,
+  SessionDetailBreakdown,
+} from "@opencode-dashboard/shared";
+import { roundCost } from "./cost";
 import { querySqliteRows } from "./sqlite";
 
 interface SessionTreeRow {
@@ -20,6 +25,46 @@ interface ParsedMessage {
   role?: string;
   time?: { created?: number; completed?: number };
   error?: unknown;
+}
+
+export function mergeSessionBreakdowns(days: Iterable<DayBreakdown>, sessionId: string) {
+  let merged: SessionBreakdown | undefined;
+  const models = new Map<string, SessionBreakdown["models"][number]>();
+
+  for (const day of days) {
+    const session = day.sessions.find((item) => item.sessionId === sessionId);
+    if (!session) continue;
+    if (!merged) {
+      merged = { ...session, breakdown: { ...session.breakdown }, models: [] };
+    } else {
+      merged.tokens += session.tokens;
+      merged.pricedTokens += session.pricedTokens;
+      merged.cost += session.cost;
+      merged.messages += session.messages;
+      for (const key of Object.keys(merged.breakdown) as (keyof typeof merged.breakdown)[]) {
+        merged.breakdown[key] += session.breakdown[key];
+      }
+    }
+    for (const model of session.models) {
+      const key = `${model.providerId}:${model.modelId}`;
+      const entry = models.get(key) ?? { ...model, breakdown: { ...model.breakdown } };
+      if (models.has(key)) {
+        entry.tokens += model.tokens;
+        entry.pricedTokens += model.pricedTokens;
+        entry.cost += model.cost;
+        entry.messages += model.messages;
+        for (const part of Object.keys(entry.breakdown) as (keyof typeof entry.breakdown)[]) {
+          entry.breakdown[part] += model.breakdown[part];
+        }
+      }
+      models.set(key, entry);
+    }
+  }
+
+  if (!merged) return undefined;
+  merged.cost = roundCost(merged.cost);
+  merged.models = [...models.values()].toSorted((a, b) => b.cost - a.cost || b.tokens - a.tokens);
+  return merged;
 }
 
 interface SessionInputRow {

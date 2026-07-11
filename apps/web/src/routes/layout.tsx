@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { HeaderRefreshButton, ThemeToggleButton } from "@/components/dashboard/dashboard-toolbar";
+import { ThemeToggleButton } from "@/components/dashboard/dashboard-toolbar";
 
 function useStuck(): [React.RefObject<HTMLDivElement | null>, boolean] {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -64,36 +64,17 @@ export function DetailStickyHeader({
   backTo,
   backParams,
   backLabel,
-  title,
   theme,
   onThemeChange,
-  canRefresh = false,
-  refreshDisabledReason = "Refresh is only available when the selected range includes today.",
-  onRefresh,
 }: {
   backTo: "/overview" | "/detail/$date";
   backParams?: { date: string };
   backLabel: string;
-  title: string;
   theme: "light" | "dark" | "system";
   onThemeChange: (nextTheme: "light" | "dark" | "system") => void;
-  canRefresh?: boolean;
-  refreshDisabledReason?: string;
-  onRefresh?: () => Promise<void>;
 }) {
-  const [refreshing, setRefreshing] = useState(false);
   const detailHeaderLinkClassName =
     "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-[var(--interactive-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
-
-  async function handleRefreshClick() {
-    if (!onRefresh || refreshing || !canRefresh) return;
-    setRefreshing(true);
-    try {
-      await onRefresh();
-    } finally {
-      setRefreshing(false);
-    }
-  }
 
   return (
     <StickyHeaderShell>
@@ -109,20 +90,8 @@ export function DetailStickyHeader({
           </Link>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <HeaderRefreshButton
-            canRefresh={canRefresh}
-            refreshing={refreshing}
-            disabledReason={refreshDisabledReason}
-            onRefresh={handleRefreshClick}
-          />
           <ThemeToggleButton theme={theme} onChange={onThemeChange} compact />
         </div>
-        <p
-          className="w-full min-w-0 truncate text-sm font-semibold text-[var(--foreground)] sm:text-base"
-          title={title}
-        >
-          {title}
-        </p>
       </div>
     </StickyHeaderShell>
   );

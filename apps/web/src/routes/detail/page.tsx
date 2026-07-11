@@ -6,7 +6,7 @@ import { DayBreakdownPanel } from "@/components/dashboard/day-breakdown";
 import { DetailLayoutShell } from "@/components/dashboard/detail-layout-shell";
 import { SessionListPanel } from "@/components/dashboard/session-list";
 import { customDateRangeAtom, dayAtom, detailLoadingAtom, errorAtom, rangeAtom } from "@/lib/atoms";
-import { fetchDay, refreshSnapshot } from "@/lib/api";
+import { fetchDay } from "@/lib/api";
 
 const TOKEN_THRESHOLD = 1_000_000;
 
@@ -68,21 +68,8 @@ export function DetailPage() {
   const totalSessions = sessions.length;
   const filteredCount = totalSessions - highTokenSessions.length;
 
-  async function handleRefresh() {
-    await refreshSnapshot();
-    const detail = await fetchDay(range, date, customDateRange);
-    setDay(detail);
-    setError(null);
-  }
-
   return (
-    <DetailLayoutShell
-      backTo="/overview"
-      backLabel="Back to overview"
-      title={`Daily spend detail for ${date}`}
-      date={date}
-      onRefresh={handleRefresh}
-    >
+    <DetailLayoutShell backTo="/overview" backLabel="Back to overview">
       <DayBreakdownPanel day={day} loading={detailLoading} />
 
       <div className="px-4 sm:px-8 lg:px-10">

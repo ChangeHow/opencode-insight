@@ -21,7 +21,10 @@ export function DetailSummaryCard({
 }) {
   return (
     <div className="px-4 sm:px-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[54rem] rounded-[12px] border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[var(--surface-shadow)] sm:p-6">
+      <div
+        data-detail-summary-card
+        className="mx-auto w-full max-w-[54rem] rounded-[12px] border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[var(--surface-shadow)] sm:p-6"
+      >
         <div className="flex flex-col items-start gap-4 md:flex-row md:justify-between">
           <div className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
             <div className="flex flex-wrap items-center gap-2">
