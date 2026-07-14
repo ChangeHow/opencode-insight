@@ -1,4 +1,5 @@
 export type TimeRange = "7d" | "month" | "3mo" | "year" | "all";
+export type AgentRuntime = "opencode" | "codex";
 
 export interface TokenBreakdown {
   input: number;
@@ -111,6 +112,7 @@ export interface ModelBreakdown {
 
 export interface SessionBreakdown {
   sessionId: string;
+  runtime: AgentRuntime;
   title: string;
   slug: string;
   directory: string;

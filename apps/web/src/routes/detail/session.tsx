@@ -56,9 +56,17 @@ export function SessionDetailPage() {
       ) : session ? (
         <>
           <SessionBreakdownPanel session={session} />
-          <div className="px-4 sm:px-8 lg:px-10">
-            <MessageAnalyticsPanel sessionId={sessionId} />
-          </div>
+          {session.runtime === "opencode" ? (
+            <div className="px-4 sm:px-8 lg:px-10">
+              <MessageAnalyticsPanel sessionId={sessionId} />
+            </div>
+          ) : (
+            <div className="px-4 pb-6 sm:px-8 lg:px-10">
+              <div className="mx-auto max-w-[64rem] border-t border-[var(--border)] pt-6 text-sm text-[var(--muted-foreground)]">
+                Transcript analytics are not available for Codex CLI sessions.
+              </div>
+            </div>
+          )}
         </>
       ) : null}
     </DetailLayoutShell>

@@ -134,6 +134,7 @@ export function parseAssistantMessage(
   return {
     id: message.id ?? fallbackId,
     sessionId: session.id,
+    runtime: "opencode",
     sessionTitle: session.title,
     sessionSlug: session.slug,
     sessionDirectory: session.directory,
@@ -150,7 +151,7 @@ export function parseAssistantMessage(
 
 function parseUsageRows(rows: SqliteUsageRow[]) {
   return rows
-    .map((row) => {
+    .map((row): RawMessage | null => {
       const timestampMs = Math.trunc(toFiniteNumber(row.time_created));
       if (!timestampMs || !row.model_id) {
         return null;
@@ -159,6 +160,7 @@ function parseUsageRows(rows: SqliteUsageRow[]) {
       return {
         id: row.id,
         sessionId: row.session_id,
+        runtime: "opencode",
         sessionTitle: row.session_title,
         sessionSlug: row.session_slug ?? "",
         sessionDirectory: row.session_directory,

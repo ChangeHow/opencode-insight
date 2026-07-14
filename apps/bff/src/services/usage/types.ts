@@ -1,4 +1,5 @@
 import type {
+  AgentRuntime,
   CostSeriesLine,
   CostSeriesOption,
   DashboardSummary,
@@ -15,6 +16,7 @@ export type SourceKind = DashboardSummary["source"]["kind"];
 export interface RawMessage {
   id: string;
   sessionId: string;
+  runtime: AgentRuntime;
   sessionTitle: string;
   sessionSlug: string;
   sessionDirectory: string;

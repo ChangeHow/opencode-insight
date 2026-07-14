@@ -9,6 +9,7 @@ import {
 } from "@opencode-dashboard/shared";
 import { logger } from "../../logger";
 import { estimateUsageCostFromDataset, getPricingDataset } from "../pricing";
+import { getCodexPaths, listCodexSessionFiles, readCodexMessages } from "./codex-reader";
 import { readLegacyMessages } from "./legacy-reader";
 import { buildSnapshot } from "./day-map";
 import { emptyBreakdown, totalTokens, readSqliteMessages } from "./sqlite-reader";
@@ -16,7 +17,7 @@ import type { RawMessage, SerializedUsageSnapshot, SourceKind, UsageSnapshot } f
 
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const SNAPSHOT_CACHE_FILE = path.join(CACHE_DIR, "usage-snapshot.json");
-const SNAPSHOT_SCHEMA_VERSION = 3;
+const SNAPSHOT_SCHEMA_VERSION = 4;
 const FAST_REFRESH_WINDOW_DAYS = 2;
 const PROVIDER_ALIASES: Record<string, string> = {
   zhipu: "zai-coding-plan",
@@ -31,7 +32,11 @@ export function normalizeProviderId(providerId: string) {
   return PROVIDER_ALIASES[normalized] ?? normalized;
 }
 
-export function computeDataFingerprint(dbPath: string, legacyDir: string): string {
+export function computeDataFingerprint(
+  dbPath: string,
+  legacyDir: string,
+  codexSessionDirs: string[] = [],
+): string {
   const parts: string[] = [];
   if (fs.existsSync(dbPath)) {
     const stat = fs.statSync(dbPath);
@@ -40,6 +45,14 @@ export function computeDataFingerprint(dbPath: string, legacyDir: string): strin
   if (fs.existsSync(legacyDir)) {
     const stat = fs.statSync(legacyDir);
     parts.push(`legacy:${stat.ino}:${Math.trunc(stat.mtimeMs)}`);
+  }
+  for (const filePath of listCodexSessionFiles(codexSessionDirs)) {
+    try {
+      const stat = fs.statSync(filePath);
+      parts.push(`codex:${filePath}:${stat.size}:${Math.trunc(stat.mtimeMs)}`);
+    } catch {
+      // The next refresh will pick up files that changed while scanning.
+    }
   }
   return parts.length > 0 ? parts.join("|") : "empty";
 }
@@ -133,43 +146,43 @@ async function enrichMessages(messages: RawMessage[]) {
 async function readUsageMessages(
   dbPath: string,
   legacyDir: string,
+  codexSessionDirs: string[],
   options?: { fromTimestampMs?: number },
 ) {
   const sqliteMessages = await readSqliteMessages(dbPath, options);
   const legacyMessages = readLegacyMessages(legacyDir, options);
+  const codexMessages = readCodexMessages(codexSessionDirs, options);
   return {
     sqliteMessages,
     legacyMessages,
-    messages: await enrichMessages(dedupeMessages([...sqliteMessages, ...legacyMessages])),
+    codexMessages,
+    messages: await enrichMessages(
+      dedupeMessages([...sqliteMessages, ...legacyMessages, ...codexMessages]),
+    ),
   };
 }
 
-function getSnapshotPaths(dbPath: string, legacyDir: string) {
-  return [dbPath, legacyDir].filter((currentPath) => fs.existsSync(currentPath));
+function getSnapshotPaths(dbPath: string, legacyDir: string, codexSessionDirs: string[]) {
+  return [dbPath, legacyDir, ...codexSessionDirs].filter((currentPath) =>
+    fs.existsSync(currentPath),
+  );
+}
+
+function resolveSourceKind(sqliteCount: number, jsonCount: number): SourceKind {
+  if (sqliteCount > 0 && jsonCount > 0) return "mixed";
+  if (sqliteCount > 0) return "sqlite";
+  if (jsonCount > 0) return "json";
+  return "none";
 }
 
 function resolveRefreshedSourceKind(
   currentKind: SourceKind,
   recentSqliteCount: number,
-  recentLegacyCount: number,
+  recentJsonCount: number,
 ): SourceKind {
-  if (currentKind !== "none") {
-    return currentKind;
-  }
-
-  if (recentSqliteCount > 0 && recentLegacyCount > 0) {
-    return "mixed";
-  }
-
-  if (recentSqliteCount > 0) {
-    return "sqlite";
-  }
-
-  if (recentLegacyCount > 0) {
-    return "json";
-  }
-
-  return "none";
+  const hasSqlite = currentKind === "sqlite" || currentKind === "mixed" || recentSqliteCount > 0;
+  const hasJson = currentKind === "json" || currentKind === "mixed" || recentJsonCount > 0;
+  return resolveSourceKind(Number(hasSqlite), Number(hasJson));
 }
 
 function serializeSnapshot(snapshot: UsageSnapshot): SerializedUsageSnapshot {
@@ -198,7 +211,7 @@ function deserializeSnapshot(snapshot: SerializedUsageSnapshot): UsageSnapshot {
   };
 }
 
-function readSnapshotCache(dbPath: string, legacyDir: string) {
+function readSnapshotCache(dbPath: string, legacyDir: string, codexSessionDirs: string[]) {
   if (!fs.existsSync(SNAPSHOT_CACHE_FILE)) {
     return null;
   }
@@ -215,7 +228,7 @@ function readSnapshotCache(dbPath: string, legacyDir: string) {
       return null;
     }
     if (cached.dataFingerprint !== undefined) {
-      const currentFingerprint = computeDataFingerprint(dbPath, legacyDir);
+      const currentFingerprint = computeDataFingerprint(dbPath, legacyDir, codexSessionDirs);
       if (cached.dataFingerprint !== currentFingerprint) {
         return null;
       }
@@ -226,17 +239,23 @@ function readSnapshotCache(dbPath: string, legacyDir: string) {
   }
 }
 
-function writeSnapshotCache(snapshot: UsageSnapshot, dbPath: string, legacyDir: string) {
+function writeSnapshotCache(
+  snapshot: UsageSnapshot,
+  dbPath: string,
+  legacyDir: string,
+  codexSessionDirs: string[],
+) {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   const serialized: SerializedUsageSnapshot = {
     ...serializeSnapshot(snapshot),
-    dataFingerprint: computeDataFingerprint(dbPath, legacyDir),
+    dataFingerprint: computeDataFingerprint(dbPath, legacyDir, codexSessionDirs),
   };
   fs.writeFileSync(SNAPSHOT_CACHE_FILE, JSON.stringify(serialized), "utf8");
 }
 
 export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
   const { dbPath, legacyDir, root, isDefault } = getOpenCodePaths();
+  const codex = getCodexPaths();
 
   logger.debug(
     {
@@ -244,13 +263,15 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
       legacyDir,
       dbExists: fs.existsSync(dbPath),
       legacyExists: fs.existsSync(legacyDir),
+      codexRoot: codex.root,
+      codexExists: codex.sessionDirs.some((sessionDir) => fs.existsSync(sessionDir)),
       isDefault,
     },
     "Checking data sources",
   );
 
   if (!options?.forceRefresh) {
-    const cached = readSnapshotCache(dbPath, legacyDir);
+    const cached = readSnapshotCache(dbPath, legacyDir, codex.sessionDirs);
     if (cached) {
       logger.info(
         { source: cached.summary.source, dayCount: cached.breakdownByDate.size, fromCache: true },
@@ -260,18 +281,18 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
     }
   }
 
-  const { sqliteMessages, legacyMessages, messages } = await readUsageMessages(dbPath, legacyDir);
+  const { sqliteMessages, legacyMessages, codexMessages, messages } = await readUsageMessages(
+    dbPath,
+    legacyDir,
+    codex.sessionDirs,
+  );
 
-  const sourceKind: SourceKind =
-    sqliteMessages.length > 0 && legacyMessages.length > 0
-      ? "mixed"
-      : sqliteMessages.length > 0
-        ? "sqlite"
-        : legacyMessages.length > 0
-          ? "json"
-          : "none";
+  const sourceKind = resolveSourceKind(
+    sqliteMessages.length,
+    legacyMessages.length + codexMessages.length,
+  );
 
-  const paths = getSnapshotPaths(dbPath, legacyDir);
+  const paths = getSnapshotPaths(dbPath, legacyDir, codex.sessionDirs);
   const snapshot = buildSnapshot(messages, sourceKind, paths);
 
   if (messages.length === 0) {
@@ -283,9 +304,11 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
         legacyDir,
         dbExists: fs.existsSync(dbPath),
         legacyExists: fs.existsSync(legacyDir),
+        codexRoot: codex.root,
+        codexExists: codex.sessionDirs.some((sessionDir) => fs.existsSync(sessionDir)),
         hint: isDefault
-          ? "Using default path. Set OPENCODE_DATA_DIR if your data is elsewhere."
-          : "Check if OPENCODE_DATA_DIR points to a valid opencode data directory",
+          ? "Using default paths. Set OPENCODE_DATA_DIR or CODEX_HOME if your data is elsewhere."
+          : "Check if OPENCODE_DATA_DIR and CODEX_HOME point to valid data directories",
       },
       "No usage messages found",
     );
@@ -298,6 +321,7 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
         messageCount: messages.length,
         sqliteCount: sqliteMessages.length,
         legacyCount: legacyMessages.length,
+        codexCount: codexMessages.length,
         dateRange:
           messages.length > 0
             ? `${messages[0].date} ~ ${messages[messages.length - 1].date}`
@@ -307,7 +331,7 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
     );
   }
 
-  writeSnapshotCache(snapshot, dbPath, legacyDir);
+  writeSnapshotCache(snapshot, dbPath, legacyDir, codex.sessionDirs);
   return snapshot;
 }
 
@@ -316,9 +340,10 @@ export async function refreshRecentUsageSnapshot(
   options?: { now?: Date | number },
 ) {
   const { dbPath, legacyDir } = getOpenCodePaths();
+  const codex = getCodexPaths();
   const snapshot =
     baseSnapshot ??
-    readSnapshotCache(dbPath, legacyDir) ??
+    readSnapshotCache(dbPath, legacyDir, codex.sessionDirs) ??
     (await loadUsageSnapshot({ forceRefresh: true }));
   const refreshStartDateKey = getFastRefreshStartDateKey(options?.now);
   const refreshStartTimestampMs = dateKeyToUtcStartTimestampMs(refreshStartDateKey);
@@ -330,8 +355,9 @@ export async function refreshRecentUsageSnapshot(
   const {
     sqliteMessages,
     legacyMessages,
+    codexMessages,
     messages: recentMessages,
-  } = await readUsageMessages(dbPath, legacyDir, {
+  } = await readUsageMessages(dbPath, legacyDir, codex.sessionDirs, {
     fromTimestampMs: effectiveRefreshStartTimestampMs,
   });
 
@@ -348,11 +374,11 @@ export async function refreshRecentUsageSnapshot(
     resolveRefreshedSourceKind(
       snapshot.summary.source.kind,
       sqliteMessages.length,
-      legacyMessages.length,
+      legacyMessages.length + codexMessages.length,
     ),
-    getSnapshotPaths(dbPath, legacyDir),
+    getSnapshotPaths(dbPath, legacyDir, codex.sessionDirs),
   );
 
-  writeSnapshotCache(refreshedSnapshot, dbPath, legacyDir);
+  writeSnapshotCache(refreshedSnapshot, dbPath, legacyDir, codex.sessionDirs);
   return refreshedSnapshot;
 }
