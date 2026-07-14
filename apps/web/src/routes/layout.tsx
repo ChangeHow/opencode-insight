@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, House } from "lucide-react";
 import { ThemeToggleButton } from "@/components/dashboard/dashboard-toolbar";
 
 function useStuck(): [React.RefObject<HTMLDivElement | null>, boolean] {
@@ -85,8 +85,13 @@ export function DetailStickyHeader({
             <span className="hidden sm:inline">{backLabel}</span>
             <span className="sm:hidden">Back</span>
           </Link>
-          <Link to="/" className={`${detailHeaderLinkClassName} hidden sm:inline-flex`}>
-            Dashboard home
+          <Link
+            to="/"
+            aria-label="Dashboard home"
+            title="Dashboard home"
+            className={`${detailHeaderLinkClassName} w-10 justify-center px-0`}
+          >
+            <House data-testid="dashboard-home-icon" className="size-4" />
           </Link>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">

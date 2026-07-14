@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useAtom } from "jotai";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useSearch } from "@tanstack/react-router";
 import { MessageAnalyticsPanel } from "@/components/dashboard/message-analytics-panel";
 import { SessionBreakdownPanel } from "@/components/dashboard/session-breakdown";
 import { DetailLayoutShell } from "@/components/dashboard/detail-layout-shell";
@@ -9,6 +9,7 @@ import { fetchSession } from "@/lib/api";
 
 export function SessionDetailPage() {
   const { session: sessionId } = useParams({ from: "/dashboard/sessions/$session" });
+  const { from } = useSearch({ from: "/dashboard/sessions/$session" });
   const [session, setSession] = useAtom(sessionAtom);
   const [loading, setLoading] = useAtom(detailLoadingAtom);
   const [, setError] = useAtom(errorAtom);
@@ -46,7 +47,11 @@ export function SessionDetailPage() {
   }, [sessionId, setError, setLoading, setSession]);
 
   return (
-    <DetailLayoutShell backTo="/overview" backLabel="Back to overview">
+    <DetailLayoutShell
+      backTo={from ? "/detail/$date" : "/overview"}
+      backParams={from ? { date: from } : undefined}
+      backLabel={from ? "Back to day" : "Back to overview"}
+    >
       {loading ? (
         <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
           <div className="rounded-[12px] border border-[var(--border)] bg-[var(--panel)] p-6 text-sm text-[var(--muted-foreground)]">
@@ -56,17 +61,9 @@ export function SessionDetailPage() {
       ) : session ? (
         <>
           <SessionBreakdownPanel session={session} />
-          {session.runtime === "opencode" ? (
-            <div className="px-4 sm:px-8 lg:px-10">
-              <MessageAnalyticsPanel sessionId={sessionId} />
-            </div>
-          ) : (
-            <div className="px-4 pb-6 sm:px-8 lg:px-10">
-              <div className="mx-auto max-w-[64rem] border-t border-[var(--border)] pt-6 text-sm text-[var(--muted-foreground)]">
-                Transcript analytics are not available for Codex CLI sessions.
-              </div>
-            </div>
-          )}
+          <div className="px-4 sm:px-8 lg:px-10">
+            <MessageAnalyticsPanel sessionId={sessionId} />
+          </div>
         </>
       ) : null}
     </DetailLayoutShell>

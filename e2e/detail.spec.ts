@@ -107,4 +107,13 @@ test.describe("Detail Page", () => {
     await page.getByRole("button", { name: /Read provider dashboard/ }).click();
     await expect(page.getByText("Provider dashboard source loaded.")).toBeVisible();
   });
+
+  test("session detail returns to its source day", async ({ page }) => {
+    await page.goto("/sessions/conversation-session?from=2026-05-10");
+
+    await expect(page.getByRole("link", { name: /back/i }).first()).toHaveAttribute(
+      "href",
+      "/detail/2026-05-10",
+    );
+  });
 });

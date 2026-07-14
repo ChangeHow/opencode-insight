@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-vi.mock("@lobehub/icons/es/OpenAI", () => ({
+vi.mock("@lobehub/icons/es/Codex", () => ({
   default: (props: Record<string, unknown>) => <svg data-icon="codex" {...props} />,
 }));
 vi.mock("@lobehub/icons/es/OpenCode", () => ({
@@ -28,6 +28,7 @@ describe("SessionBreakdownPanel", () => {
     const runtime = screen.getByLabelText("Agent runtime: Codex CLI");
     expect(runtime).toHaveTextContent("Codex CLI");
     expect(runtime.querySelector('[data-icon="codex"]')).toBeInTheDocument();
+    expect(screen.getByTestId("session-title-row")).toContainElement(runtime);
   });
 
   test("labels the OpenCode agent runtime with its icon", () => {

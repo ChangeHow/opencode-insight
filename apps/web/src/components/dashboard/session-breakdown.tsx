@@ -1,8 +1,6 @@
-import type { ComponentType, SVGProps } from "react";
 import { Clock3, Coins, Folder, MessageSquare, Shapes } from "lucide-react";
-import OpenAI from "@lobehub/icons/es/OpenAI";
-import OpenCode from "@lobehub/icons/es/OpenCode";
-import type { AgentRuntime, SessionDetailBreakdown } from "@opencode-dashboard/shared";
+import type { SessionDetailBreakdown } from "@opencode-dashboard/shared";
+import { AgentRuntimeBadge } from "@/components/dashboard/agent-runtime-badge";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { TOKEN_COLORS } from "@/lib/chart-colors";
 import { cn } from "@/lib/utils";
@@ -16,14 +14,6 @@ const TOKEN_PARTS = [
   { key: "cacheRead" as const, label: "Cache read", color: TOKEN_COLORS.cacheRead },
   { key: "cacheWrite" as const, label: "Cache write", color: TOKEN_COLORS.cacheWrite },
 ];
-
-const RUNTIME_DETAILS: Record<
-  AgentRuntime,
-  { icon: ComponentType<SVGProps<SVGSVGElement>>; label: string }
-> = {
-  opencode: { icon: OpenCode, label: "OpenCode" },
-  codex: { icon: OpenAI, label: "Codex CLI" },
-};
 
 export function SessionBreakdownPanel({ session }: { session: SessionDetailBreakdown }) {
   const classifiedTokens = TOKEN_PARTS.reduce(
@@ -39,16 +29,19 @@ export function SessionBreakdownPanel({ session }: { session: SessionDetailBreak
       <div data-testid="session-overview" className="mx-auto max-w-[64rem] py-5 sm:py-6">
         <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="metric-label">Entire session</p>
-              <RuntimeBadge runtime={session.runtime} />
-            </div>
-            <h2
-              id="session-overview-title"
-              className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-[var(--foreground)]"
+            <p className="metric-label">Entire session</p>
+            <div
+              data-testid="session-title-row"
+              className="mt-2 flex flex-wrap items-center gap-2.5"
             >
-              {session.title || "Untitled session"}
-            </h2>
+              <h2
+                id="session-overview-title"
+                className="min-w-0 text-2xl font-semibold tracking-[-0.035em] text-[var(--foreground)]"
+              >
+                {session.title || "Untitled session"}
+              </h2>
+              <AgentRuntimeBadge runtime={session.runtime} />
+            </div>
             <p className="mt-2 flex min-w-0 items-center gap-2 text-xs text-[var(--muted-foreground)]">
               <Folder className="size-3.5 shrink-0" />
               <span className="truncate">{session.directory}</span>
@@ -156,21 +149,6 @@ export function SessionBreakdownPanel({ session }: { session: SessionDetailBreak
         </div>
       </div>
     </section>
-  );
-}
-
-function RuntimeBadge({ runtime }: { runtime: AgentRuntime }) {
-  const details = RUNTIME_DETAILS[runtime];
-  const Icon = details.icon;
-
-  return (
-    <span
-      aria-label={`Agent runtime: ${details.label}`}
-      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-strong)] px-2 py-1 text-[10px] font-semibold text-[var(--muted-foreground)]"
-    >
-      <Icon className="size-3.5 shrink-0" />
-      {details.label}
-    </span>
   );
 }
 
