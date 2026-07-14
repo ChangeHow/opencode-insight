@@ -45,4 +45,21 @@ describe("SessionBreakdownPanel", () => {
     expect(runtime).toHaveTextContent("OpenCode");
     expect(runtime.querySelector('[data-icon="opencode"]')).toBeInTheDocument();
   });
+
+  test("keeps long session titles compact", () => {
+    const title = "A very long session title that should remain a compact reference";
+    render(
+      <SessionBreakdownPanel
+        session={{
+          ...makeSessionBreakdown("session-long-title", { title }),
+          longestTaskDurationMs: 1_000,
+        }}
+      />,
+    );
+
+    const heading = screen.getByRole("heading", { name: title });
+    expect(heading).toHaveClass("max-w-[34rem]", "truncate", "text-xl");
+    expect(heading).toHaveAttribute("title", title);
+    expect(screen.getByText("1 model")).toHaveClass("whitespace-nowrap");
+  });
 });
