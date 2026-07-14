@@ -2,19 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import type {
   MessageDetail,
-  MessageDistributionPayload,
-  MessageListPayload,
-  MessageOverviewPayload,
   MessagePart,
   MessagePartReasoning,
   MessagePartText,
   MessagePartTool,
-  TimelinePoint,
   TokenBreakdown,
-  ToolUsageStat,
 } from "@opencode-dashboard/shared";
+import { buildCodexMessagePayloads } from "./codex-transcript";
 import { roundCost } from "./cost";
+import { buildMessagePayloadsFromMessages, type MessagePayloads } from "./message-payloads";
 import { querySqliteRows } from "./sqlite";
+import { getCodexPaths } from "./usage/codex-reader";
 
 export interface RawMessageRow {
   id: string;
@@ -86,9 +84,7 @@ interface ParsedPartData {
 }
 
 interface MessagePayloadCacheEntry {
-  overview: MessageOverviewPayload;
-  distribution: MessageDistributionPayload;
-  listFn: (page: number, pageSize: number) => MessageListPayload;
+  payloads: MessagePayloads;
   expiresAt: number;
 }
 
@@ -111,10 +107,6 @@ function normalizeTokens(t: ParsedMessageData["tokens"]): TokenBreakdown {
     cacheWrite: Math.max(0, Math.trunc(t.cache?.write ?? 0)),
     reasoning: Math.max(0, Math.trunc(t.reasoning ?? 0)),
   };
-}
-
-function totalTokenCount(t: TokenBreakdown): number {
-  return t.input + t.output + t.cacheRead + t.cacheWrite + t.reasoning;
 }
 
 function outputToString(output: unknown): string {
@@ -246,9 +238,9 @@ export async function buildMessagePayloads(
     queryParts?: (dbPath: string, sessionId: string) => Promise<RawPartRow[]>;
   },
 ): Promise<{
-  overview: MessageOverviewPayload;
-  distribution: MessageDistributionPayload;
-  listFn: (page: number, pageSize: number) => MessageListPayload;
+  overview: MessagePayloads["overview"];
+  distribution: MessagePayloads["distribution"];
+  listFn: MessagePayloads["listFn"];
 }> {
   const now = Date.now();
   pruneMessagePayloadCache(now);
@@ -256,11 +248,7 @@ export async function buildMessagePayloads(
   const cacheKey = getMessagePayloadCacheKey(dbPath, sessionId);
   const cached = messagePayloadCache.get(cacheKey);
   if (cached && cached.expiresAt > now) {
-    return {
-      overview: cached.overview,
-      distribution: cached.distribution,
-      listFn: cached.listFn,
-    };
+    return cached.payloads;
   }
 
   const messageQuery =
@@ -303,68 +291,20 @@ export async function buildMessagePayloads(
     if (msg) allMessages.push(msg);
   }
 
-  const total = allMessages.length;
-  const timeline: TimelinePoint[] = [];
-  const toolCountMap = new Map<string, { count: number; totalTokens: number }>();
-  let cumulativeTokens = 0;
-  let intermediateCumulativeCost = 0;
-
-  for (let i = 0; i < allMessages.length; i++) {
-    const msg = allMessages[i];
-    const msgTokens = totalTokenCount(msg.tokens);
-    cumulativeTokens += msgTokens;
-    intermediateCumulativeCost += msg.cost;
-    const cumulativeCost = roundCost(intermediateCumulativeCost);
-
-    timeline.push({
-      messageIndex: i,
-      role: msg.role,
-      createdAt: msg.createdAt,
-      tokens: msg.tokens,
-      cost: roundCost(msg.cost),
-      cumulativeTokens,
-      cumulativeCost,
-    });
-
-    for (const part of msg.parts) {
-      if (part.type !== "tool") continue;
-      const entry = toolCountMap.get(part.toolName) ?? { count: 0, totalTokens: 0 };
-      entry.count += 1;
-      entry.totalTokens += msgTokens;
-      toolCountMap.set(part.toolName, entry);
-    }
-  }
-
-  const toolUsage: ToolUsageStat[] = [...toolCountMap.entries()]
-    .map(([tool, s]) => ({ tool, count: s.count, totalTokens: s.totalTokens }))
-    .toSorted((a, b) => b.count - a.count || b.totalTokens - a.totalTokens);
-
-  const overview: MessageOverviewPayload = { timeline, toolUsage, totalMessages: total };
-  const distribution: MessageDistributionPayload = {
-    points: allMessages.map((msg, i) => ({
-      messageIndex: i,
-      messageId: msg.id,
-      role: msg.role,
-      modelId: msg.modelId,
-      providerId: msg.providerId,
-      tokens: msg.tokens,
-    })),
-    totalMessages: total,
-  };
-
-  const listFn = (page: number, pageSize: number): MessageListPayload => {
-    const start = page * pageSize;
-    const slice = allMessages.slice(start, start + pageSize);
-    return { messages: slice, total, page, pageSize };
-  };
+  const payloads = buildMessagePayloadsFromMessages(allMessages);
 
   messagePayloadCache.set(cacheKey, {
-    overview,
-    distribution,
-    listFn,
+    payloads,
     expiresAt: now + MESSAGE_PAYLOAD_CACHE_TTL_MS,
   });
   pruneMessagePayloadCache(now);
 
-  return { overview, distribution, listFn };
+  return payloads;
+}
+
+export function buildSessionMessagePayloads(sessionId: string) {
+  if (sessionId.startsWith("codex:")) {
+    return buildCodexMessagePayloads(getCodexPaths().sessionDirs, sessionId);
+  }
+  return buildMessagePayloads(getDbPath(), sessionId);
 }

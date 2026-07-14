@@ -27,6 +27,11 @@ function writeSession(root: string, directory: "sessions" | "archived_sessions",
         payload: { model_info: { slug: "gpt-4o" } },
       },
       {
+        timestamp: "2026-07-14T10:00:02.000Z",
+        type: "event_msg",
+        payload: { type: "user_message", message: "## My request for Codex:\nImplement parser" },
+      },
+      {
         timestamp: "2026-07-14T10:00:04.000Z",
         type: "event_msg",
         payload: {
@@ -127,7 +132,7 @@ describe("Codex usage reader", () => {
     expect(messages).toHaveLength(2);
     expect(messages[0]).toMatchObject({
       sessionId: "codex:session-abc",
-      sessionTitle: "Codex CLI session",
+      sessionTitle: "Implement parser",
       sessionDirectory: "/Users/alice/project",
       runtime: "codex",
       modelId: "gpt-4o",
@@ -153,6 +158,24 @@ describe("Codex usage reader", () => {
       sessionId: "codex:session-archived",
       tokens: { input: 20, cacheRead: 10, output: 8, reasoning: 2, cacheWrite: 0 },
     });
+  });
+
+  test("prefers the latest explicit thread name from the Codex session index", () => {
+    writeSession(tempRoot, "sessions", "session-named");
+    fs.writeFileSync(
+      path.join(tempRoot, "session_index.jsonl"),
+      [
+        { id: "meta-session-named", thread_name: "Old title" },
+        { id: "meta-session-named", thread_name: "Fix parser edge case" },
+      ]
+        .map((entry) => JSON.stringify(entry))
+        .join("\n"),
+      "utf8",
+    );
+
+    const messages = readCodexMessages([path.join(tempRoot, "sessions")]);
+
+    expect(messages[0]?.sessionTitle).toBe("Fix parser edge case");
   });
 
   test("ignores a slightly older cumulative snapshot replayed out of order", () => {

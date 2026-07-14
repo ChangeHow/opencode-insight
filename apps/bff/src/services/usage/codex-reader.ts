@@ -8,6 +8,8 @@ type TokenUsage = Record<string, unknown>;
 
 interface CodexState {
   sessionId?: string;
+  sessionTitle?: string;
+  fallbackTitle?: string;
   providerId: string;
   modelId: string;
   directory: string;
@@ -18,6 +20,45 @@ interface CodexState {
 
 function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+export function cleanCodexUserText(text: string) {
+  return text.replace(/^\s*## My request for Codex:\s*/i, "").trim();
+}
+
+export function isInjectedCodexContext(text: string) {
+  const trimmed = text.trimStart();
+  return ["<environment_context>", "<system-reminder>", "<user_instructions>"].some((prefix) =>
+    trimmed.startsWith(prefix),
+  );
+}
+
+function titleFromUserText(text: string) {
+  const title = text.replace(/\s+/g, " ").trim();
+  return title.length <= 80 ? title : `${title.slice(0, 77).trimEnd()}...`;
+}
+
+function readSessionTitles(sessionDirs: string[]) {
+  const titles = new Map<string, string>();
+  const root = sessionDirs[0] ? path.dirname(sessionDirs[0]) : "";
+  if (!root) return titles;
+  try {
+    for (const line of fs
+      .readFileSync(path.join(root, "session_index.jsonl"), "utf8")
+      .split(/\r?\n/)) {
+      try {
+        const entry = JSON.parse(line) as { id?: unknown; thread_name?: unknown };
+        const id = stringValue(entry.id);
+        const title = stringValue(entry.thread_name);
+        if (id && title) titles.set(id, title);
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // Older Codex versions may not have a session index.
+  }
+  return titles;
 }
 
 function nonnegativeInteger(value: unknown) {
@@ -147,6 +188,7 @@ export function getCodexPaths() {
   return {
     root,
     sessionDirs: [path.join(root, "sessions"), path.join(root, "archived_sessions")],
+    sessionIndexPath: path.join(root, "session_index.jsonl"),
     isDefault,
   };
 }
@@ -175,7 +217,7 @@ export function listCodexSessionFiles(sessionDirs: string[]) {
   return files.toSorted();
 }
 
-function readSessionFile(filePath: string) {
+function readSessionFile(filePath: string, sessionTitles: ReadonlyMap<string, string>) {
   let content: string;
   let mtimeMs: number;
   try {
@@ -209,12 +251,21 @@ function readSessionFile(filePath: string) {
     }
     const data = payload as Record<string, unknown>;
     if (entry.type === "session_meta") {
-      state.sessionId = stringValue(data.id) ?? state.sessionId;
+      state.sessionId = stringValue(data.session_id) ?? stringValue(data.id) ?? state.sessionId;
+      state.sessionTitle =
+        (state.sessionId ? sessionTitles.get(state.sessionId) : undefined) ?? state.sessionTitle;
       state.providerId =
         stringValue(data.provider) ?? stringValue(data.model_provider) ?? state.providerId;
       state.directory = path.normalize(stringValue(data.cwd) ?? state.directory);
       state.forkParentId = getForkParent(data) ?? state.forkParentId;
       state.sourceParentId = getSourceParent(data.source) ?? state.sourceParentId;
+      continue;
+    }
+    if (entry.type === "event_msg" && data.type === "user_message") {
+      const text = cleanCodexUserText(stringValue(data.message) ?? stringValue(data.text) ?? "");
+      if (text && !isInjectedCodexContext(text)) {
+        state.fallbackTitle ??= titleFromUserText(text);
+      }
       continue;
     }
     if (entry.type === "turn_context") {
@@ -292,13 +343,15 @@ function readSessionFile(filePath: string) {
       tokens,
     });
   }
-  return messages;
+  const sessionTitle = state.sessionTitle ?? state.fallbackTitle ?? "Codex CLI session";
+  return messages.map((message) => ({ ...message, sessionTitle }));
 }
 
 export function readCodexMessages(sessionDirs: string[], options?: { fromTimestampMs?: number }) {
   const deduped = new Map<string, RawMessage>();
+  const sessionTitles = readSessionTitles(sessionDirs);
   for (const filePath of listCodexSessionFiles(sessionDirs)) {
-    for (const message of readSessionFile(filePath)) {
+    for (const message of readSessionFile(filePath, sessionTitles)) {
       if (!deduped.has(message.id)) {
         deduped.set(message.id, message);
       }

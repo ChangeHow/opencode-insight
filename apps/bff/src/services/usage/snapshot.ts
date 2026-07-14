@@ -17,7 +17,7 @@ import type { RawMessage, SerializedUsageSnapshot, SourceKind, UsageSnapshot } f
 
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const SNAPSHOT_CACHE_FILE = path.join(CACHE_DIR, "usage-snapshot.json");
-const SNAPSHOT_SCHEMA_VERSION = 4;
+const SNAPSHOT_SCHEMA_VERSION = 5;
 const FAST_REFRESH_WINDOW_DAYS = 2;
 const PROVIDER_ALIASES: Record<string, string> = {
   zhipu: "zai-coding-plan",
@@ -53,6 +53,13 @@ export function computeDataFingerprint(
     } catch {
       // The next refresh will pick up files that changed while scanning.
     }
+  }
+  const sessionIndexPath = codexSessionDirs[0]
+    ? path.join(path.dirname(codexSessionDirs[0]), "session_index.jsonl")
+    : "";
+  if (sessionIndexPath && fs.existsSync(sessionIndexPath)) {
+    const stat = fs.statSync(sessionIndexPath);
+    parts.push(`codex-index:${stat.size}:${Math.trunc(stat.mtimeMs)}`);
   }
   return parts.length > 0 ? parts.join("|") : "empty";
 }

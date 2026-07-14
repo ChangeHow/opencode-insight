@@ -15,7 +15,7 @@ vi.mock("../services/usage/index.js", () => ({
 }));
 
 vi.mock("../services/messages.js", () => ({
-  buildMessagePayloads: vi.fn(),
+  buildSessionMessagePayloads: vi.fn(),
   getDbPath: vi.fn(() => "/tmp/opencode.db"),
   invalidateMessagePayloadCache: vi.fn(),
 }));
@@ -56,7 +56,7 @@ import {
   getRangeData,
   getDateFilteredData,
 } from "../services/usage/index";
-import { buildMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
+import { buildSessionMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
 import { buildSessionDetailBreakdown } from "../services/session-tasks";
 import { getRemoteUsageForRange, pushUsageSnapshot } from "../services/sync/remote";
 
@@ -64,7 +64,7 @@ const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
 const mockRefreshRecentUsageSnapshot = vi.mocked(refreshRecentUsageSnapshot);
 const mockGetRangeData = vi.mocked(getRangeData);
 const mockGetDateFilteredData = vi.mocked(getDateFilteredData);
-const mockBuildMessagePayloads = vi.mocked(buildMessagePayloads);
+const mockBuildSessionMessagePayloads = vi.mocked(buildSessionMessagePayloads);
 const mockBuildSessionDetailBreakdown = vi.mocked(buildSessionDetailBreakdown);
 const mockInvalidateMessagePayloadCache = vi.mocked(invalidateMessagePayloadCache);
 const mockGetRemoteUsageForRange = vi.mocked(getRemoteUsageForRange);
@@ -84,7 +84,7 @@ describe("BFF API Routes", () => {
     mockRefreshRecentUsageSnapshot.mockResolvedValue(snapshot);
     mockGetRangeData.mockReturnValue(makeRangeData());
     mockGetDateFilteredData.mockReturnValue(makeRangeData());
-    mockBuildMessagePayloads.mockResolvedValue({
+    mockBuildSessionMessagePayloads.mockResolvedValue({
       overview: { timeline: [], toolUsage: [], totalMessages: 0 },
       distribution: { points: [], totalMessages: 0 },
       listFn: (page, pageSize) => ({ messages: [], total: 0, page, pageSize }),
@@ -439,7 +439,7 @@ describe("BFF API Routes", () => {
   });
 
   test("message analytics endpoints return payloads per request", async () => {
-    mockBuildMessagePayloads.mockResolvedValue({
+    mockBuildSessionMessagePayloads.mockResolvedValue({
       overview: {
         timeline: [],
         toolUsage: [{ tool: "read", count: 2, totalTokens: 300 }],
@@ -463,7 +463,7 @@ describe("BFF API Routes", () => {
     expect(overviewRes.status).toBe(200);
     expect(distributionRes.status).toBe(200);
     expect(listRes.status).toBe(200);
-    expect(mockBuildMessagePayloads).toHaveBeenCalledTimes(4);
+    expect(mockBuildSessionMessagePayloads).toHaveBeenCalledTimes(4);
 
     const analyticsJson = await analyticsRes.json();
     expect(analyticsJson).toEqual({
