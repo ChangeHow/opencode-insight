@@ -93,7 +93,7 @@ function HeatmapDayButton({
           </span>
           <span
             className={cn(
-              "-mx-1.5 hidden w-[calc(100%+0.75rem)] whitespace-nowrap text-[clamp(0.5rem,30cqw,0.6875rem)] leading-none font-semibold tabular-nums sm:-mx-2 sm:block sm:w-[calc(100%+1rem)]",
+              "-mx-1.5 hidden w-[calc(100%+0.75rem)] whitespace-nowrap text-center text-[clamp(0.5rem,30cqw,0.6875rem)] leading-none font-semibold tabular-nums sm:-mx-2 sm:block sm:w-[calc(100%+1rem)]",
               isZeroCost ? "text-[var(--heat-empty-fg)]" : spendClass[entry.intensity],
             )}
           >

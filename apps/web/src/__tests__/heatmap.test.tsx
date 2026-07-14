@@ -149,6 +149,20 @@ describe("Heatmap", () => {
     expect(amount).toHaveClass("text-[var(--heat-token-4)]");
   });
 
+  it("should center spend text within the calendar cell", () => {
+    render(
+      <Heatmap
+        days={[
+          makeHeatmapDay("2025-01-09", { cost: 98.1, messages: 2, tokens: 1200, intensity: 4 }),
+        ]}
+        selectedDate={null}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("$98.10")).toHaveClass("text-center");
+  });
+
   it("should reset visible month when the range data changes", async () => {
     const user = userEvent.setup();
 
