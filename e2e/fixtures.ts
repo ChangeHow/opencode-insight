@@ -334,6 +334,7 @@ export function makeMockSessionDetailBreakdown(
 
   return {
     sessionId,
+    runtime: "opencode",
     title: "Untitled session",
     slug: sessionId,
     directory: "/workspace/opencode-token-dashboard",

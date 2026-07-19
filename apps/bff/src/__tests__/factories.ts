@@ -28,6 +28,7 @@ interface UsageSnapshot {
   messages: Array<{
     id: string;
     sessionId: string;
+    runtime: "opencode" | "codex";
     sessionTitle: string;
     sessionSlug: string;
     sessionDirectory: string;
@@ -102,6 +103,7 @@ export function makeSessionBreakdown(
   const model = makeModelBreakdown();
   return {
     sessionId: id,
+    runtime: "opencode",
     title: "Session title",
     slug: "calm-river",
     directory: "/Users/changehow/workspace/opencode-token-dashboard",
@@ -124,6 +126,7 @@ export function makeRawMessage(
   return {
     id: `msg_${date}`,
     sessionId: "ses_123",
+    runtime: "opencode",
     sessionTitle: "Session title",
     sessionSlug: "calm-river",
     sessionDirectory: "/Users/changehow/workspace/opencode-token-dashboard",

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { calculateLongestTaskDuration } from "../services/session-tasks";
+import {
+  buildSessionDetailBreakdown,
+  calculateLongestTaskDuration,
+} from "../services/session-tasks";
+import { makeSessionBreakdown } from "./factories";
 
 function session(id: string, parentId: string | null = null, timeCreated = 0) {
   return { id, parent_id: parentId, time_created: timeCreated, depth: parentId ? 1 : 0 };
@@ -27,6 +31,15 @@ function message(
 }
 
 describe("session task duration", () => {
+  test("does not query the OpenCode database for Codex sessions", async () => {
+    const result = await buildSessionDetailBreakdown(
+      "/tmp/missing-opencode.db",
+      makeSessionBreakdown("codex:session-abc", { runtime: "codex" }),
+    );
+
+    expect(result.longestTaskDurationMs).toBe(0);
+  });
+
   test("returns the longest task inside one session", () => {
     const duration = calculateLongestTaskDuration(
       [session("parent")],

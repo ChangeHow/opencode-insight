@@ -1,5 +1,6 @@
 import { Clock3, Coins, Folder, MessageSquare, Shapes } from "lucide-react";
 import type { SessionDetailBreakdown } from "@opencode-dashboard/shared";
+import { AgentRuntimeBadge } from "@/components/dashboard/agent-runtime-badge";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { TOKEN_COLORS } from "@/lib/chart-colors";
 import { cn } from "@/lib/utils";
@@ -27,20 +28,24 @@ export function SessionBreakdownPanel({ session }: { session: SessionDetailBreak
     <section className="px-4 sm:px-8 lg:px-10" aria-labelledby="session-overview-title">
       <div data-testid="session-overview" className="mx-auto max-w-[64rem] py-5 sm:py-6">
         <div className="flex flex-col gap-4 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="metric-label">Entire session</p>
-            <h2
-              id="session-overview-title"
-              className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-[var(--foreground)]"
-            >
-              {session.title || "Untitled session"}
-            </h2>
+            <div data-testid="session-title-row" className="mt-2 flex min-w-0 items-center gap-2.5">
+              <h2
+                id="session-overview-title"
+                title={session.title || "Untitled session"}
+                className="max-w-[34rem] min-w-0 truncate text-xl font-semibold tracking-[-0.025em] text-[var(--foreground)]"
+              >
+                {session.title || "Untitled session"}
+              </h2>
+              <AgentRuntimeBadge runtime={session.runtime} className="shrink-0" />
+            </div>
             <p className="mt-2 flex min-w-0 items-center gap-2 text-xs text-[var(--muted-foreground)]">
               <Folder className="size-3.5 shrink-0" />
               <span className="truncate">{session.directory}</span>
             </p>
           </div>
-          <p className="self-start text-xs font-medium text-[var(--accent)]">
+          <p className="shrink-0 self-start text-xs font-medium whitespace-nowrap text-[var(--accent)]">
             {session.models.length} model{session.models.length === 1 ? "" : "s"}
           </p>
         </div>
@@ -68,13 +73,19 @@ export function SessionBreakdownPanel({ session }: { session: SessionDetailBreak
             className="border-l border-[var(--border)]"
             icon={Clock3}
             label="Longest active task"
-            value={formatCompactDuration(session.longestTaskDurationMs)}
+            value={
+              session.runtime === "opencode"
+                ? formatCompactDuration(session.longestTaskDurationMs)
+                : "N/A"
+            }
           />
         </div>
-        <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
-          Assistant active time. Steer continuations are merged and overlapping subagent work is
-          counted once.
-        </p>
+        {session.runtime === "opencode" ? (
+          <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
+            Assistant active time. Steer continuations are merged and overlapping subagent work is
+            counted once.
+          </p>
+        ) : null}
 
         <div className="mt-5 grid lg:grid-cols-2 lg:divide-x lg:divide-[var(--border)]">
           <div className="py-5 lg:pr-5">

@@ -107,6 +107,12 @@ const dayDetailRoute = createRoute({
 const sessionDetailRoute = createRoute({
   getParentRoute: () => dashboardLayoutRoute,
   path: "/sessions/$session",
+  validateSearch: (search: Record<string, unknown>) => ({
+    from:
+      typeof search.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.from)
+        ? search.from
+        : undefined,
+  }),
   component: SessionDetailPage,
 });
 

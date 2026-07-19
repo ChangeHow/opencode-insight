@@ -48,6 +48,17 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("Detail Page", () => {
+  test("uses a legible home icon on day and session headers", async ({ page }) => {
+    for (const path of ["/detail/2026-05-10", "/sessions/home-icon-session"]) {
+      await page.goto(path);
+
+      const homeIcon = page.getByTestId("dashboard-home-icon");
+      await expect(homeIcon).toBeVisible();
+      await expect(homeIcon).toHaveCSS("width", "20px");
+      await expect(homeIcon).toHaveCSS("height", "20px");
+    }
+  });
+
   test("day detail panels should align with the summary card on large screens", async ({
     page,
   }) => {
@@ -106,5 +117,14 @@ test.describe("Detail Page", () => {
     await expect(page.locator('[data-message-role="assistant"]')).toContainText("Finding");
     await page.getByRole("button", { name: /Read provider dashboard/ }).click();
     await expect(page.getByText("Provider dashboard source loaded.")).toBeVisible();
+  });
+
+  test("session detail returns to its source day", async ({ page }) => {
+    await page.goto("/sessions/conversation-session?from=2026-05-10");
+
+    await expect(page.getByRole("link", { name: /back/i }).first()).toHaveAttribute(
+      "href",
+      "/detail/2026-05-10",
+    );
   });
 });

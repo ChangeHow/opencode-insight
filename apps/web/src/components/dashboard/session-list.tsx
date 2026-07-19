@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { SessionBreakdown } from "@opencode-dashboard/shared";
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
+import { AgentRuntimeBadge } from "@/components/dashboard/agent-runtime-badge";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { Stat } from "@/components/dashboard/stat";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -104,14 +105,15 @@ export function SessionListPanel({
   );
 }
 
-function SessionCard({ date: _date, session }: { date: string; session: SessionBreakdown }) {
+function SessionCard({ date, session }: { date: string; session: SessionBreakdown }) {
   const topModel = session.models.length > 0 ? session.models[0] : null;
 
   return (
     <Link
       to="/sessions/$session"
       params={{ session: session.sessionId }}
-      className="group grid gap-4 rounded-[22px] border border-[var(--border)] bg-[var(--panel-strong)] p-4 transition hover:border-[var(--accent)] hover:bg-[var(--panel-strong)]/80 sm:grid-cols-[1.5fr_1fr_1fr_1fr_auto]"
+      search={{ from: date }}
+      className="group grid gap-4 rounded-[22px] border border-[var(--border)] bg-[var(--panel-strong)] p-4 transition hover:border-[var(--accent)] hover:bg-[var(--panel-strong)]/80 sm:grid-cols-[minmax(0,1.5fr)_auto_1fr_1fr_1fr_auto] sm:items-center"
     >
       <div className="min-w-0">
         <p className="truncate font-semibold text-[var(--foreground)]">
@@ -127,6 +129,7 @@ function SessionCard({ date: _date, session }: { date: string; session: SessionB
           </p>
         )}
       </div>
+      <AgentRuntimeBadge runtime={session.runtime} className="self-start sm:self-center" />
       <Stat label="Tokens" value={formatCompactNumber(session.tokens)} />
       <Stat
         label="Messages"

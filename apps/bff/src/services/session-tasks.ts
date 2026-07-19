@@ -222,6 +222,10 @@ export async function buildSessionDetailBreakdown(
   dbPath: string,
   session: Omit<SessionDetailBreakdown, "longestTaskDurationMs">,
 ) {
+  if (session.runtime !== "opencode") {
+    return { ...session, longestTaskDurationMs: 0 } satisfies SessionDetailBreakdown;
+  }
+
   const sessions = await querySqliteRows<SessionTreeRow>(
     dbPath,
     SESSION_TREE_QUERY,

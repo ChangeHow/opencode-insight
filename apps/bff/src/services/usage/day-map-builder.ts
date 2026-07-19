@@ -24,6 +24,7 @@ export function buildDayMap(messages: RawMessage[], timeZone: string) {
     {
       date: string;
       sessionId: string;
+      runtime: SessionBreakdown["runtime"];
       title: string;
       slug: string;
       directory: string;
@@ -86,6 +87,7 @@ export function buildDayMap(messages: RawMessage[], timeZone: string) {
     const sessionEntry = sessionMap.get(sessionKey) ?? {
       date,
       sessionId: message.sessionId,
+      runtime: message.runtime,
       title: message.sessionTitle,
       slug: message.sessionSlug,
       directory: message.sessionDirectory,
@@ -140,6 +142,7 @@ export function buildDayMap(messages: RawMessage[], timeZone: string) {
     if (!day) continue;
     day.sessions.push({
       sessionId: session.sessionId,
+      runtime: session.runtime,
       title: session.title,
       slug: session.slug,
       directory: session.directory,

@@ -1,15 +1,23 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SessionListPanel } from "../components/dashboard/session-list";
 import { DetailStickyHeader } from "../routes/layout";
 import { makeSessionBreakdown } from "./factories";
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: (props: { children: unknown; className?: string; to: string }) => {
-    const { children, className, to } = props;
+  Link: (props: {
+    children: unknown;
+    className?: string;
+    to: string;
+    search?: { from?: string };
+    "aria-label"?: string;
+    title?: string;
+  }) => {
+    const { children, className, to, search, "aria-label": ariaLabel, title } = props;
+    const href = search?.from ? `${to}?from=${search.from}` : to;
     return (
-      <a href={to} className={className}>
+      <a href={href} className={className} aria-label={ariaLabel} title={title}>
         {children}
       </a>
     );
@@ -18,6 +26,12 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("../components/dashboard/provider-icon.js", () => ({
   ProviderIcon: ({ providerId }: { providerId: string }) => <span>{providerId}</span>,
+}));
+vi.mock("@lobehub/icons/es/Codex", () => ({
+  default: (props: Record<string, unknown>) => <svg data-icon="codex" {...props} />,
+}));
+vi.mock("@lobehub/icons/es/OpenCode", () => ({
+  default: (props: Record<string, unknown>) => <svg data-icon="opencode" {...props} />,
 }));
 
 describe("detail navigation and session list", () => {
@@ -43,6 +57,11 @@ describe("detail navigation and session list", () => {
     );
 
     expect(screen.getByText("High token session")).toBeInTheDocument();
+    expect(screen.getByLabelText("Agent runtime: OpenCode")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /high token session/i })).toHaveAttribute(
+      "href",
+      "/sessions/$session?from=2026-04-10",
+    );
     expect(screen.queryByText("Filtered session")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /show 1 session below 1m tokens/i }));
@@ -61,6 +80,8 @@ describe("detail navigation and session list", () => {
     );
 
     expect(screen.getByRole("link", { name: /back to overview/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /dashboard home/i })).toBeInTheDocument();
+    const homeLink = screen.getByRole("link", { name: /dashboard home/i });
+    expect(homeLink).not.toHaveTextContent("Dashboard home");
+    expect(within(homeLink).getByTestId("dashboard-home-icon")).toBeInTheDocument();
   });
 });

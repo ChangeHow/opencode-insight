@@ -75,6 +75,7 @@ function insertAssistantMessage(
 
 const SNAPSHOT_CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const originalOpencodeDataDir = process.env.OPENCODE_DATA_DIR;
+const originalCodexHome = process.env.CODEX_HOME;
 
 describe("Usage runtime integration", () => {
   let tempRoot = "";
@@ -82,6 +83,7 @@ describe("Usage runtime integration", () => {
   beforeEach(() => {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-bff-"));
     process.env.OPENCODE_DATA_DIR = tempRoot;
+    process.env.CODEX_HOME = path.join(tempRoot, "codex");
     fs.rmSync(SNAPSHOT_CACHE_DIR, { recursive: true, force: true });
   });
 
@@ -90,6 +92,11 @@ describe("Usage runtime integration", () => {
       delete process.env.OPENCODE_DATA_DIR;
     } else {
       process.env.OPENCODE_DATA_DIR = originalOpencodeDataDir;
+    }
+    if (originalCodexHome === undefined) {
+      delete process.env.CODEX_HOME;
+    } else {
+      process.env.CODEX_HOME = originalCodexHome;
     }
 
     fs.rmSync(SNAPSHOT_CACHE_DIR, { recursive: true, force: true });
@@ -196,6 +203,67 @@ describe("Usage runtime integration", () => {
       messages: 3,
       tokens: 4_500,
     });
+  });
+
+  test("loads Codex CLI usage and invalidates the snapshot cache when JSONL grows", async () => {
+    const sessionDir = path.join(process.env.CODEX_HOME!, "sessions", "2026", "07", "14");
+    const sessionPath = path.join(sessionDir, "session-codex.jsonl");
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const entries = [
+      {
+        timestamp: "2026-07-14T10:00:00.000Z",
+        type: "session_meta",
+        payload: {
+          id: "meta-codex",
+          model_provider: "openai",
+          cwd: "/Users/alice/project",
+        },
+      },
+      {
+        timestamp: "2026-07-14T10:00:01.000Z",
+        type: "turn_context",
+        payload: { model: "gpt-4o" },
+      },
+      {
+        timestamp: "2026-07-14T10:00:04.000Z",
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: {
+            total_token_usage: { input_tokens: 100, output_tokens: 50 },
+            last_token_usage: { input_tokens: 100, output_tokens: 50 },
+          },
+        },
+      },
+    ];
+    fs.writeFileSync(sessionPath, entries.map((entry) => JSON.stringify(entry)).join("\n"), "utf8");
+
+    const initialSnapshot = await loadUsageSnapshot({ forceRefresh: true });
+
+    expect(initialSnapshot.summary.source.kind).toBe("json");
+    expect(initialSnapshot.summary.totalTokens).toBe(150);
+    expect(initialSnapshot.breakdownByDate.get("2026-07-14")?.sessions[0]).toMatchObject({
+      sessionId: "codex:session-codex",
+      runtime: "codex",
+    });
+
+    const nextEntry = {
+      timestamp: "2026-07-14T10:00:08.000Z",
+      type: "event_msg",
+      payload: {
+        type: "token_count",
+        info: {
+          total_token_usage: { input_tokens: 180, output_tokens: 70 },
+          last_token_usage: { input_tokens: 80, output_tokens: 20 },
+        },
+      },
+    };
+    fs.appendFileSync(sessionPath, `\n${JSON.stringify(nextEntry)}`, "utf8");
+
+    const refreshedSnapshot = await loadUsageSnapshot();
+
+    expect(refreshedSnapshot.messages).toHaveLength(2);
+    expect(refreshedSnapshot.summary.totalTokens).toBe(250);
   });
 
   test("refreshes recent usage without rebuilding older history first", async () => {

@@ -72,6 +72,7 @@ export function makeSessionBreakdown(
 
   return {
     sessionId: id,
+    runtime: "opencode",
     title: "Session title",
     slug: "calm-river",
     directory: "/Users/changehow/workspace/opencode-token-dashboard",
