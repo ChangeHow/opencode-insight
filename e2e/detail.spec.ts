@@ -48,6 +48,17 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("Detail Page", () => {
+  test("uses a legible home icon on day and session headers", async ({ page }) => {
+    for (const path of ["/detail/2026-05-10", "/sessions/home-icon-session"]) {
+      await page.goto(path);
+
+      const homeIcon = page.getByTestId("dashboard-home-icon");
+      await expect(homeIcon).toBeVisible();
+      await expect(homeIcon).toHaveCSS("width", "20px");
+      await expect(homeIcon).toHaveCSS("height", "20px");
+    }
+  });
+
   test("day detail panels should align with the summary card on large screens", async ({
     page,
   }) => {

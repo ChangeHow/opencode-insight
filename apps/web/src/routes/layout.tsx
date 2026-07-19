@@ -74,13 +74,13 @@ export function DetailStickyHeader({
   onThemeChange: (nextTheme: "light" | "dark" | "system") => void;
 }) {
   const detailHeaderLinkClassName =
-    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] px-3.5 text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-[var(--interactive-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
+    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-[var(--interactive-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
 
   return (
     <StickyHeaderShell>
       <div className="flex min-w-0 flex-wrap items-center gap-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Link to={backTo} params={backParams} className={detailHeaderLinkClassName}>
+          <Link to={backTo} params={backParams} className={`${detailHeaderLinkClassName} px-3.5`}>
             <ChevronLeft className="size-4" />
             <span className="hidden sm:inline">{backLabel}</span>
             <span className="sm:hidden">Back</span>
@@ -89,9 +89,9 @@ export function DetailStickyHeader({
             to="/"
             aria-label="Dashboard home"
             title="Dashboard home"
-            className={`${detailHeaderLinkClassName} w-10 justify-center px-0`}
+            className={`${detailHeaderLinkClassName} w-10 justify-center`}
           >
-            <House data-testid="dashboard-home-icon" className="size-4" />
+            <House data-testid="dashboard-home-icon" className="size-[20px] shrink-0" />
           </Link>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
