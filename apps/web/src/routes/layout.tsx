@@ -85,6 +85,8 @@ export function DetailStickyHeader({
             <span className="hidden sm:inline">{backLabel}</span>
             <span className="sm:hidden">Back</span>
           </Link>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <Link
             to="/"
             aria-label="Dashboard home"
@@ -93,8 +95,6 @@ export function DetailStickyHeader({
           >
             <House data-testid="dashboard-home-icon" className="size-[20px] shrink-0" />
           </Link>
-        </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
           <ThemeToggleButton theme={theme} onChange={onThemeChange} compact />
         </div>
       </div>

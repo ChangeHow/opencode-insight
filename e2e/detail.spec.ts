@@ -48,14 +48,31 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("Detail Page", () => {
-  test("uses a legible home icon on day and session headers", async ({ page }) => {
+  test("aligns home and theme controls on day and session headers", async ({ page }) => {
     for (const path of ["/detail/2026-05-10", "/sessions/home-icon-session"]) {
       await page.goto(path);
 
+      const homeButton = page.getByRole("link", { name: "Dashboard home" });
+      const themeButton = page.getByRole("button", { name: /Theme mode/ });
       const homeIcon = page.getByTestId("dashboard-home-icon");
+      const themeIcon = themeButton.locator("svg").first();
+      const [homeBox, themeBox] = await Promise.all([
+        homeButton.boundingBox(),
+        themeButton.boundingBox(),
+      ]);
+
+      expect(homeBox).not.toBeNull();
+      expect(themeBox).not.toBeNull();
+      const controlGap = (themeBox?.x ?? 0) - ((homeBox?.x ?? 0) + (homeBox?.width ?? 0));
+      expect(Math.abs(controlGap - 8)).toBeLessThanOrEqual(1);
+      expect(themeBox?.y).toBeCloseTo(homeBox?.y ?? 0, 0);
+      expect(themeBox?.width).toBeCloseTo(homeBox?.width ?? 0, 0);
+      expect(themeBox?.height).toBeCloseTo(homeBox?.height ?? 0, 0);
       await expect(homeIcon).toBeVisible();
       await expect(homeIcon).toHaveCSS("width", "20px");
       await expect(homeIcon).toHaveCSS("height", "20px");
+      await expect(themeIcon).toHaveCSS("width", "20px");
+      await expect(themeIcon).toHaveCSS("height", "20px");
     }
   });
 
