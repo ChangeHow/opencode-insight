@@ -206,9 +206,9 @@ export function ThemeToggleButton({
           variant="outline"
           size="sm"
           aria-label={`Theme mode (${active.label})`}
-          className={compact ? "h-10 px-2.5" : "h-10"}
+          className={compact ? "size-10 p-0" : "h-10"}
         >
-          <ActiveIcon className="size-4" />
+          <ActiveIcon className={compact ? "size-[20px] shrink-0" : "size-4"} />
           {compact ? null : active.label}
         </Button>
       </PopoverTrigger>
