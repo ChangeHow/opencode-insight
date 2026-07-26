@@ -42,7 +42,7 @@ function ProviderTrend({ provider }: { provider: ProviderInsight }) {
       <div
         role="img"
         aria-label={`No daily spend trend for ${provider.providerId}`}
-        className="h-8 w-full min-w-28 rounded-[6px] bg-black/5 md:ml-auto md:w-44"
+        className="h-8 w-full min-w-28 rounded-[8px] bg-black/5 md:ml-auto md:w-44"
       />
     );
   }
@@ -212,7 +212,7 @@ export function ProviderInsightsPage({
               ))}
             </div>
           ) : !hasLedgerData ? (
-            <div className="mt-6 rounded-[14px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-5 py-7">
+            <div className="mt-6 rounded-[12px] border border-dashed border-[var(--border)] bg-[var(--panel-strong)]/55 px-5 py-7">
               <p className="text-lg font-semibold text-[var(--foreground)]">{emptyTitle}</p>
               <p className="mt-2 max-w-2xl text-sm text-[var(--muted-foreground)]">
                 {emptyDescription}
@@ -262,7 +262,7 @@ export function ProviderInsightsPage({
                     {ledgerProviders.map((provider) => (
                       <tr
                         key={provider.providerId}
-                        className={`grid grid-cols-2 gap-x-4 gap-y-3 rounded-[14px] border p-4 transition md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 md:last:border-b-0 ${selectedProviderId === provider.providerId ? "border-[var(--accent)] bg-[var(--panel-strong)]/75 md:bg-[var(--panel-strong)]/75" : "border-[var(--border)] bg-[var(--panel-strong)]/60 md:bg-transparent"}`}
+                        className={`grid grid-cols-2 gap-x-4 gap-y-3 rounded-[12px] border p-4 transition md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 md:last:border-b-0 ${selectedProviderId === provider.providerId ? "border-[var(--accent)] bg-[var(--panel-strong)]/75 md:bg-[var(--panel-strong)]/75" : "border-[var(--border)] bg-[var(--panel-strong)]/60 md:bg-transparent"}`}
                       >
                         <td className="col-span-2 p-0 md:table-cell md:px-3 md:py-3">
                           {onSelectProvider ? (

@@ -26,7 +26,7 @@ export const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center rounded-[7px] px-4 py-1.5 text-xs font-semibold text-[var(--muted-foreground)] transition-all",
+      "inline-flex items-center justify-center rounded-[8px] px-4 py-1.5 text-xs font-semibold text-[var(--muted-foreground)] transition-all",
       "data-[state=active]:bg-[var(--panel)] data-[state=active]:text-[var(--foreground)] data-[state=active]:shadow-sm",
       "hover:text-[var(--foreground)]",
       className,

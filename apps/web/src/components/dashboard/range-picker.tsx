@@ -30,7 +30,7 @@ export function RangePicker({ value, onChange, className }: RangePickerProps) {
           aria-pressed={value === range.value}
           onClick={() => onChange(range.value)}
           className={cn(
-            "inline-flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-[7px] px-2 text-xs leading-none font-semibold transition-colors outline-none focus:ring-2 focus:ring-[var(--ring)] md:flex-none md:px-4",
+            "inline-flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-[8px] px-2 text-xs leading-none font-semibold transition-colors outline-none focus:ring-2 focus:ring-[var(--ring)] md:flex-none md:px-4",
             value === range.value
               ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
               : "text-[var(--muted-foreground)] hover:bg-[var(--interactive-hover)] hover:text-[var(--foreground)]",

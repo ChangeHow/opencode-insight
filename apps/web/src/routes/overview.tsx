@@ -186,7 +186,7 @@ export function DashboardPage() {
           <Card>
             <CardContent className="p-4 sm:p-6">
               <div className="space-y-2">
-                <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                   <Rows3 className="size-3.5" />
                   Model metrics
                 </p>
@@ -264,19 +264,19 @@ export function DashboardPage() {
                     <table className="min-w-full border-collapse text-left">
                       <thead>
                         <tr className="border-b border-[var(--border)]">
-                          <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          <th className="px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                             Model
                           </th>
-                          <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          <th className="w-[18rem] px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                             Trend
                           </th>
-                          <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                             Spend
                           </th>
-                          <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                             Tokens
                           </th>
-                          <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          <th className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
                             Messages
                           </th>
                         </tr>

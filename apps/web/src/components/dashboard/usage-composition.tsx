@@ -59,7 +59,7 @@ export function UsageComposition({
             <p className="mt-2 max-w-lg text-xs leading-5 text-[var(--muted-foreground)]">
               Input, output, reasoning, and cache activity across local and Remote usage.
             </p>
-            <div className="mt-6 grid grid-cols-2 divide-x divide-[var(--border)] border-y border-[var(--border)]">
+            <div className="mt-6 grid grid-cols-2 divide-x divide-[var(--border)]">
               <CompositionStat label="Cache share" value={total > 0 ? cacheTokens / total : 0} />
               <CompositionStat
                 label="Reasoning share"
@@ -84,7 +84,7 @@ export function UsageComposition({
                 />
               ))}
             </div>
-            <div className="grid divide-y divide-[var(--border)] border-y border-[var(--border)] sm:grid-cols-5 sm:divide-x sm:divide-y-0">
+            <div className="grid divide-y divide-[var(--border)] sm:grid-cols-5 sm:divide-x sm:divide-y-0">
               {TOKEN_GROUPS.map((group) => (
                 <div key={group.key} className="p-3">
                   <p className="flex items-center gap-2 text-[10px] font-medium text-[var(--muted-foreground)]">
