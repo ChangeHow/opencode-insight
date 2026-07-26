@@ -46,7 +46,7 @@ export function TokenBreakdownPanel({
   });
 
   return (
-    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[6px] border border-[var(--border)] bg-[var(--panel)] p-5 md:h-full md:w-[38rem] md:min-w-[38rem] md:p-6">
+    <div className="flex h-auto w-full min-w-0 shrink-0 flex-col rounded-[8px] border border-[var(--border)] bg-[var(--panel)] p-5 md:h-full md:w-[38rem] md:min-w-[38rem] md:p-6">
       <div className="space-y-2">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
           <Layers3 className="size-3.5" />

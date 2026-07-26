@@ -87,7 +87,7 @@ export function RemoteUsagePanel({ remote }: { remote: RemoteUsagePayload | null
 
   return (
     <div className="px-4 sm:px-8 lg:px-10">
-      <section className="border-y border-[var(--border)] py-5 sm:py-6">
+      <section className="border-t border-[var(--border)] py-5 sm:py-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <p className="metric-label">

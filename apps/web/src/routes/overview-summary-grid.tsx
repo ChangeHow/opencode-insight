@@ -52,7 +52,7 @@ export function OverviewSummaryGrid({
                   : "No retained usage in this period. OpenCode may have cleaned older sessions."
                 : "Waiting for local pricing data"
             }
-            accent="var(--metric-amber)"
+            accent="var(--accent)"
             data={combinedMetrics.trend}
             dataKey="cost"
             icon={Wallet}
@@ -76,7 +76,7 @@ export function OverviewSummaryGrid({
                   ? "No model usage available"
                   : "No active model usage in this range"
             }
-            accent="var(--metric-violet)"
+            accent="var(--accent)"
             data={combinedMetrics.trend}
             dataKey="tokens"
             icon={Coins}
@@ -98,7 +98,7 @@ export function OverviewSummaryGrid({
                 ? `${formatCompactNumber(combinedMetrics.tokens.total / combinedMetrics.messages.total)} tokens per message`
                 : "No assistant messages in this range"
             }
-            accent="var(--metric-green)"
+            accent="var(--accent)"
             data={combinedMetrics.trend}
             dataKey="messages"
             icon={MessageSquare}
@@ -117,7 +117,7 @@ export function OverviewSummaryGrid({
                 ? `${formatCompactNumber(combinedMetrics.messages.total)} messages across all machines`
                 : "No data yet"
             }
-            accent="var(--metric-green)"
+            accent="var(--muted-foreground)"
             data={combinedMetrics.trend}
             dataKey="messages"
             icon={Activity}
@@ -137,7 +137,7 @@ export function OverviewSummaryGrid({
                 ? `Peak workload ${formatDateLabel(combinedMetrics.bestDay.date)}`
                 : "No best day yet"
             }
-            accent="var(--metric-orange)"
+            accent="var(--muted-foreground)"
             data={combinedMetrics.trend}
             dataKey="tokens"
             icon={Gauge}
@@ -147,7 +147,7 @@ export function OverviewSummaryGrid({
             title="Pricing coverage"
             value={summary ? `${Math.round(combinedMetrics.pricingCoverage * 100)}%` : "—"}
             detail="Priced tokens across local and Remote usage"
-            accent="var(--metric-violet)"
+            accent="var(--muted-foreground)"
             data={combinedMetrics.trend}
             dataKey="cost"
             icon={ShieldCheck}
@@ -161,7 +161,7 @@ export function OverviewSummaryGrid({
                 ? `Current streak ${combinedMetrics.currentStreak}d across all machines`
                 : "No activity streak"
             }
-            accent="var(--metric-gold)"
+            accent="var(--muted-foreground)"
             data={combinedMetrics.trend}
             dataKey="messages"
             icon={Flame}

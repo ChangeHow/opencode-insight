@@ -220,7 +220,7 @@ function OverviewTab({ error }: { error: string | null }) {
               value: point.cumulativeTokens,
             }))}
             label="Cumulative tokens over messages"
-            accent="var(--metric-violet)"
+            accent="var(--accent)"
             className="h-full w-full"
           />
         </div>

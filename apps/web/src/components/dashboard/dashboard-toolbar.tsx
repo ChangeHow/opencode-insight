@@ -63,7 +63,7 @@ export function ControlBar({
               key={view}
               to={`/${view}`}
               aria-current={currentView === view ? "page" : undefined}
-              className={`inline-flex h-full items-center rounded-[7px] px-3 text-xs font-semibold capitalize outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+              className={`inline-flex h-full items-center rounded-[8px] px-3 text-xs font-semibold capitalize outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
                 currentView === view
                   ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
                   : "text-[var(--muted-foreground)] hover:bg-[var(--interactive-hover)] hover:text-[var(--foreground)]"

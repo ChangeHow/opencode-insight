@@ -38,7 +38,7 @@ export function DashboardPageLayout({
         className={
           variant === "wide"
             ? "w-full space-y-8 pb-10 lg:pb-14"
-            : "mx-auto max-w-7xl space-y-6 pb-8 lg:pb-10"
+            : "mx-auto max-w-7xl space-y-8 pb-8 lg:pb-10"
         }
       >
         {children}
@@ -74,7 +74,7 @@ export function DetailStickyHeader({
   onThemeChange: (nextTheme: "light" | "dark" | "system") => void;
 }) {
   const detailHeaderLinkClassName =
-    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-[var(--interactive-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
+    "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--panel)] text-sm font-semibold text-[var(--foreground)] outline-none transition hover:bg-[var(--interactive-hover)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]";
 
   return (
     <StickyHeaderShell>

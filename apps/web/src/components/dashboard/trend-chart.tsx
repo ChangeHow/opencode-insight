@@ -69,7 +69,7 @@ export function TrendChart({
         <div
           role="group"
           aria-label="Chart metric"
-          className="grid w-full grid-cols-3 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] p-1"
+          className="grid w-full grid-cols-3 rounded-[10px] border border-[var(--border)] bg-[var(--panel)] p-1"
         >
           {METRICS.map((item) => (
             <button
@@ -78,7 +78,7 @@ export function TrendChart({
               aria-pressed={metric === item.key}
               onClick={() => setMetric(item.key)}
               className={cn(
-                "h-8 min-w-0 rounded-[6px] px-2 text-[10px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+                "h-8 min-w-0 rounded-[8px] px-2 text-[10px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
                 metric === item.key
                   ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
                   : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
@@ -135,7 +135,7 @@ export function TrendChart({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex h-10 w-full items-center justify-between gap-3 rounded-[9px] border border-[var(--border)] bg-[var(--panel)] px-3 text-sm font-medium text-[var(--foreground)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            className="flex h-10 w-full items-center justify-between gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--panel)] px-3 text-sm font-medium text-[var(--foreground)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           >
             <span className="truncate text-left">
               {selectedKeys.length > 0

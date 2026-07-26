@@ -49,7 +49,7 @@ export function ToolCallCard({ part }: ToolCallCardProps) {
         {duration ? (
           <span className="shrink-0 text-[10px] text-[var(--muted-foreground)]">{duration}</span>
         ) : null}
-        <span className="shrink-0 rounded-[6px] bg-[var(--panel-strong)] px-2 py-0.5 text-[10px] capitalize text-[var(--muted-foreground)]">
+        <span className="shrink-0 rounded-[8px] bg-[var(--panel-strong)] px-2 py-0.5 text-[10px] capitalize text-[var(--muted-foreground)]">
           {part.status}
         </span>
       </CollapsibleTrigger>

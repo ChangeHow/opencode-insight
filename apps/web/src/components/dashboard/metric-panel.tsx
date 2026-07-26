@@ -45,7 +45,7 @@ export function MetricPanel({
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
-    <section className={cn("flex h-full flex-col p-5", className)}>
+    <section className={cn("flex h-full flex-col p-6", className)}>
       <div className="min-w-0">
         <p className="metric-label">
           <span
@@ -74,9 +74,6 @@ export function CompactMetric({
   title,
   value,
   detail,
-  accent,
-  data,
-  dataKey,
   icon: Icon,
 }: {
   className?: string;
@@ -89,18 +86,13 @@ export function CompactMetric({
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
-    <section className={cn("grid h-full grid-cols-[1fr_6rem] gap-4 p-4 sm:p-5", className)}>
+    <section className={cn("flex h-full flex-col p-5 sm:p-6", className)}>
       <p className="metric-label">
         <Icon className="size-3.5" />
         {title}
       </p>
-      <div className="col-start-1">
-        <p className="metric-value text-[1.65rem]">{value}</p>
-        <p className="mt-1 text-xs text-[var(--muted-foreground)]">{detail}</p>
-      </div>
-      <div className="col-start-2 row-span-2 row-start-1 self-end">
-        <MetricSparkline data={data} dataKey={dataKey} accent={accent} label={title} />
-      </div>
+      <p className="metric-value mt-3 text-[1.65rem]">{value}</p>
+      <p className="mt-1 text-xs text-[var(--muted-foreground)]">{detail}</p>
     </section>
   );
 }

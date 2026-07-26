@@ -40,7 +40,7 @@
   --muted-foreground: oklch(0.52 0.014 255);
   --panel: oklch(0.995 0.002 255 / 94%);
   --panel-strong: oklch(0.94 0.006 255);
-  --border: oklch(0.86 0.008 255);
+  --border: oklch(0.9 0.006 255);
   --accent: oklch(0.52 0.12 257);
   --accent-foreground: oklch(0.99 0.002 255);
   --accent-soft: color-mix(in oklch, var(--accent) 10%, var(--panel));
@@ -67,19 +67,19 @@
   --heat-empty-date: oklch(0.6 0.012 255);
   --chart: oklch(0.56 0.11 257);
   --chart-grid: oklch(0.78 0.01 255 / 42%);
-  --metric-violet: oklch(0.59 0.14 292);
-  --metric-green: oklch(0.61 0.11 158);
-  --metric-orange: oklch(0.65 0.13 52);
-  --metric-amber: oklch(0.66 0.12 76);
-  --metric-gold: oklch(0.7 0.1 92);
-  --metric-teal: oklch(0.62 0.09 190);
+  --metric-violet: oklch(0.58 0.1 270);
+  --metric-green: oklch(0.62 0.08 155);
+  --metric-orange: oklch(0.66 0.1 45);
+  --metric-amber: oklch(0.72 0.08 85);
+  --metric-gold: oklch(0.6 0.09 300);
+  --metric-teal: oklch(0.62 0.09 195);
   --chart-surface: linear-gradient(180deg, oklch(0.99 0.002 255), oklch(0.95 0.006 255));
   --tooltip-surface: oklch(0.995 0.002 255);
   --scrollbar-thumb: oklch(0.58 0.01 255 / 45%);
   --scrollbar-thumb-active: oklch(0.48 0.02 255 / 60%);
   --pill-surface: oklch(1 0 0 / 72%);
   --header-shadow-color: oklch(0.2 0.01 255 / 6%);
-  --surface-shadow: 0 1px 2px oklch(0.2 0.01 255 / 4%), 0 8px 24px oklch(0.2 0.01 255 / 5%);
+  --surface-shadow: 0 1px 2px oklch(0.2 0.01 255 / 5%), 0 12px 32px oklch(0.2 0.01 255 / 7%);
 }
 
 :root[data-theme="dark"] {
@@ -88,7 +88,7 @@
   --muted-foreground: oklch(0.66 0.012 255);
   --panel: oklch(0.22 0.01 260 / 94%);
   --panel-strong: oklch(0.27 0.012 260);
-  --border: oklch(0.32 0.014 260);
+  --border: oklch(0.28 0.012 260);
   --accent: oklch(0.72 0.1 252);
   --accent-foreground: oklch(0.17 0.02 260);
   --accent-soft: color-mix(in oklch, var(--accent) 12%, var(--panel));
@@ -115,19 +115,19 @@
   --heat-empty-date: oklch(0.56 0.012 255);
   --chart: oklch(0.72 0.1 252);
   --chart-grid: oklch(0.5 0.01 255 / 26%);
-  --metric-violet: oklch(0.74 0.13 292);
-  --metric-green: oklch(0.73 0.11 158);
-  --metric-orange: oklch(0.76 0.12 52);
-  --metric-amber: oklch(0.78 0.11 76);
-  --metric-gold: oklch(0.8 0.09 92);
-  --metric-teal: oklch(0.75 0.09 190);
+  --metric-violet: oklch(0.74 0.1 270);
+  --metric-green: oklch(0.74 0.09 155);
+  --metric-orange: oklch(0.78 0.1 45);
+  --metric-amber: oklch(0.82 0.09 85);
+  --metric-gold: oklch(0.74 0.1 300);
+  --metric-teal: oklch(0.74 0.09 195);
   --chart-surface: linear-gradient(180deg, oklch(0.25 0.01 260), oklch(0.205 0.008 260));
   --tooltip-surface: oklch(0.24 0.01 260);
   --scrollbar-thumb: oklch(0.62 0.01 255 / 30%);
   --scrollbar-thumb-active: oklch(0.72 0.02 255 / 45%);
   --pill-surface: oklch(0.26 0.01 260 / 82%);
   --header-shadow-color: oklch(0 0 0 / 28%);
-  --surface-shadow: 0 1px 2px oklch(0 0 0 / 14%), 0 12px 30px oklch(0 0 0 / 12%);
+  --surface-shadow: 0 1px 2px oklch(0 0 0 / 18%), 0 16px 36px oklch(0 0 0 / 16%);
 }
 
 * {
