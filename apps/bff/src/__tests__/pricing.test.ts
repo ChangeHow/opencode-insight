@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { beforeEach, afterEach, describe, it, expect, test, vi } from "vitest";
 import { parseModelsDevPricingDataset } from "../services/models-dev-pricing";
 import {
@@ -6,6 +7,14 @@ import {
   invalidatePricingCache,
 } from "../services/pricing";
 import { makeTokenBreakdown, makePricingDataset } from "./factories";
+
+function createDeferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
 
 describe("Pricing Module", () => {
   describe("Given a model in the dataset", () => {
@@ -438,67 +447,162 @@ describe("Pricing Module", () => {
   describe("Given remote pricing changes", () => {
     beforeEach(() => {
       invalidatePricingCache();
-      vi.useFakeTimers();
+      vi.spyOn(fs, "existsSync").mockReturnValue(true);
+      vi.spyOn(fs, "readFileSync").mockReturnValue(
+        JSON.stringify({
+          "test/cached-model": { input_cost_per_token: 0.000001 },
+        }),
+      );
+      vi.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+      vi.spyOn(fs, "writeFileSync").mockImplementation(() => undefined);
     });
 
     afterEach(() => {
       invalidatePricingCache();
       vi.useRealTimers();
       vi.unstubAllGlobals();
+      vi.restoreAllMocks();
     });
 
-    test("refreshes pricing after the in-memory cache expires", async () => {
-      let liteLlmPricing = {};
+    test("returns cached pricing immediately while the first refresh is pending", async () => {
+      const liteLlm = createDeferredResponse();
+      const modelsDev = createDeferredResponse();
       vi.stubGlobal(
         "fetch",
-        vi.fn(async (input: string | URL | Request) =>
-          Response.json(String(input).includes("models.dev") ? {} : liteLlmPricing),
+        vi.fn((input: string | URL | Request) =>
+          String(input).includes("models.dev") ? modelsDev.promise : liteLlm.promise,
         ),
       );
 
-      const usage = makeTokenBreakdown({ input: 1_000_000, output: 1_000_000 });
-      const staleDataset = await getPricingDataset();
-      expect(
-        estimateUsageCostFromDataset(staleDataset, "gpt-5.6-sol", "openai", usage).priced,
-      ).toBe(false);
+      await expect(getPricingDataset()).resolves.toMatchObject({
+        "test/cached-model": { input_cost_per_token: 0.000001 },
+      });
+      expect(fetch).toHaveBeenCalledTimes(2);
 
-      liteLlmPricing = {
-        "gpt-5.6-sol": {
-          input_cost_per_token: 0.000005,
-          output_cost_per_token: 0.00003,
-        },
-      };
-      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
-
-      const refreshedDataset = await getPricingDataset();
-      expect(
-        estimateUsageCostFromDataset(refreshedDataset, "gpt-5.6-sol", "openai", usage),
-      ).toEqual({ estimatedCost: 35, priced: true });
+      liteLlm.resolve(Response.json({}));
+      modelsDev.resolve(Response.json({}));
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     });
 
-    test("keeps remote pricing authoritative over static fallbacks", async () => {
+    test("waits for authoritative pricing when no persistent cache exists", async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const liteLlm = createDeferredResponse();
+      const modelsDev = createDeferredResponse();
       vi.stubGlobal(
         "fetch",
-        vi.fn(async (input: string | URL | Request) =>
-          Response.json(
-            String(input).includes("models.dev")
-              ? {}
-              : {
-                  "gpt-5.3": {
-                    input_cost_per_token: 0.000001,
-                    output_cost_per_token: 0.000001,
-                  },
-                },
-          ),
+        vi.fn((input: string | URL | Request) =>
+          String(input).includes("models.dev") ? modelsDev.promise : liteLlm.promise,
         ),
       );
 
-      const dataset = await getPricingDataset();
-      const usage = makeTokenBreakdown({ input: 1_000_000, output: 1_000_000 });
+      let settled = false;
+      const datasetPromise = getPricingDataset().then((dataset) => {
+        settled = true;
+        return dataset;
+      });
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
 
-      expect(estimateUsageCostFromDataset(dataset, "gpt-5.3", "openai", usage)).toEqual({
-        estimatedCost: 2,
-        priced: true,
+      liteLlm.resolve(Response.json({ "test/remote-model": { input_cost_per_token: 0.000002 } }));
+      modelsDev.resolve(Response.json({}));
+
+      await expect(datasetPromise).resolves.toMatchObject({
+        "test/remote-model": { input_cost_per_token: 0.000002 },
+      });
+    });
+
+    test("deduplicates concurrent refreshes and applies new pricing", async () => {
+      const liteLlm = createDeferredResponse();
+      const modelsDev = createDeferredResponse();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string | URL | Request) =>
+          String(input).includes("models.dev") ? modelsDev.promise : liteLlm.promise,
+        ),
+      );
+
+      await Promise.all([getPricingDataset(), getPricingDataset()]);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      liteLlm.resolve(Response.json({ "test/cached-model": { input_cost_per_token: 0.000002 } }));
+      modelsDev.resolve(Response.json({}));
+      await vi.waitFor(async () => {
+        expect((await getPricingDataset())["test/cached-model"]?.input_cost_per_token).toBe(
+          0.000002,
+        );
+      });
+    });
+
+    test("returns stale pricing immediately after the cache expires", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(0);
+      let refreshPending: Promise<Response> | undefined;
+      const remotePricing = { "test/cached-model": { input_cost_per_token: 0.000002 } };
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string | URL | Request) => {
+          if (String(input).includes("models.dev")) return Response.json({});
+          return refreshPending ?? Response.json(remotePricing);
+        }),
+      );
+
+      await getPricingDataset();
+      await vi.waitFor(async () => {
+        expect((await getPricingDataset())["test/cached-model"]?.input_cost_per_token).toBe(
+          0.000002,
+        );
+      });
+      let resolveRefresh!: (response: Response) => void;
+      refreshPending = new Promise<Response>((resolve) => {
+        resolveRefresh = resolve;
+      });
+      vi.spyOn(Date, "now").mockReturnValue(600_001);
+
+      expect((await getPricingDataset())["test/cached-model"]?.input_cost_per_token).toBe(0.000002);
+      resolveRefresh(Response.json({ "test/cached-model": { input_cost_per_token: 0.000003 } }));
+      await vi.waitFor(async () => {
+        expect((await getPricingDataset())["test/cached-model"]?.input_cost_per_token).toBe(
+          0.000003,
+        );
+      });
+    });
+
+    test("does not allow a pre-invalidation refresh to replace a newer dataset", async () => {
+      const oldLiteLlm = createDeferredResponse();
+      const oldModelsDev = createDeferredResponse();
+      const newLiteLlm = createDeferredResponse();
+      const newModelsDev = createDeferredResponse();
+      const liteLlmResponses = [oldLiteLlm.promise, newLiteLlm.promise];
+      const modelsDevResponses = [oldModelsDev.promise, newModelsDev.promise];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: string | URL | Request) =>
+          String(input).includes("models.dev")
+            ? modelsDevResponses.shift()!
+            : liteLlmResponses.shift()!,
+        ),
+      );
+
+      await getPricingDataset();
+      invalidatePricingCache();
+      await getPricingDataset();
+      newLiteLlm.resolve(
+        Response.json({ "test/cached-model": { input_cost_per_token: 0.000003 } }),
+      );
+      newModelsDev.resolve(Response.json({}));
+      await vi.waitFor(async () => {
+        expect((await getPricingDataset())["test/cached-model"]?.input_cost_per_token).toBe(
+          0.000003,
+        );
+      });
+
+      oldLiteLlm.resolve(
+        Response.json({ "test/cached-model": { input_cost_per_token: 0.000004 } }),
+      );
+      oldModelsDev.resolve(Response.json({}));
+      await vi.waitFor(async () => {
+        expect((await getPricingDataset())["test/cached-model"]?.input_cost_per_token).toBe(
+          0.000003,
+        );
       });
     });
   });

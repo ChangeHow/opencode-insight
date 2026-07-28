@@ -8,6 +8,13 @@ import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSyn
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { box } from "@clack/prompts";
+import {
+  formatHttpHost,
+  getReadinessUrl,
+  isPortAvailable,
+  terminateProcess,
+  waitForReadiness,
+} from "./readiness.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PID_FILE = path.join(ROOT, ".telescope-daemon.pid");
@@ -65,6 +72,11 @@ if (existsSync(PID_FILE)) {
 const port = Number(cli.port ?? process.env.PORT ?? 8787);
 const host = cli.host ?? process.env.HOST ?? "127.0.0.1";
 
+if (!(await isPortAvailable(host, port))) {
+  console.error(`❌ Cannot start daemon: ${host}:${port} is already in use.`);
+  process.exit(1);
+}
+
 const env = {
   ...process.env,
   PORT: String(port),
@@ -94,30 +106,52 @@ child.unref();
 const pid = child.pid;
 writeFileSync(PID_FILE, String(pid), "utf8");
 
-// Give the process a moment to start; detect immediate crashes
-await new Promise((resolve) => setTimeout(resolve, 1200));
+const readiness = await waitForReadiness({
+  url: getReadinessUrl(host, port),
+  isAlive: () => {
+    if (child.exitCode !== null) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+});
 
-let alive = false;
-try {
-  process.kill(pid, 0);
-  alive = true;
-} catch {
-  alive = false;
-}
-
-if (!alive) {
+if (!readiness.ready) {
+  let stopped = readiness.reason === "exited";
+  if (readiness.reason === "timeout") {
+    stopped = await terminateProcess({
+      isAlive: () => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      terminate: () => process.kill(pid, "SIGTERM"),
+      forceTerminate: () => process.kill(pid, "SIGKILL"),
+    });
+  }
+  if (!stopped) {
+    console.error(`❌ Daemon did not become ready and PID ${pid} could not be terminated.`);
+    console.error(`   Run 'pnpm daemon:stop' before retrying.`);
+    process.exit(1);
+  }
   try {
     unlinkSync(PID_FILE);
   } catch {
     /* ignore */
   }
-  console.error("❌ Daemon process exited immediately. Check error log:");
+  console.error(`❌ Daemon did not become ready (${readiness.reason}). Check error log:`);
   console.error("   " + errFile);
   process.exit(1);
 }
 
-const displayHost = host === "0.0.0.0" ? "localhost" : host;
-const url = `http://${displayHost}:${port}`;
+const displayHost = host === "0.0.0.0" ? "localhost" : host === "::" ? "::1" : host;
+const url = `http://${formatHttpHost(displayHost)}:${port}`;
 
 box(
   [

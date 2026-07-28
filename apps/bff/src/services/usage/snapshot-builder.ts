@@ -1,12 +1,17 @@
-import type { TimeRange, TokenBreakdown, TrendPoint } from "@opencode-dashboard/shared";
+import type {
+  DayBreakdown,
+  TimeRange,
+  TokenBreakdown,
+  TrendPoint,
+} from "@opencode-dashboard/shared";
 import {
   DEFAULT_TIME_ZONE,
+  formatDateInTimeZone,
   getDateKeyWeekday,
   getPresetDateRange,
 } from "@opencode-dashboard/shared";
 import { roundCost } from "../cost";
 import type { RawMessage, SourceKind, UsageSnapshot } from "./types";
-import { totalTokens } from "./sqlite-reader";
 import { buildDayMap } from "./day-map-builder";
 import { computeStreak } from "./streak";
 
@@ -16,17 +21,59 @@ export function buildSnapshot(
   paths: string[],
 ): UsageSnapshot {
   const dayMap = buildDayMap(messages, DEFAULT_TIME_ZONE);
-  const totalTokensAll = messages.reduce((sum, message) => sum + totalTokens(message.tokens), 0);
-  const totalCostAll = messages.reduce((sum, message) => sum + message.estimatedCost, 0);
-  const pricedTokensAll = messages.reduce((sum, message) => sum + message.pricedTokens, 0);
-  const totalMessagesAll = messages.length;
+  return buildSnapshotFromDayMap(messages, dayMap, sourceKind, paths);
+}
+
+export function buildIncrementalSnapshot(
+  baseSnapshot: UsageSnapshot,
+  recentMessages: RawMessage[],
+  refreshStartTimestampMs: number,
+  sourceKind: SourceKind,
+  paths: string[],
+): UsageSnapshot {
+  const refreshStartDateKey = formatDateInTimeZone(refreshStartTimestampMs, DEFAULT_TIME_ZONE);
+  const alignedRefreshStartTimestampMs = Date.parse(`${refreshStartDateKey}T00:00:00.000Z`);
+  const normalizedRecentMessages = dedupeAndSortMessages(recentMessages);
+  const firstRecentIndex = findFirstMessageAtOrAfter(
+    baseSnapshot.messages,
+    alignedRefreshStartTimestampMs,
+  );
+  const recentIds = new Set(normalizedRecentMessages.map((message) => message.id));
+  const historicalMessages = baseSnapshot.messages
+    .slice(0, firstRecentIndex)
+    .filter((message) => !recentIds.has(message.id));
+  const messages = [...historicalMessages, ...normalizedRecentMessages];
+  const dayMap = new Map<string, DayBreakdown>();
+
+  for (const [date, day] of baseSnapshot.breakdownByDate) {
+    if (date < refreshStartDateKey) {
+      dayMap.set(date, day);
+    }
+  }
+  for (const [date, day] of buildDayMap(normalizedRecentMessages, DEFAULT_TIME_ZONE)) {
+    dayMap.set(date, day);
+  }
+
+  return buildSnapshotFromDayMap(messages, dayMap, sourceKind, paths);
+}
+
+function buildSnapshotFromDayMap(
+  messages: RawMessage[],
+  dayMap: Map<string, DayBreakdown>,
+  sourceKind: SourceKind,
+  paths: string[],
+): UsageSnapshot {
+  const days = [...dayMap.values()];
+  const totalTokensAll = days.reduce((sum, day) => sum + day.tokens, 0);
+  const totalCostAll = days.reduce((sum, day) => sum + day.cost, 0);
+  const pricedTokensAll = days.reduce((sum, day) => sum + day.pricedTokens, 0);
+  const totalMessagesAll = days.reduce((sum, day) => sum + day.messages, 0);
   const orderedDates = [...dayMap.keys()].toSorted();
   const topModel =
-    [...dayMap.values()].flatMap((day) => day.models).toSorted((a, b) => b.tokens - a.tokens)[0] ??
-    null;
-  const bestDay = [...dayMap.values()].toSorted((a, b) => b.tokens - a.tokens)[0] ?? null;
+    days.flatMap((day) => day.models).toSorted((a, b) => b.tokens - a.tokens)[0] ?? null;
+  const bestDay = days.toSorted((a, b) => b.tokens - a.tokens)[0] ?? null;
   const streaks = computeStreak(orderedDates);
-  const maxTokens = Math.max(...[...dayMap.values()].map((item) => item.tokens), 0);
+  const maxTokens = Math.max(...days.map((item) => item.tokens), 0);
 
   const heatmap: {
     date: string;
@@ -100,6 +147,30 @@ export function buildSnapshot(
     trendByRange,
     breakdownByDate: dayMap,
   };
+}
+
+function dedupeAndSortMessages(messages: RawMessage[]) {
+  const byId = new Map<string, RawMessage>();
+  for (const message of messages) {
+    if (!byId.has(message.id)) {
+      byId.set(message.id, message);
+    }
+  }
+  return [...byId.values()].toSorted((left, right) => left.timestampMs - right.timestampMs);
+}
+
+function findFirstMessageAtOrAfter(messages: RawMessage[], timestampMs: number) {
+  let low = 0;
+  let high = messages.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (messages[middle].timestampMs < timestampMs) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+  return low;
 }
 
 function buildTrend(

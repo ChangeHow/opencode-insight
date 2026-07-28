@@ -17,7 +17,10 @@ vi.mock("../services/pricing.js", async () => {
   };
 });
 
+import { flushSnapshotCacheWrites } from "../services/usage/snapshot";
+import { scheduleSnapshotCacheWrite } from "../services/usage/snapshot-cache";
 import { loadUsageSnapshot, refreshRecentUsageSnapshot } from "../services/usage/index";
+import { makeUsageSnapshot } from "./factories";
 
 async function createTestDatabase(dbPath: string) {
   const { DatabaseSync } = (await import("node:sqlite")) as {
@@ -74,6 +77,7 @@ function insertAssistantMessage(
 }
 
 const SNAPSHOT_CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
+const SNAPSHOT_CACHE_FILE = path.join(SNAPSHOT_CACHE_DIR, "usage-snapshot.json");
 const originalOpencodeDataDir = process.env.OPENCODE_DATA_DIR;
 const originalCodexHome = process.env.CODEX_HOME;
 
@@ -87,7 +91,8 @@ describe("Usage runtime integration", () => {
     fs.rmSync(SNAPSHOT_CACHE_DIR, { recursive: true, force: true });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushSnapshotCacheWrites();
     if (originalOpencodeDataDir === undefined) {
       delete process.env.OPENCODE_DATA_DIR;
     } else {
@@ -102,6 +107,24 @@ describe("Usage runtime integration", () => {
     fs.rmSync(SNAPSHOT_CACHE_DIR, { recursive: true, force: true });
     fs.rmSync(tempRoot, { recursive: true, force: true });
     vi.clearAllMocks();
+  });
+
+  test("persists only the latest queued snapshot", async () => {
+    const first = makeUsageSnapshot({
+      summary: { scannedAt: "2026-04-26T10:00:00.000Z" },
+    });
+    const latest = makeUsageSnapshot({
+      summary: { scannedAt: "2026-04-26T10:01:00.000Z" },
+    });
+
+    scheduleSnapshotCacheWrite(first);
+    scheduleSnapshotCacheWrite(latest);
+    await flushSnapshotCacheWrites();
+
+    const cached = JSON.parse(fs.readFileSync(SNAPSHOT_CACHE_FILE, "utf8")) as {
+      summary: { scannedAt: string };
+    };
+    expect(cached.summary.scannedAt).toBe("2026-04-26T10:01:00.000Z");
   });
 
   test("loads assistant usage from sqlite through runtime-native bindings", async () => {
@@ -205,6 +228,47 @@ describe("Usage runtime integration", () => {
     });
   });
 
+  test("refreshes the entire last activity date after a long idle period", async () => {
+    const dbPath = path.join(tempRoot, "opencode.db");
+    const db = await createTestDatabase(dbPath);
+    const morning = Date.UTC(2026, 3, 24, 9, 0, 0);
+    const afternoon = Date.UTC(2026, 3, 24, 15, 0, 0);
+
+    db.exec(`
+      CREATE TABLE session (
+        id TEXT PRIMARY KEY,
+        parent_id TEXT,
+        title TEXT NOT NULL,
+        slug TEXT,
+        directory TEXT NOT NULL
+      );
+      CREATE TABLE message (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        time_created INTEGER NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX message_session_time_created_id_idx
+        ON message (session_id, time_created, id);
+    `);
+    insertSession(db, tempRoot);
+    insertAssistantMessage(db, "morning", morning);
+    insertAssistantMessage(db, "afternoon", afternoon);
+
+    const initialSnapshot = await loadUsageSnapshot({ forceRefresh: true });
+    const refreshedSnapshot = await refreshRecentUsageSnapshot(initialSnapshot, {
+      now: Date.UTC(2026, 4, 10, 12, 0, 0),
+    });
+    db.close();
+
+    expect(refreshedSnapshot.messages.map((message) => message.id)).toEqual([
+      "morning",
+      "afternoon",
+    ]);
+    expect(refreshedSnapshot.summary.totalTokens).toBe(3_000);
+    expect(refreshedSnapshot.breakdownByDate.get("2026-04-24")?.messages).toBe(2);
+  });
+
   test("loads Codex CLI usage and invalidates the snapshot cache when JSONL grows", async () => {
     const sessionDir = path.join(process.env.CODEX_HOME!, "sessions", "2026", "07", "14");
     const sessionPath = path.join(sessionDir, "session-codex.jsonl");
@@ -239,7 +303,10 @@ describe("Usage runtime integration", () => {
     fs.writeFileSync(sessionPath, entries.map((entry) => JSON.stringify(entry)).join("\n"), "utf8");
 
     const initialSnapshot = await loadUsageSnapshot({ forceRefresh: true });
+    await flushSnapshotCacheWrites();
 
+    expect(initialSnapshot.dataFingerprint).not.toBe("");
+    expect(fs.existsSync(SNAPSHOT_CACHE_FILE)).toBe(true);
     expect(initialSnapshot.summary.source.kind).toBe("json");
     expect(initialSnapshot.summary.totalTokens).toBe(150);
     expect(initialSnapshot.breakdownByDate.get("2026-07-14")?.sessions[0]).toMatchObject({
@@ -366,8 +433,6 @@ describe("Usage runtime integration", () => {
       }),
     );
 
-    db.close();
-
     const refreshedSnapshot = await refreshRecentUsageSnapshot(initialSnapshot, { now: today });
 
     expect(refreshedSnapshot.messages).toHaveLength(3);
@@ -375,5 +440,15 @@ describe("Usage runtime integration", () => {
     expect(refreshedSnapshot.summary.totalTokens).toBe(400);
     expect(refreshedSnapshot.breakdownByDate.get("2026-04-24")?.tokens).toBe(150);
     expect(refreshedSnapshot.breakdownByDate.get("2026-04-26")?.tokens).toBe(250);
+
+    db.prepare("DELETE FROM message WHERE time_created >= ?").run(todayFirst);
+    db.close();
+
+    const afterDeletion = await refreshRecentUsageSnapshot(refreshedSnapshot, { now: today });
+
+    expect(afterDeletion.messages.map((message) => message.id)).toEqual(["msg_older"]);
+    expect(afterDeletion.summary.totalMessages).toBe(1);
+    expect(afterDeletion.summary.totalTokens).toBe(150);
+    expect(afterDeletion.breakdownByDate.has("2026-04-26")).toBe(false);
   });
 });
