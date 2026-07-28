@@ -28,6 +28,9 @@ let tempRoot = "";
 let dbPath = "";
 let loadUsageSnapshot: typeof import("../services/usage/index").loadUsageSnapshot | undefined;
 let refreshSnapshot: typeof import("../controllers/shared").refreshSnapshot | undefined;
+let flushSnapshotCacheWrites:
+  | typeof import("../services/usage/snapshot").flushSnapshotCacheWrites
+  | undefined;
 let benchmarkReady: Promise<void> | null = null;
 let nextMessageIndex = MESSAGE_COUNT;
 
@@ -44,6 +47,7 @@ async function createBenchmarkDatabase(databasePath: string) {
   db.exec(`
     CREATE TABLE session (
       id TEXT PRIMARY KEY,
+      parent_id TEXT,
       title TEXT NOT NULL,
       slug TEXT,
       directory TEXT NOT NULL
@@ -154,6 +158,7 @@ async function setupBenchmark() {
   }
 
   ({ loadUsageSnapshot } = await import("../services/usage/index"));
+  ({ flushSnapshotCacheWrites } = await import("../services/usage/snapshot"));
   await loadUsageSnapshot({ forceRefresh: true });
   ({ refreshSnapshot } = await import("../controllers/shared"));
 }
@@ -168,7 +173,8 @@ describe("usage refresh benchmark", () => {
     await ensureBenchmarkReady();
   });
 
-  afterAll(() => {
+  afterAll(async () => {
+    await flushSnapshotCacheWrites?.();
     if (originalOpenCodeDataDir === undefined) {
       delete process.env.OPENCODE_DATA_DIR;
     } else {

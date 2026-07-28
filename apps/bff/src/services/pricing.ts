@@ -325,29 +325,78 @@ function loadCachedDataset() {
   }
 }
 
-let pricingDatasetPromise: Promise<PricingDataset> | null = null;
+let pricingDataset: PricingDataset | null = null;
 let pricingDatasetLoadedAt = 0;
+let pricingRefreshPromise: Promise<void> | null = null;
+let pricingGeneration = 0;
 const pricingLookupCache = new Map<string, ModelPricing | null>();
 
-export async function getPricingDataset() {
-  if (
-    !pricingDatasetPromise ||
-    Date.now() - pricingDatasetLoadedAt >= PRICING_REFRESH_INTERVAL_MS
-  ) {
-    pricingDatasetLoadedAt = Date.now();
-    pricingLookupCache.clear();
-    pricingDatasetPromise = Promise.all([
-      fetchPricingDataset().catch(() => loadCachedDataset()),
-      fetchModelsDevPricingDataset().catch(() => loadCachedModelsDevPricingDataset()),
-    ]).then(([dataset, modelsDevDataset]) =>
-      mergeFallbackDataset(
-        mergeFallbackDataset(filterLitellmData(dataset), modelsDevDataset),
-        FALLBACK_PRICING,
-      ),
-    );
+function mergePricingDatasets(dataset: PricingDataset, modelsDevDataset: PricingDataset) {
+  return mergeFallbackDataset(
+    mergeFallbackDataset(filterLitellmData(dataset), modelsDevDataset),
+    FALLBACK_PRICING,
+  );
+}
+
+function loadLocalPricingDataset() {
+  const dataset = loadCachedDataset();
+  const modelsDevDataset = loadCachedModelsDevPricingDataset();
+  return {
+    dataset: mergePricingDatasets(dataset, modelsDevDataset),
+    hasPersistentCache: Object.keys(dataset).length > 0 || Object.keys(modelsDevDataset).length > 0,
+  };
+}
+
+function refreshPricingDataset() {
+  if (pricingRefreshPromise) {
+    return pricingRefreshPromise;
   }
 
-  return pricingDatasetPromise;
+  const generation = pricingGeneration;
+  const refreshPromise = Promise.all([
+    fetchPricingDataset().catch(() => loadCachedDataset()),
+    fetchModelsDevPricingDataset().catch(() => loadCachedModelsDevPricingDataset()),
+  ])
+    .then(([dataset, modelsDevDataset]) => {
+      if (generation === pricingGeneration) {
+        pricingDataset = mergePricingDatasets(dataset, modelsDevDataset);
+        pricingDatasetLoadedAt = Date.now();
+        pricingLookupCache.clear();
+      }
+    })
+    .catch(() => {
+      // Keep the current dataset when a background refresh fails.
+    })
+    .finally(() => {
+      if (pricingRefreshPromise === refreshPromise) {
+        pricingRefreshPromise = null;
+      }
+    });
+  pricingRefreshPromise = refreshPromise;
+  return refreshPromise;
+}
+
+export async function getPricingDataset() {
+  let dataset = pricingDataset;
+  const needsInitialRefresh = dataset === null;
+  let hasPersistentCache = true;
+  if (dataset === null) {
+    const local = loadLocalPricingDataset();
+    dataset = local.dataset;
+    hasPersistentCache = local.hasPersistentCache;
+    pricingDataset = dataset;
+    pricingDatasetLoadedAt = Date.now();
+  }
+
+  if (needsInitialRefresh || Date.now() - pricingDatasetLoadedAt >= PRICING_REFRESH_INTERVAL_MS) {
+    const refresh = refreshPricingDataset();
+    if (needsInitialRefresh && !hasPersistentCache) {
+      await refresh;
+      return pricingDataset ?? dataset;
+    }
+  }
+
+  return dataset;
 }
 
 function resolvePricing(dataset: PricingDataset, modelId: string, providerId: string) {
@@ -393,7 +442,9 @@ export async function estimateUsageCost(
 }
 
 export function invalidatePricingCache() {
-  pricingDatasetPromise = null;
+  pricingGeneration += 1;
+  pricingDataset = null;
   pricingDatasetLoadedAt = 0;
+  pricingRefreshPromise = null;
   pricingLookupCache.clear();
 }

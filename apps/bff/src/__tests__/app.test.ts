@@ -59,6 +59,7 @@ import {
 import { buildSessionMessagePayloads, invalidateMessagePayloadCache } from "../services/messages";
 import { buildSessionDetailBreakdown } from "../services/session-tasks";
 import { getRemoteUsageForRange, pushUsageSnapshot } from "../services/sync/remote";
+import { createSystem } from "../controllers/system";
 
 const mockLoadUsageSnapshot = vi.mocked(loadUsageSnapshot);
 const mockRefreshRecentUsageSnapshot = vi.mocked(refreshRecentUsageSnapshot);
@@ -100,6 +101,26 @@ describe("BFF API Routes", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual(rangeData.summary);
+  });
+
+  test("GET /api/ready returns ready after the initial snapshot resolves", async () => {
+    const res = await app.request("/api/ready");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ready: true });
+  });
+
+  test("GET /api/ready returns unavailable without waiting for a pending or rejected snapshot", async () => {
+    const pendingSystem = createSystem(() => new Promise(() => {}));
+    const rejectedSystem = createSystem(() => Promise.reject(new Error("initial scan failed")));
+
+    const pendingRes = await pendingSystem.request("/api/ready");
+    const rejectedRes = await rejectedSystem.request("/api/ready");
+
+    expect(pendingRes.status).toBe(503);
+    expect(await pendingRes.json()).toEqual({ ready: false });
+    expect(rejectedRes.status).toBe(503);
+    expect(await rejectedRes.json()).toEqual({ ready: false });
   });
 
   test("request logs include rich request context", async () => {

@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { DayBreakdown } from "@opencode-dashboard/shared";
 import {
   dateKeyToUtcNoon,
   DEFAULT_TIME_ZONE,
@@ -9,15 +8,18 @@ import {
 } from "@opencode-dashboard/shared";
 import { logger } from "../../logger";
 import { estimateUsageCostFromDataset, getPricingDataset } from "../pricing";
-import { getCodexPaths, listCodexSessionFiles, readCodexMessages } from "./codex-reader";
+import { getCodexPaths, readCodexMessages } from "./codex-reader";
 import { readLegacyMessages } from "./legacy-reader";
-import { buildSnapshot } from "./day-map";
-import { emptyBreakdown, totalTokens, readSqliteMessages } from "./sqlite-reader";
-import type { RawMessage, SerializedUsageSnapshot, SourceKind, UsageSnapshot } from "./types";
+import {
+  flushSnapshotCacheWrites,
+  readSnapshotCache,
+  scheduleSnapshotCacheWrite,
+  withDataFingerprint,
+} from "./snapshot-cache";
+import { buildIncrementalSnapshot, buildSnapshot } from "./snapshot-builder";
+import { totalTokens, readSqliteMessages } from "./sqlite-reader";
+import type { RawMessage, SourceKind, UsageSnapshot } from "./types";
 
-const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
-const SNAPSHOT_CACHE_FILE = path.join(CACHE_DIR, "usage-snapshot.json");
-const SNAPSHOT_SCHEMA_VERSION = 5;
 const FAST_REFRESH_WINDOW_DAYS = 2;
 const PROVIDER_ALIASES: Record<string, string> = {
   zhipu: "zai-coding-plan",
@@ -30,58 +32,6 @@ const PROVIDER_ALIASES: Record<string, string> = {
 export function normalizeProviderId(providerId: string) {
   const normalized = providerId.trim().toLowerCase();
   return PROVIDER_ALIASES[normalized] ?? normalized;
-}
-
-export function computeDataFingerprint(
-  dbPath: string,
-  legacyDir: string,
-  codexSessionDirs: string[] = [],
-): string {
-  const parts: string[] = [];
-  if (fs.existsSync(dbPath)) {
-    const stat = fs.statSync(dbPath);
-    parts.push(`db:${stat.ino}:${stat.size}`);
-  }
-  if (fs.existsSync(legacyDir)) {
-    const stat = fs.statSync(legacyDir);
-    parts.push(`legacy:${stat.ino}:${Math.trunc(stat.mtimeMs)}`);
-  }
-  for (const filePath of listCodexSessionFiles(codexSessionDirs)) {
-    try {
-      const stat = fs.statSync(filePath);
-      parts.push(`codex:${filePath}:${stat.size}:${Math.trunc(stat.mtimeMs)}`);
-    } catch {
-      // The next refresh will pick up files that changed while scanning.
-    }
-  }
-  const sessionIndexPath = codexSessionDirs[0]
-    ? path.join(path.dirname(codexSessionDirs[0]), "session_index.jsonl")
-    : "";
-  if (sessionIndexPath && fs.existsSync(sessionIndexPath)) {
-    const stat = fs.statSync(sessionIndexPath);
-    parts.push(`codex-index:${stat.size}:${Math.trunc(stat.mtimeMs)}`);
-  }
-  return parts.length > 0 ? parts.join("|") : "empty";
-}
-
-export function emptyDayBreakdown(date: string): DayBreakdown {
-  return {
-    date,
-    tokens: 0,
-    pricedTokens: 0,
-    cost: 0,
-    messages: 0,
-    breakdown: emptyBreakdown(),
-    models: [],
-    sessions: [],
-  };
-}
-
-export function normalizeDayBreakdown(day: DayBreakdown): DayBreakdown {
-  return {
-    ...day,
-    sessions: day.sessions ?? [],
-  };
 }
 
 function getOpenCodePaths() {
@@ -192,74 +142,6 @@ function resolveRefreshedSourceKind(
   return resolveSourceKind(Number(hasSqlite), Number(hasJson));
 }
 
-function serializeSnapshot(snapshot: UsageSnapshot): SerializedUsageSnapshot {
-  return {
-    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
-    summary: snapshot.summary,
-    messages: snapshot.messages,
-    heatmap: snapshot.heatmap,
-    trendByRange: snapshot.trendByRange,
-    breakdownByDate: [...snapshot.breakdownByDate.values()].toSorted((a, b) =>
-      a.date.localeCompare(b.date),
-    ),
-  };
-}
-
-function deserializeSnapshot(snapshot: SerializedUsageSnapshot): UsageSnapshot {
-  return {
-    summary: snapshot.summary,
-    dataFingerprint: snapshot.dataFingerprint ?? "",
-    messages: snapshot.messages,
-    heatmap: snapshot.heatmap,
-    trendByRange: snapshot.trendByRange,
-    breakdownByDate: new Map(
-      snapshot.breakdownByDate.map((day) => [day.date, normalizeDayBreakdown(day)]),
-    ),
-  };
-}
-
-function readSnapshotCache(dbPath: string, legacyDir: string, codexSessionDirs: string[]) {
-  if (!fs.existsSync(SNAPSHOT_CACHE_FILE)) {
-    return null;
-  }
-
-  try {
-    const cached = JSON.parse(
-      fs.readFileSync(SNAPSHOT_CACHE_FILE, "utf8"),
-    ) as SerializedUsageSnapshot;
-    if (cached.schemaVersion !== SNAPSHOT_SCHEMA_VERSION) {
-      return null;
-    }
-    const missingSessionShape = cached.breakdownByDate.some((day) => !("sessions" in day));
-    if (missingSessionShape) {
-      return null;
-    }
-    if (cached.dataFingerprint !== undefined) {
-      const currentFingerprint = computeDataFingerprint(dbPath, legacyDir, codexSessionDirs);
-      if (cached.dataFingerprint !== currentFingerprint) {
-        return null;
-      }
-    }
-    return deserializeSnapshot(cached);
-  } catch {
-    return null;
-  }
-}
-
-function writeSnapshotCache(
-  snapshot: UsageSnapshot,
-  dbPath: string,
-  legacyDir: string,
-  codexSessionDirs: string[],
-) {
-  fs.mkdirSync(CACHE_DIR, { recursive: true });
-  const serialized: SerializedUsageSnapshot = {
-    ...serializeSnapshot(snapshot),
-    dataFingerprint: computeDataFingerprint(dbPath, legacyDir, codexSessionDirs),
-  };
-  fs.writeFileSync(SNAPSHOT_CACHE_FILE, JSON.stringify(serialized), "utf8");
-}
-
 export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
   const { dbPath, legacyDir, root, isDefault } = getOpenCodePaths();
   const codex = getCodexPaths();
@@ -280,11 +162,18 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
   if (!options?.forceRefresh) {
     const cached = readSnapshotCache(dbPath, legacyDir, codex.sessionDirs);
     if (cached) {
-      logger.info(
-        { source: cached.summary.source, dayCount: cached.breakdownByDate.size, fromCache: true },
-        "Loaded usage snapshot from cache",
-      );
-      return cached;
+      if (cached.fresh) {
+        logger.info(
+          {
+            source: cached.snapshot.summary.source,
+            dayCount: cached.snapshot.breakdownByDate.size,
+            fromCache: true,
+          },
+          "Loaded usage snapshot from cache",
+        );
+        return cached.snapshot;
+      }
+      logger.info("Usage snapshot cache is stale; rebuilding from source");
     }
   }
 
@@ -300,7 +189,12 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
   );
 
   const paths = getSnapshotPaths(dbPath, legacyDir, codex.sessionDirs);
-  const snapshot = buildSnapshot(messages, sourceKind, paths);
+  const snapshot = withDataFingerprint(
+    buildSnapshot(messages, sourceKind, paths),
+    dbPath,
+    legacyDir,
+    codex.sessionDirs,
+  );
 
   if (messages.length === 0) {
     logger.warn(
@@ -338,7 +232,7 @@ export async function loadUsageSnapshot(options?: { forceRefresh?: boolean }) {
     );
   }
 
-  writeSnapshotCache(snapshot, dbPath, legacyDir, codex.sessionDirs);
+  scheduleSnapshotCacheWrite(snapshot);
   return snapshot;
 }
 
@@ -348,16 +242,20 @@ export async function refreshRecentUsageSnapshot(
 ) {
   const { dbPath, legacyDir } = getOpenCodePaths();
   const codex = getCodexPaths();
+  const cached = baseSnapshot ? null : readSnapshotCache(dbPath, legacyDir, codex.sessionDirs);
   const snapshot =
     baseSnapshot ??
-    readSnapshotCache(dbPath, legacyDir, codex.sessionDirs) ??
+    (cached?.fresh ? cached.snapshot : undefined) ??
     (await loadUsageSnapshot({ forceRefresh: true }));
   const refreshStartDateKey = getFastRefreshStartDateKey(options?.now);
   const refreshStartTimestampMs = dateKeyToUtcStartTimestampMs(refreshStartDateKey);
-  const snapshotLastTimestampMs = snapshot.messages.at(-1)?.timestampMs;
+  const snapshotLastDateKey = snapshot.messages.at(-1)?.date;
+  const snapshotLastDateStartTimestampMs = snapshotLastDateKey
+    ? dateKeyToUtcStartTimestampMs(snapshotLastDateKey)
+    : undefined;
   const effectiveRefreshStartTimestampMs =
-    snapshotLastTimestampMs !== undefined
-      ? Math.min(refreshStartTimestampMs, snapshotLastTimestampMs)
+    snapshotLastDateStartTimestampMs !== undefined
+      ? Math.min(refreshStartTimestampMs, snapshotLastDateStartTimestampMs)
       : refreshStartTimestampMs;
   const {
     sqliteMessages,
@@ -368,24 +266,25 @@ export async function refreshRecentUsageSnapshot(
     fromTimestampMs: effectiveRefreshStartTimestampMs,
   });
 
-  if (recentMessages.length === 0) {
-    return snapshot;
-  }
-
-  const historicalMessages = snapshot.messages.filter(
-    (message) => message.timestampMs < effectiveRefreshStartTimestampMs,
-  );
-  const mergedMessages = dedupeMessages([...historicalMessages, ...recentMessages]);
-  const refreshedSnapshot = buildSnapshot(
-    mergedMessages,
-    resolveRefreshedSourceKind(
-      snapshot.summary.source.kind,
-      sqliteMessages.length,
-      legacyMessages.length + codexMessages.length,
+  const refreshedSnapshot = withDataFingerprint(
+    buildIncrementalSnapshot(
+      snapshot,
+      recentMessages,
+      effectiveRefreshStartTimestampMs,
+      resolveRefreshedSourceKind(
+        snapshot.summary.source.kind,
+        sqliteMessages.length,
+        legacyMessages.length + codexMessages.length,
+      ),
+      getSnapshotPaths(dbPath, legacyDir, codex.sessionDirs),
     ),
-    getSnapshotPaths(dbPath, legacyDir, codex.sessionDirs),
+    dbPath,
+    legacyDir,
+    codex.sessionDirs,
   );
 
-  writeSnapshotCache(refreshedSnapshot, dbPath, legacyDir, codex.sessionDirs);
+  scheduleSnapshotCacheWrite(refreshedSnapshot);
   return refreshedSnapshot;
 }
+
+export { flushSnapshotCacheWrites };
