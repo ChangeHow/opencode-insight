@@ -6,7 +6,7 @@ import { roundCost } from "../cost";
 import { querySqliteRows } from "../sqlite";
 import type { RawMessage } from "./types";
 
-const SQLITE_USAGE_QUERY = `
+const SQLITE_USAGE_QUERY_PREFIX = `
   WITH RECURSIVE session_owner(id, root_id, root_title, root_slug, root_directory) AS (
     SELECT id, id, title, slug, directory
     FROM session
@@ -33,14 +33,27 @@ const SQLITE_USAGE_QUERY = `
     COALESCE(owner.root_title, s.title) AS session_title,
     COALESCE(owner.root_slug, s.slug) AS session_slug,
     COALESCE(owner.root_directory, s.directory) AS session_directory
+`;
+
+const SQLITE_USAGE_QUERY = `${SQLITE_USAGE_QUERY_PREFIX}
   FROM message m
   JOIN session s ON s.id = m.session_id
   LEFT JOIN session_owner owner ON owner.id = s.id
   WHERE json_extract(m.data, '$.role') = 'assistant'
     AND json_extract(m.data, '$.modelID') IS NOT NULL
 `;
-const SQLITE_USAGE_WINDOW_QUERY = `${SQLITE_USAGE_QUERY}
+
+const SQLITE_USAGE_RECENT_QUERY = `${SQLITE_USAGE_QUERY_PREFIX}
+  FROM session s
+  CROSS JOIN message m
+  LEFT JOIN session_owner owner ON owner.id = s.id
+  WHERE m.session_id = s.id
+    AND json_extract(m.data, '$.role') = 'assistant'
+    AND json_extract(m.data, '$.modelID') IS NOT NULL
     AND m.time_created >= ?
+`;
+
+const SQLITE_USAGE_WINDOW_QUERY = `${SQLITE_USAGE_RECENT_QUERY}
     AND m.time_created < ?
 `;
 
@@ -191,9 +204,7 @@ export async function readSqliteMessages(dbPath: string, options?: { fromTimesta
   }
 
   try {
-    const query = `${SQLITE_USAGE_QUERY}${
-      options?.fromTimestampMs ? " AND m.time_created >= ?" : ""
-    }`;
+    const query = options?.fromTimestampMs ? SQLITE_USAGE_RECENT_QUERY : SQLITE_USAGE_QUERY;
     const rows = await querySqliteRows<SqliteUsageRow>(
       dbPath,
       query,

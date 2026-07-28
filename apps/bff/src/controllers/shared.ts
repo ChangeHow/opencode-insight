@@ -15,7 +15,6 @@ export let snapshotPromise = Promise.resolve(loadUsageSnapshot()).then((snapshot
   return snapshot;
 });
 let refreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
-let backgroundRefreshPromise: Promise<Awaited<typeof snapshotPromise>> | null = null;
 
 export function parseRange(value: string | undefined): TimeRange {
   if (
@@ -56,7 +55,6 @@ export function refreshSnapshot() {
     .then((snapshot) => {
       snapshotPromise = Promise.resolve(snapshot);
       void syncUsageSnapshot(snapshot);
-      void scheduleBackgroundRefresh();
       return snapshot;
     })
     .finally(() => {
@@ -70,26 +68,4 @@ export async function forceRefreshSnapshot() {
   const snapshot = await loadUsageSnapshot({ forceRefresh: true });
   snapshotPromise = Promise.resolve(snapshot);
   return snapshot;
-}
-
-function scheduleBackgroundRefresh() {
-  if (backgroundRefreshPromise) {
-    return backgroundRefreshPromise;
-  }
-
-  backgroundRefreshPromise = loadUsageSnapshot({ forceRefresh: true })
-    .then((snapshot) => {
-      snapshotPromise = Promise.resolve(snapshot);
-      void syncUsageSnapshot(snapshot);
-      return snapshot;
-    })
-    .catch((error) => {
-      logger.error({ err: error }, "Background refresh validation failed");
-      return snapshotPromise;
-    })
-    .finally(() => {
-      backgroundRefreshPromise = null;
-    });
-
-  return backgroundRefreshPromise;
 }
