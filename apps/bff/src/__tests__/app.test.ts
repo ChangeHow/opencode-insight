@@ -376,19 +376,18 @@ describe("BFF API Routes", () => {
     });
   });
 
-  test("POST /api/refresh invalidates cache and returns new scannedAt", async () => {
+  test("POST /api/refresh updates recent data without forcing a full scan", async () => {
     const newSnapshot = makeUsageSnapshot({
       summary: { scannedAt: "2025-01-20T12:00:00.000Z" },
     });
     mockRefreshRecentUsageSnapshot.mockResolvedValue(newSnapshot);
-    mockLoadUsageSnapshot.mockResolvedValue(newSnapshot);
 
     const res = await app.request("/api/refresh", { method: "POST" });
 
     expect(res.status).toBe(200);
     expect(mockInvalidateMessagePayloadCache).toHaveBeenCalled();
     expect(mockRefreshRecentUsageSnapshot).toHaveBeenCalled();
-    expect(mockLoadUsageSnapshot).toHaveBeenCalledWith({ forceRefresh: true });
+    expect(mockLoadUsageSnapshot).not.toHaveBeenCalled();
 
     const json = await res.json();
     expect(json).toEqual({
