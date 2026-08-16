@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSyn
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { box } from "@clack/prompts";
+import { registerQueryCommands } from "./opendash-query.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PID_FILE = path.join(ROOT, ".telescope-daemon.pid");
@@ -198,20 +199,40 @@ const program = new Command();
 
 program
   .name("opendash")
-  .description("Manage the opencode-telescope dashboard daemon")
+  .description(
+    "Manage the opencode-telescope dashboard daemon and query usage data.\n\nDaemon commands keep the local web dashboard running in the background.\nQuery commands read live usage data from the daemon (start it first).",
+  )
   .version("0.1.0");
+
+program.addHelpText(
+  "after",
+  `\nQuick start:
+  opendash start                 # launch the dashboard daemon
+  opendash summary --range month # query this month's usage
+  opendash models --json         # per-model data as JSON`,
+);
 
 program
   .command("start")
-  .description("Start the dashboard daemon in the background")
+  .description(
+    "Start the dashboard daemon in the background.\nServes the built web app and the REST API on the configured port.",
+  )
   .option("--port <port>", "Port to listen on", process.env.PORT ?? "8787")
   .option("--host <host>", "Host to bind to", process.env.HOST ?? "127.0.0.1")
   .action(startCommand);
 
-program.command("stop").description("Stop the running dashboard daemon").action(stopCommand);
+program.command("stop").description("Stop the running dashboard daemon.").action(stopCommand);
 
-program.command("status").description("Show the daemon running status").action(statusCommand);
+program
+  .command("status")
+  .description("Show whether the daemon is running, its PID, and access URL.")
+  .action(statusCommand);
 
-program.command("logs").description("Stream daemon logs (tail -f)").action(logsCommand);
+program
+  .command("logs")
+  .description("Stream daemon logs (tail -f). Press Ctrl-C to stop streaming.")
+  .action(logsCommand);
+
+registerQueryCommands(program);
 
 program.parse();
