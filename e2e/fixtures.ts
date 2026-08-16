@@ -214,24 +214,24 @@ export function makeMockDashboard(): DashboardPayload {
   const heatmap = makeMockHeatmap();
   const trend = makeMockTrend();
   const series = makeMockSeries();
-  const providers = makeMockProviders();
 
   return {
     summary: makeMockSummary(),
     heatmap,
     trend,
     series,
-    providers: providers.providers,
     selectedDay: null,
   };
 }
 
 export function makeMockProviderDashboard(providerId: string): ProviderDashboardPayload {
   const dashboard = makeMockDashboard();
-  const provider = dashboard.providers.find((item) => item.providerId === providerId) ?? null;
+  const providers = makeMockProviders();
+  const provider = providers.providers.find((item) => item.providerId === providerId) ?? null;
   return {
     ...dashboard,
     provider,
+    providers: providers.providers,
     trend: provider?.trend ?? [],
     series: {
       options: dashboard.series.options.filter((option) => option.providerId === providerId),

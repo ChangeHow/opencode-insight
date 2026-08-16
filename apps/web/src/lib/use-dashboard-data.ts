@@ -4,7 +4,6 @@ import {
   customDateRangeAtom,
   dashboardStateAtom,
   heatmapAtom,
-  providerInsightsAtom,
   rangeAtom,
   remoteUsageAtom,
   selectedSeriesKeysAtom,
@@ -28,7 +27,6 @@ export function useDashboardData() {
   const setTrend = useSetAtom(trendAtom);
   const setSeriesOptions = useSetAtom(seriesOptionsAtom);
   const setSeriesLines = useSetAtom(seriesLinesAtom);
-  const setProviderInsights = useSetAtom(providerInsightsAtom);
   const setRemoteUsage = useSetAtom(remoteUsageAtom);
   const setSelectedSeriesKeys = useSetAtom(selectedSeriesKeysAtom);
   const dashboardState = useAtomValue(dashboardStateAtom);
@@ -39,48 +37,47 @@ export function useDashboardData() {
   );
   const lastSeriesSelectionKey = useRef<string | null>(null);
 
+  const onSuccess = useCallback(
+    (dashboard: Awaited<ReturnType<typeof fetchDashboard>>) => {
+      setSummary(dashboard.summary);
+      setHeatmap(dashboard.heatmap);
+      setTrend(dashboard.trend);
+      setSeriesOptions(dashboard.series.options);
+      setSeriesLines(dashboard.series.lines);
+      setSelectedSeriesKeys((current) => {
+        const visibleOptions = dashboard.series.options.filter(hasSeriesValue).slice(0, 10);
+        if (lastSeriesSelectionKey.current !== requestKey) {
+          lastSeriesSelectionKey.current = requestKey;
+          return visibleOptions.slice(0, 3).map((option) => option.key);
+        }
+
+        const valid = current.filter((key) => visibleOptions.some((option) => option.key === key));
+        return valid.length > 0 ? valid : visibleOptions.slice(0, 3).map((option) => option.key);
+      });
+    },
+    [
+      setHeatmap,
+      setSelectedSeriesKeys,
+      setSeriesLines,
+      setSeriesOptions,
+      setSummary,
+      setTrend,
+      requestKey,
+    ],
+  );
+
+  const onError = useCallback(() => {
+    setSummary(null);
+    setHeatmap([]);
+    setTrend([]);
+    setSeriesOptions([]);
+    setSeriesLines([]);
+  }, [setHeatmap, setSeriesLines, setSeriesOptions, setSummary, setTrend]);
+
   useDataFetcher({
     fetchFn: useCallback(() => fetchDashboard(range, customDateRange), [range, customDateRange]),
-    onSuccess: useCallback(
-      (dashboard: Awaited<ReturnType<typeof fetchDashboard>>) => {
-        setSummary(dashboard.summary);
-        setHeatmap(dashboard.heatmap);
-        setTrend(dashboard.trend);
-        setSeriesOptions(dashboard.series.options);
-        setSeriesLines(dashboard.series.lines);
-        setProviderInsights(dashboard.providers);
-        setSelectedSeriesKeys((current) => {
-          const visibleOptions = dashboard.series.options.filter(hasSeriesValue).slice(0, 10);
-          if (lastSeriesSelectionKey.current !== requestKey) {
-            lastSeriesSelectionKey.current = requestKey;
-            return visibleOptions.slice(0, 3).map((option) => option.key);
-          }
-
-          const valid = current.filter((key) =>
-            visibleOptions.some((option) => option.key === key),
-          );
-          return valid.length > 0 ? valid : visibleOptions.slice(0, 3).map((option) => option.key);
-        });
-      },
-      [
-        setHeatmap,
-        setProviderInsights,
-        setSelectedSeriesKeys,
-        setSeriesLines,
-        setSeriesOptions,
-        setSummary,
-        setTrend,
-        requestKey,
-      ],
-    ),
-    onError: useCallback(() => {
-      setSummary(null);
-      setHeatmap([]);
-      setTrend([]);
-      setSeriesOptions([]);
-      setSeriesLines([]);
-      setProviderInsights([]);
-    }, [setHeatmap, setProviderInsights, setSeriesLines, setSeriesOptions, setSummary, setTrend]),
+    onSuccess,
+    onError,
   });
 
   useEffect(() => {
