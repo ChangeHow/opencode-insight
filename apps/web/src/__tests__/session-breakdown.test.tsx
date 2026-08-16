@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@lobehub/icons/es/Codex", () => ({
   default: (props: Record<string, unknown>) => <svg data-icon="codex" {...props} />,
@@ -15,7 +15,7 @@ import { SessionBreakdownPanel } from "../components/dashboard/session-breakdown
 import { makeSessionBreakdown } from "./factories";
 
 describe("SessionBreakdownPanel", () => {
-  test("labels the Codex CLI agent runtime with its icon", () => {
+  test("labels the Codex CLI agent runtime with its icon", async () => {
     render(
       <SessionBreakdownPanel
         session={{
@@ -27,11 +27,11 @@ describe("SessionBreakdownPanel", () => {
 
     const runtime = screen.getByLabelText("Agent runtime: Codex CLI");
     expect(runtime).toHaveTextContent("Codex CLI");
-    expect(runtime.querySelector('[data-icon="codex"]')).toBeInTheDocument();
+    await waitFor(() => expect(runtime.querySelector('[data-icon="codex"]')).toBeInTheDocument());
     expect(screen.getByTestId("session-title-row")).toContainElement(runtime);
   });
 
-  test("labels the OpenCode agent runtime with its icon", () => {
+  test("labels the OpenCode agent runtime with its icon", async () => {
     render(
       <SessionBreakdownPanel
         session={{
@@ -43,7 +43,9 @@ describe("SessionBreakdownPanel", () => {
 
     const runtime = screen.getByLabelText("Agent runtime: OpenCode");
     expect(runtime).toHaveTextContent("OpenCode");
-    expect(runtime.querySelector('[data-icon="opencode"]')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(runtime.querySelector('[data-icon="opencode"]')).toBeInTheDocument(),
+    );
   });
 
   test("keeps long session titles compact", () => {

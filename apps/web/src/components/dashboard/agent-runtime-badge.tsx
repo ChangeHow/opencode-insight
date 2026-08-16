@@ -1,15 +1,10 @@
-import type { ComponentType, SVGProps } from "react";
-import Codex from "@lobehub/icons/es/Codex";
-import OpenCode from "@lobehub/icons/es/OpenCode";
 import type { AgentRuntime } from "@opencode-dashboard/shared";
+import { BrandIcon, type BrandIconName } from "@/components/dashboard/brand-icons";
 import { cn } from "@/lib/utils";
 
-const RUNTIME_DETAILS: Record<
-  AgentRuntime,
-  { icon: ComponentType<SVGProps<SVGSVGElement>>; label: string }
-> = {
-  opencode: { icon: OpenCode, label: "OpenCode" },
-  codex: { icon: Codex, label: "Codex CLI" },
+const RUNTIME_DETAILS: Record<AgentRuntime, { icon: BrandIconName; label: string }> = {
+  opencode: { icon: "opencode", label: "OpenCode" },
+  codex: { icon: "codex", label: "Codex CLI" },
 };
 
 export function AgentRuntimeBadge({
@@ -20,7 +15,6 @@ export function AgentRuntimeBadge({
   className?: string;
 }) {
   const details = RUNTIME_DETAILS[runtime];
-  const Icon = details.icon;
 
   return (
     <span
@@ -30,7 +24,7 @@ export function AgentRuntimeBadge({
         className,
       )}
     >
-      <Icon className="size-3.5 shrink-0" />
+      <BrandIcon name={details.icon} className="size-3.5 shrink-0" />
       {details.label}
     </span>
   );
