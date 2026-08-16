@@ -17,7 +17,7 @@
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "vite": "^8.0.2",
+    "vite": "^8.2.1",
     "vite-plugin-dts": "^4.5.4"
   }
 }
