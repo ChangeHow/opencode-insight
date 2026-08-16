@@ -302,7 +302,7 @@ export async function buildMessagePayloads(
   return payloads;
 }
 
-export function buildSessionMessagePayloads(sessionId: string) {
+export async function buildSessionMessagePayloads(sessionId: string) {
   if (sessionId.startsWith("codex:")) {
     return buildCodexMessagePayloads(getCodexPaths().sessionDirs, sessionId);
   }

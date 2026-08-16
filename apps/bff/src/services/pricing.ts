@@ -178,12 +178,12 @@ function hasPriorityPricing(pricing: ModelPricing) {
   );
 }
 
-function findPricing(
-  dataset: PricingDataset,
+export function findModelEntry<T>(
+  dataset: Record<string, T>,
   modelId: string,
   providerId?: string,
-  requirePriority = false,
-): ModelPricing | undefined {
+  match?: (entry: T) => boolean,
+): T | undefined {
   const raw = resolveAlias(modelId).toLowerCase();
   const hints = providerTags(providerId);
   const strippedCandidates = iterativelyStripProviderPrefixes(raw);
@@ -200,46 +200,59 @@ function findPricing(
     (value, index, array): value is string => Boolean(value) && array.indexOf(value) === index,
   );
 
+  const accepts = (entry: T) => !match || match(entry);
+
   for (const variant of variants) {
-    for (const [key, pricing] of Object.entries(dataset)) {
+    for (const [key, entry] of Object.entries(dataset)) {
       const lowerKey = key.toLowerCase();
       if (
-        (!requirePriority || hasPriorityPricing(pricing)) &&
+        accepts(entry) &&
         hints.includes(primaryProviderTag(lowerKey) ?? "") &&
         lowerKey.endsWith(`/${variant}`)
       ) {
-        return pricing;
+        return entry;
       }
     }
 
-    for (const [key, pricing] of Object.entries(dataset)) {
+    for (const [key, entry] of Object.entries(dataset)) {
       const lowerKey = key.toLowerCase();
-      if ((!requirePriority || hasPriorityPricing(pricing)) && lowerKey === variant) {
-        return pricing;
+      if (accepts(entry) && lowerKey === variant) {
+        return entry;
       }
       if (
-        (!requirePriority || hasPriorityPricing(pricing)) &&
+        accepts(entry) &&
         matchesProviderHint(lowerKey, providerId) &&
         lowerKey.endsWith(`/${variant}`)
       ) {
-        return pricing;
+        return entry;
       }
     }
   }
 
   for (const variant of variants) {
-    for (const [key, pricing] of Object.entries(dataset)) {
+    for (const [key, entry] of Object.entries(dataset)) {
       const lowerKey = key.toLowerCase();
-      if (
-        (!requirePriority || hasPriorityPricing(pricing)) &&
-        (lowerKey.endsWith(`/${variant}`) || lowerKey.includes(variant))
-      ) {
-        return pricing;
+      if (accepts(entry) && (lowerKey.endsWith(`/${variant}`) || lowerKey.includes(variant))) {
+        return entry;
       }
     }
   }
 
   return undefined;
+}
+
+function findPricing(
+  dataset: PricingDataset,
+  modelId: string,
+  providerId?: string,
+  requirePriority = false,
+): ModelPricing | undefined {
+  return findModelEntry(
+    dataset,
+    modelId,
+    providerId,
+    requirePriority ? (pricing) => hasPriorityPricing(pricing) : undefined,
+  );
 }
 
 function computeTieredComponent(tokens: number, base?: number, above?: number) {

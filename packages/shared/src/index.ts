@@ -144,7 +144,6 @@ export interface DashboardPayload {
   heatmap: HeatmapDay[];
   trend: TrendPoint[];
   series: CostSeriesPayload;
-  providers: ProviderInsight[];
   selectedDay: DayBreakdown | null;
   remoteSync?: RemoteUsagePayload;
 }
@@ -217,6 +216,7 @@ export interface RemoteSyncActionPayload {
 
 export interface ProviderDashboardPayload extends DashboardPayload {
   provider: ProviderInsight | null;
+  providers: ProviderInsight[];
 }
 
 export interface ApiErrorPayload {
@@ -286,10 +286,41 @@ export interface ToolUsageStat {
   totalTokens: number;
 }
 
+/** Where the initialization context came from. */
+export type ContextSegmentKind =
+  | "user" // the user's own prompt
+  | "instructions" // AGENTS.md / user_instructions / persona files
+  | "environment" // environment_context: cwd, sandbox, git, tool output
+  | "tools" // tool/schema definitions (estimated)
+  | "other"; // unclassified content
+
+export interface ContextSegmentStat {
+  kind: ContextSegmentKind;
+  label: string;
+  tokens: number;
+}
+
+export interface FirstPromptContextStat {
+  messageIndex: number;
+  modelId: string;
+  providerId?: string;
+  /** 0 = unknown. Only sessions with runtime telemetry (codex) get a real
+   *  window; catalogs describe API limits, not subscription caps, so a
+   *  catalog-derived percentage would be misleading. */
+  contextWindow: number;
+  promptTokens: number;
+  /** 0 when the window is unknown. */
+  ratio: number;
+  source?: "reported" | "catalog";
+  /** Composition of the initial context when the runtime exposes it. */
+  segments?: ContextSegmentStat[];
+}
+
 export interface MessageOverviewPayload {
   timeline: TimelinePoint[];
   toolUsage: ToolUsageStat[];
   totalMessages: number;
+  firstPromptContext?: FirstPromptContextStat | null;
 }
 
 export interface MessageTokenPoint {
