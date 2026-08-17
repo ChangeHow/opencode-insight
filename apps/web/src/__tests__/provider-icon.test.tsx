@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 
 vi.mock("@lobehub/icons/es/Anthropic", () => ({
   default: (props: Record<string, unknown>) => <svg data-icon="anthropic" {...props} />,
@@ -35,33 +35,33 @@ vi.mock("@lobehub/icons/es/Zhipu", () => ({
 import { ProviderIcon } from "../components/dashboard/provider-icon";
 
 describe("ProviderIcon", () => {
-  test("renders the Moonshot icon for Moonshot providers", () => {
+  test("renders the Moonshot icon for Moonshot providers", async () => {
     const { container } = render(<ProviderIcon providerId="moonshotai" />);
-    expect(container.querySelector('[data-icon="moonshot"]')).toBeTruthy();
+    await waitFor(() => expect(container.querySelector('[data-icon="moonshot"]')).toBeTruthy());
   });
 
-  test("renders the Moonshot icon for Kimi providers", () => {
+  test("renders the Moonshot icon for Kimi providers", async () => {
     const { container } = render(<ProviderIcon providerId="kimi" />);
-    expect(container.querySelector('[data-icon="moonshot"]')).toBeTruthy();
+    await waitFor(() => expect(container.querySelector('[data-icon="moonshot"]')).toBeTruthy());
   });
 
-  test("renders the OpenCode icon for opencode-go provider", () => {
+  test("renders the OpenCode icon for opencode-go provider", async () => {
     const { container } = render(<ProviderIcon providerId="opencode-go" />);
-    expect(container.querySelector('[data-icon="opencode"]')).toBeTruthy();
+    await waitFor(() => expect(container.querySelector('[data-icon="opencode"]')).toBeTruthy());
   });
 
-  test("renders the OpenCode icon for opencode provider", () => {
+  test("renders the OpenCode icon for opencode provider", async () => {
     const { container } = render(<ProviderIcon providerId="opencode" />);
-    expect(container.querySelector('[data-icon="opencode"]')).toBeTruthy();
+    await waitFor(() => expect(container.querySelector('[data-icon="opencode"]')).toBeTruthy());
   });
 
-  test("renders the ZenMux icon for zenmux provider", () => {
+  test("renders the ZenMux icon for zenmux provider", async () => {
     const { container } = render(<ProviderIcon providerId="zenmux" />);
-    expect(container.querySelector('[data-icon="zenmux"]')).toBeTruthy();
+    await waitFor(() => expect(container.querySelector('[data-icon="zenmux"]')).toBeTruthy());
   });
 
-  test("renders the ZenMux icon for hyphenated zen-mux id", () => {
+  test("renders the ZenMux icon for hyphenated zen-mux id", async () => {
     const { container } = render(<ProviderIcon providerId="zen-mux" />);
-    expect(container.querySelector('[data-icon="zenmux"]')).toBeTruthy();
+    await waitFor(() => expect(container.querySelector('[data-icon="zenmux"]')).toBeTruthy());
   });
 });

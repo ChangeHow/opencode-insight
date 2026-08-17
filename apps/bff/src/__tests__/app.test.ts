@@ -330,7 +330,6 @@ describe("BFF API Routes", () => {
         options: rangeData.seriesOptions,
         lines: rangeData.seriesLines,
       },
-      providers: rangeData.providers,
       selectedDay: null,
       remoteSync: undefined,
     });

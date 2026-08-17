@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "node ../../scripts/check-port.mjs 8787 'BFF'",
     "dev": "bun --watch src/index.ts",
-    "build": "echo 'No build needed — daemon uses bun to run TS directly'",
+    "build": "node ../../scripts/build-bff.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "oxlint src/",
     "test": "vitest run",
@@ -29,7 +29,7 @@
     "@types/node": "^24.5.2",
     "@vitest/coverage-v8": "^4.1.1",
     "tsx": "^4.20.5",
-    "vite": "^8.0.2",
+    "vite": "^8.2.1",
     "vitest": "^4.1.1"
   }
 }

@@ -27,7 +27,7 @@ describe("Codex transcript reader", () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  test("reconstructs user, assistant, reasoning, tool, and token details without duplicates", () => {
+  test("reconstructs user, assistant, reasoning, tool, and token details without duplicates", async () => {
     const entries = [
       {
         timestamp: "2026-07-14T10:00:00.000Z",
@@ -114,7 +114,7 @@ describe("Codex transcript reader", () => {
       "utf8",
     );
 
-    const payloads = buildCodexMessagePayloads(
+    const payloads = await buildCodexMessagePayloads(
       [path.join(tempRoot, "sessions")],
       "codex:session-abc",
     );
@@ -147,6 +147,7 @@ describe("Codex transcript reader", () => {
     expect(payloads.overview.toolUsage).toEqual([
       { tool: "shell_command", count: 1, totalTokens: 145 },
     ]);
-    expect(buildSessionMessagePayloads("codex:session-abc").listFn(0, 20).total).toBe(2);
+    const cachedPage = (await buildSessionMessagePayloads("codex:session-abc")).listFn(0, 20);
+    expect(cachedPage.total).toBe(2);
   });
 });

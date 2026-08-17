@@ -70,12 +70,27 @@ logger.info(
 if (webDistDir) {
   logger.info({ webDistDir }, "Serving static files from web dist");
   const resolvedWebDist = path.resolve(webDistDir);
+  // Hashed assets are immutable; the HTML shell must always be revalidated so
+  // deploys show up immediately instead of being heuristic-cached by browsers.
+  app.use("/assets/*", (c, next) => {
+    c.header("Cache-Control", "public, max-age=31536000, immutable");
+    return next();
+  });
+  app.use("/*", async (c, next) => {
+    await next();
+    if (c.res.headers.get("content-type")?.includes("text/html")) {
+      c.res.headers.set("Cache-Control", "no-cache");
+    }
+  });
   app.use("/*", serveStatic({ root: resolvedWebDist }));
   app.get("/*", (c) => {
     const indexPath = path.join(resolvedWebDist, "index.html");
     if (fs.existsSync(indexPath)) {
       return new Response(fs.readFileSync(indexPath), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-cache",
+        },
       });
     }
     return c.notFound();

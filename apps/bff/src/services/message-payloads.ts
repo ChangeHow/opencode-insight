@@ -1,4 +1,5 @@
 import type {
+  ContextSegmentStat,
   MessageDetail,
   MessageDistributionPayload,
   MessageListPayload,
@@ -7,6 +8,7 @@ import type {
   TokenBreakdown,
   ToolUsageStat,
 } from "@opencode-dashboard/shared";
+import { findFirstPromptContext } from "./context-window";
 import { roundCost } from "./cost";
 
 export interface MessagePayloads {
@@ -19,7 +21,23 @@ function totalTokenCount(tokens: TokenBreakdown): number {
   return tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite + tokens.reasoning;
 }
 
-export function buildMessagePayloadsFromMessages(allMessages: MessageDetail[]): MessagePayloads {
+export interface MessagePayloadContext {
+  /** Authoritative context window reported by the runtime itself (codex
+   * token_count events). Overrides catalog lookups when present. */
+  reportedContextWindow?: number;
+  /** Request tokens of the session's first API call, as reported by the
+   * runtime. Overrides message-token aggregation, which reflects end-of-turn
+   * cumulative context instead of the initialization request. */
+  reportedFirstRequestTokens?: number;
+  /** Composition of the initial context when the runtime exposes it
+   * (kind/label/tokens per source, already scaled to match the total). */
+  reportedSegments?: ContextSegmentStat[];
+}
+
+export function buildMessagePayloadsFromMessages(
+  allMessages: MessageDetail[],
+  payloadContext: MessagePayloadContext = {},
+): MessagePayloads {
   const total = allMessages.length;
   const timeline: TimelinePoint[] = [];
   const toolCountMap = new Map<string, { count: number; totalTokens: number }>();
@@ -55,7 +73,17 @@ export function buildMessagePayloadsFromMessages(allMessages: MessageDetail[]): 
   const toolUsage: ToolUsageStat[] = [...toolCountMap.entries()]
     .map(([tool, stats]) => ({ tool, count: stats.count, totalTokens: stats.totalTokens }))
     .toSorted((a, b) => b.count - a.count || b.totalTokens - a.totalTokens);
-  const overview: MessageOverviewPayload = { timeline, toolUsage, totalMessages: total };
+  const overview: MessageOverviewPayload = {
+    timeline,
+    toolUsage,
+    totalMessages: total,
+    firstPromptContext: findFirstPromptContext(
+      allMessages,
+      payloadContext.reportedContextWindow,
+      payloadContext.reportedFirstRequestTokens,
+      payloadContext.reportedSegments,
+    ),
+  };
   const distribution: MessageDistributionPayload = {
     points: allMessages.map((message, i) => ({
       messageIndex: i,

@@ -6,10 +6,11 @@ import { describe, expect, test } from "vitest";
 const packageRoot = path.resolve(import.meta.dirname, "../..");
 const distDir = path.join(packageRoot, "dist");
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-const runtimeEntryPath = path.join(packageRoot, "src", "index.ts");
+const runtimeEntryPath = path.join(distDir, "index.js");
+const fallbackPricingPath = path.join(distDir, "fallback-pricing.json");
 
 describe("Build artifacts", () => {
-  test("keeps bun runtime build free of dist artifacts", () => {
+  test("creates the Node runtime bundle for the published CLI", () => {
     fs.rmSync(distDir, { recursive: true, force: true });
 
     execFileSync(pnpmCommand, ["build"], {
@@ -17,7 +18,8 @@ describe("Build artifacts", () => {
       stdio: "pipe",
     });
 
-    expect(fs.existsSync(distDir)).toBe(false);
+    expect(fs.existsSync(distDir)).toBe(true);
     expect(fs.existsSync(runtimeEntryPath)).toBe(true);
+    expect(fs.existsSync(fallbackPricingPath)).toBe(true);
   });
 });

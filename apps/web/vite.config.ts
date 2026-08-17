@@ -12,6 +12,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // agent-prism data: vendored from the same repo HEAD as the UI components
+      "@evilmartians/agent-prism-data": path.resolve(
+        __dirname,
+        "./src/lib/agent-prism-data/index.ts",
+      ),
     },
   },
   server: {

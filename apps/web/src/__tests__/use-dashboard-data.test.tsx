@@ -14,7 +14,6 @@ import {
   trendAtom,
   seriesOptionsAtom,
   seriesLinesAtom,
-  providerInsightsAtom,
   selectedSeriesKeysAtom,
 } from "../lib/atoms/index";
 import {
@@ -24,7 +23,6 @@ import {
   makeHeatmapDay,
   makeTrendPoint,
   makeCostSeriesPayload,
-  makeProviderInsightsPayload,
 } from "./factories";
 
 vi.mock("../lib/api.js", () => ({
@@ -52,7 +50,6 @@ describe("useDashboardData Hook", () => {
       heatmap: [makeHeatmapDay()],
       trend: [makeTrendPoint()],
       series: makeCostSeriesPayload(),
-      providers: makeProviderInsightsPayload().providers,
       selectedDay: null,
     });
   });
@@ -76,14 +73,12 @@ describe("useDashboardData Hook", () => {
     const heatmap = [makeHeatmapDay()];
     const trend = [makeTrendPoint()];
     const series = makeCostSeriesPayload();
-    const providers = makeProviderInsightsPayload();
 
     mockFetchDashboard.mockResolvedValue({
       summary,
       heatmap,
       trend,
       series,
-      providers: providers.providers,
       selectedDay: null,
     });
 
@@ -98,7 +93,6 @@ describe("useDashboardData Hook", () => {
     expect(store.get(trendAtom)).toEqual(trend);
     expect(store.get(seriesOptionsAtom)).toEqual(series.options);
     expect(store.get(seriesLinesAtom)).toEqual(series.lines);
-    expect(store.get(providerInsightsAtom)).toEqual(providers.providers);
   });
 
   test("should auto-select top 3 series from options when no prior selection", async () => {
@@ -116,7 +110,6 @@ describe("useDashboardData Hook", () => {
       heatmap: [makeHeatmapDay()],
       trend: [makeTrendPoint()],
       series,
-      providers: makeProviderInsightsPayload().providers,
       selectedDay: null,
     });
 
@@ -158,7 +151,6 @@ describe("useDashboardData Hook", () => {
     store.set(trendAtom, [makeTrendPoint("2025-01-25")]);
     store.set(seriesOptionsAtom, [makeCostSeriesOption({ key: "cached" })]);
     store.set(seriesLinesAtom, [makeCostSeriesLine({ key: "cached" })]);
-    store.set(providerInsightsAtom, makeProviderInsightsPayload().providers);
     store.set(dashboardStateAtom, {
       key: `${getCurrentTimeZone()}:7d:2025-01-01:2025-01-07`,
       refreshTick: 0,
@@ -196,7 +188,6 @@ describe("useDashboardData Hook", () => {
     expect(store.get(trendAtom)).toEqual([]);
     expect(store.get(seriesOptionsAtom)).toEqual([]);
     expect(store.get(seriesLinesAtom)).toEqual([]);
-    expect(store.get(providerInsightsAtom)).toEqual([]);
   });
 
   test("should auto refresh every 10 minutes", async () => {

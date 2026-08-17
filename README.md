@@ -48,7 +48,7 @@ This gives you a single command to start, a single command to stop, and a predic
 
 ```bash
 pnpm build
-pnpm daemon:start
+opendash server
 ```
 
 Open the dashboard at:
@@ -58,7 +58,7 @@ Open the dashboard at:
 To listen on all interfaces (e.g. for LAN access):
 
 ```bash
-pnpm daemon:start -- --host 0.0.0.0
+opendash server --lan
 ```
 
 The daemon command prints:
@@ -74,6 +74,8 @@ The daemon command prints:
 pnpm daemon:start
 pnpm daemon:stop
 pnpm daemon:restart
+opendash server --port 9000
+opendash server --lan --port 9000
 ```
 
 Useful log command:
@@ -81,6 +83,21 @@ Useful log command:
 ```bash
 tail -f logs/bff.log
 ```
+
+### Query usage from the CLI
+
+The `opendash` CLI can query the running daemon directly, `tokscale`-style — table output by default, `--json` for scripting:
+
+```bash
+opendash summary                      # totals, streaks, top model (default 7d)
+opendash models --range month         # per-model spend and volume
+opendash daily --range 3mo --limit 14 # recent active days
+opendash providers --range all        # per-provider totals
+opendash models --json > report.json  # raw JSON for automation
+opendash summary --start 2026-07-01 --end 2026-07-31   # custom window
+```
+
+Common flags: `--range 7d|month|3mo|year|all`, `--start/--end`, `--json`, `--url <base>` (defaults to the daemon on `127.0.0.1:8787`).
 
 ### Upgrade while running in the background
 
@@ -150,14 +167,18 @@ pnpm lint
 
 ## API
 
-- `GET /api/summary?range=30d|60d|90d`
-- `GET /api/heatmap?range=30d|60d|90d`
-- `GET /api/trend?range=30d|60d|90d`
-- `GET /api/series?range=30d|60d|90d&series=provider::model`
-- `GET /api/day/:date?range=30d|60d|90d`
+- `GET /api` — machine-readable index of every endpoint
+- `GET /api/summary?range=7d|month|3mo|year|all`
+- `GET /api/heatmap?range=…`
+- `GET /api/trend?range=…`
+- `GET /api/series?range=…&series=<key>`
+- `GET /api/dashboard?range=…` — consolidated payload
+- `GET /api/providers?range=…` / `GET /api/provider/:providerId`
+- `GET /api/day/:date` / `GET /api/session/:sessionId…`
+- `GET /api/sync/remote` / `POST /api/sync/force`
 - `POST /api/refresh`
 
-All read endpoints also support `start=YYYY-MM-DD&end=YYYY-MM-DD` instead of `range`.
+All read endpoints also support `start=YYYY-MM-DD&end=YYYY-MM-DD` instead of `range`, plus `timeZone` (IANA name).
 
 ## Notes
 

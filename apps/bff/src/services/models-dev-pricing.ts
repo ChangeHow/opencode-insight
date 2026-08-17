@@ -5,11 +5,19 @@ import type { ModelPricing, PricingDataset } from "./pricing";
 const MODELS_DEV_URL = "https://models.dev/api.json";
 const CACHE_DIR = path.join(process.cwd(), ".cache", "opencode-telescope");
 const CACHE_FILE = path.join(CACHE_DIR, "pricing-models-dev.json");
+const CONTEXT_CACHE_FILE = path.join(CACHE_DIR, "context-models-dev.json");
 const REQUEST_TIMEOUT_MS = 8000;
 const PER_MILLION = 1_000_000;
+const CONTEXT_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+
+export type ContextWindowDataset = Record<string, number>;
 
 interface ModelsDevModel {
   id?: string;
+  limit?: {
+    context?: number;
+    output?: number;
+  };
   cost?: {
     input?: number;
     output?: number;
@@ -24,6 +32,10 @@ function perToken(value?: number) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? value / PER_MILLION
     : undefined;
+}
+
+function parseModelsDevDataset(content: string): ModelsDevDataset {
+  return JSON.parse(content) as ModelsDevDataset;
 }
 
 function toPricing(model: ModelsDevModel): ModelPricing | undefined {
@@ -45,7 +57,7 @@ function toPricing(model: ModelsDevModel): ModelPricing | undefined {
 }
 
 export function parseModelsDevPricingDataset(content: string): PricingDataset {
-  const providers = JSON.parse(content) as ModelsDevDataset;
+  const providers = parseModelsDevDataset(content);
   const result: PricingDataset = {};
 
   for (const [providerId, provider] of Object.entries(providers)) {
@@ -62,7 +74,37 @@ export function parseModelsDevPricingDataset(content: string): PricingDataset {
   return result;
 }
 
-export async function fetchModelsDevPricingDataset() {
+export function parseModelsDevContextWindows(content: string): ContextWindowDataset {
+  const providers = parseModelsDevDataset(content);
+  const result: ContextWindowDataset = {};
+
+  for (const [providerId, provider] of Object.entries(providers)) {
+    for (const [modelKey, model] of Object.entries(provider.models ?? {})) {
+      const context = model.limit?.context;
+      if (typeof context !== "number" || !Number.isFinite(context) || context <= 0) {
+        continue;
+      }
+      const modelId = model.id ?? modelKey;
+      result[`${providerId}/${modelId}`.toLowerCase()] = context;
+    }
+  }
+
+  return result;
+}
+
+export function loadCachedModelsDevContextWindows() {
+  if (!fs.existsSync(CONTEXT_CACHE_FILE)) {
+    return {} as ContextWindowDataset;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(CONTEXT_CACHE_FILE, "utf8")) as ContextWindowDataset;
+  } catch {
+    return {} as ContextWindowDataset;
+  }
+}
+
+async function fetchModelsDevRaw(): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -70,15 +112,18 @@ export async function fetchModelsDevPricingDataset() {
     if (!response.ok) {
       throw new Error(`Failed to fetch models.dev pricing: ${response.status}`);
     }
-
-    const body = await response.text();
-    const dataset = parseModelsDevPricingDataset(body);
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(dataset), "utf8");
-    return dataset;
+    return await response.text();
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function fetchModelsDevPricingDataset() {
+  const body = await fetchModelsDevRaw();
+  const dataset = parseModelsDevPricingDataset(body);
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.writeFileSync(CACHE_FILE, JSON.stringify(dataset), "utf8");
+  return dataset;
 }
 
 export function loadCachedModelsDevPricingDataset() {

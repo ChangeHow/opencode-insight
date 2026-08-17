@@ -28,8 +28,15 @@ export function cleanCodexUserText(text: string) {
 
 export function isInjectedCodexContext(text: string) {
   const trimmed = text.trimStart();
-  return ["<environment_context>", "<system-reminder>", "<user_instructions>"].some((prefix) =>
-    trimmed.startsWith(prefix),
+  return [
+    "<environment_context>",
+    "<system-reminder>",
+    "<user_instructions>",
+    // AGENTS.md instructions are injected as a user-role message with a
+    // markdown heading prefix instead of an XML tag.
+    /^#\s*AGENTS\.md/i,
+  ].some((prefix) =>
+    typeof prefix === "string" ? trimmed.startsWith(prefix) : prefix.test(trimmed),
   );
 }
 

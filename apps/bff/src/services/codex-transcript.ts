@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { MessageDetail, MessagePartTool, TokenBreakdown } from "@opencode-dashboard/shared";
+import type {
+  ContextSegmentStat,
+  MessageDetail,
+  MessagePartTool,
+  TokenBreakdown,
+} from "@opencode-dashboard/shared";
 import { buildMessagePayloadsFromMessages, type MessagePayloads } from "./message-payloads";
 import {
   cleanCodexUserText,
@@ -80,10 +85,10 @@ function cache(payloadKey: string, payloads: MessagePayloads): MessagePayloads {
   return payloads;
 }
 
-export function buildCodexMessagePayloads(
+export async function buildCodexMessagePayloads(
   sessionDirs: string[],
   sessionId: string,
-): MessagePayloads {
+): Promise<MessagePayloads> {
   const slug = sessionId.startsWith("codex:") ? sessionId.slice("codex:".length) : "";
   const filePath = slug
     ? listCodexSessionFiles(sessionDirs).find(
@@ -110,9 +115,32 @@ export function buildCodexMessagePayloads(
   const canonicalAssistants = new Set<string>();
   const fallbacks: Array<{ role: "user" | "assistant"; text: string; at: number }> = [];
   let modelId: string | undefined;
+  // Context window as reported by codex itself (token_count events). This is
+  // the authoritative number — it reflects plan/policy caps (e.g. 258400 for
+  // ChatGPT subscription), unlike catalog defaults from models.dev.
+  let contextWindow: number | undefined;
+  // Request tokens of the FIRST API call in the session = the initialization
+  // context. Later token_count events within the first turn grow cumulatively
+  // (tool results re-enter the context), so they must not overwrite this.
+  let firstRequestTokens: number | undefined;
   let providerId: string | undefined;
   let currentAssistant: MessageDetail | undefined;
   let assistantNumber = 0;
+  // Injected context classification (chars per kind) for the composition view.
+  const injectedChars = new Map<string, number>();
+  function recordInjectedContext(text: string) {
+    const trimmed = text.trimStart();
+    const kind = trimmed.startsWith("<environment_context>")
+      ? "environment"
+      : trimmed.startsWith("<user_instructions>") || trimmed.startsWith("<system_instructions>")
+        ? "instructions"
+        : /^#\s*AGENTS\.md/i.test(trimmed)
+          ? "instructions"
+          : trimmed.startsWith("<system-reminder>")
+            ? "environment"
+            : "other";
+    injectedChars.set(kind, (injectedChars.get(kind) ?? 0) + text.length);
+  }
 
   const createAssistant = (at: number, turnId?: string) => {
     const assistant: MessageDetail = {
@@ -161,16 +189,20 @@ export function buildCodexMessagePayloads(
         const text = cleanCodexUserText(
           textValue(payload.message) ?? textValue(payload.text) ?? "",
         );
-        if (text && !isInjectedCodexContext(text)) {
-          canonicalUsers.add(text);
-          messages.push({
-            id: `codex:${slug}:user:${index}`,
-            role: "user",
-            createdAt: at,
-            cost: 0,
-            tokens: emptyTokens(),
-            parts: [{ type: "text", text, time: { start: at, end: at } }],
-          });
+        if (text) {
+          if (isInjectedCodexContext(text)) {
+            recordInjectedContext(text);
+          } else {
+            canonicalUsers.add(text);
+            messages.push({
+              id: `codex:${slug}:user:${index}`,
+              role: "user",
+              createdAt: at,
+              cost: 0,
+              tokens: emptyTokens(),
+              parts: [{ type: "text", text, time: { start: at, end: at } }],
+            });
+          }
         }
       } else if (eventType === "agent_reasoning" || eventType === "agent_message") {
         const text = textValue(payload.text) ?? textValue(payload.message) ?? "";
@@ -185,7 +217,17 @@ export function buildCodexMessagePayloads(
         }
       } else if (eventType === "token_count") {
         const info = record(payload.info);
+        const reportedWindow = Math.trunc(Number(info?.model_context_window) || 0);
+        if (reportedWindow > 0) contextWindow = reportedWindow;
         const usage = record(info?.last_token_usage);
+        if (usage) {
+          const requestTokens =
+            Math.max(0, Math.trunc(Number(usage.input_tokens) || 0)) +
+            Math.max(0, Math.trunc(Number(usage.cache_write_input_tokens) || 0));
+          if (requestTokens > 0 && firstRequestTokens === undefined) {
+            firstRequestTokens = requestTokens;
+          }
+        }
         if (usage && currentAssistant) {
           const input = Math.max(0, Math.trunc(Number(usage.input_tokens) || 0));
           const cacheRead = Math.min(
@@ -250,8 +292,12 @@ export function buildCodexMessagePayloads(
       !fallback.text ||
       seen.has(fallback.text) ||
       (fallback.role === "user" && isInjectedCodexContext(fallback.text))
-    )
+    ) {
+      if (fallback.role === "user" && fallback.text && isInjectedCodexContext(fallback.text)) {
+        recordInjectedContext(fallback.text);
+      }
       continue;
+    }
     if (fallback.role === "user") {
       messages.push({
         id: `codex:${slug}:user:fallback:${messages.length}`,
@@ -277,5 +323,66 @@ export function buildCodexMessagePayloads(
       (left.parts[0]?.time.start ?? left.createdAt) -
       (right.parts[0]?.time.start ?? right.createdAt),
   );
-  return cache(key, buildMessagePayloadsFromMessages(messages));
+
+  // Composition estimate: chars/4 per source, scaled proportionally so the
+  // segments sum to the reported request tokens (keeps the donut consistent
+  // with the headline number). Tool schemas are not in the rollout file, so
+  // whatever they occupy lands in "other"/unaccounted.
+  const segmentLabels: Record<string, string> = {
+    instructions: "Agent instructions (AGENTS.md / persona)",
+    environment: "Environment context (cwd, sandbox, reminders)",
+    other: "Other injected content",
+  };
+  const estimateTokens = (chars: number) => Math.max(1, Math.round(chars / 4));
+  // First *real* user prompt (AGENTS.md / env injections are filtered out above).
+  const userChars = messages
+    .find((m) => m.role === "user")
+    ?.parts.filter((p): p is Extract<typeof p, { type: "text" }> => p.type === "text")
+    .reduce((sum, p) => sum + p.text.length, 0);
+  const rawSegments: Array<{ kind: string; label: string; tokens: number }> = [];
+  for (const [kind, chars] of injectedChars) {
+    rawSegments.push({
+      kind,
+      label: segmentLabels[kind] ?? segmentLabels.other,
+      tokens: estimateTokens(chars),
+    });
+  }
+  if (userChars) {
+    rawSegments.push({ kind: "user", label: "Your prompt", tokens: estimateTokens(userChars) });
+  }
+  let segments: ContextSegmentStat[] | undefined;
+  if (rawSegments.length > 0 && firstRequestTokens) {
+    const rawTotal = rawSegments.reduce((sum, s) => sum + s.tokens, 0);
+    const scale = firstRequestTokens / Math.max(rawTotal, firstRequestTokens);
+    const scaled = rawSegments.map((s) => ({
+      kind: s.kind as ContextSegmentStat["kind"],
+      label: s.label,
+      tokens: Math.round(s.tokens * Math.min(scale, 1)),
+    }));
+    // Whatever the transcript cannot account for is the runtime's own system
+    // prompt + tool schemas — they never appear in the rollout file. Reporting
+    // them as one segment keeps the composition summing to the headline.
+    const accounted = scaled.reduce((sum, s) => sum + s.tokens, 0);
+    const runtimeOverhead = firstRequestTokens - accounted;
+    segments =
+      runtimeOverhead > 200
+        ? [
+            ...scaled,
+            {
+              kind: "tools",
+              label: "Runtime system prompt & tool schemas (not in transcript)",
+              tokens: runtimeOverhead,
+            },
+          ]
+        : scaled;
+  }
+
+  return cache(
+    key,
+    buildMessagePayloadsFromMessages(messages, {
+      reportedContextWindow: contextWindow,
+      reportedFirstRequestTokens: firstRequestTokens,
+      reportedSegments: segments,
+    }),
+  );
 }

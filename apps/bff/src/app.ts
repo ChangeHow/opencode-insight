@@ -1,5 +1,6 @@
 import "./env.js";
 import { Hono } from "hono";
+import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { requestLogger } from "./middleware/logger";
 import { dashboard } from "./controllers/dashboard";
@@ -10,6 +11,7 @@ import { system } from "./controllers/system";
 
 const app = new Hono();
 
+app.use("/api/*", compress());
 app.use("/api/*", cors());
 app.use("*", requestLogger());
 

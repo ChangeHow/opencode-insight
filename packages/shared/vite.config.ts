@@ -1,9 +1,10 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
 
+// Type declarations are emitted by `tsc -p tsconfig.build.json` in the build
+// script (tsgo). vite-plugin-dts relies on the TS5 programmatic API which
+// tsgo does not provide.
 export default defineConfig({
-  plugins: [dts({ rollupTypes: true })],
   build: {
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
@@ -11,6 +12,6 @@ export default defineConfig({
       fileName: () => "index.js",
     },
     outDir: "dist",
-    emptyOutDir: true,
+    emptyOutDir: false,
   },
 });

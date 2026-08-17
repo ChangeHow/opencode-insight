@@ -64,7 +64,6 @@ dashboard.get("/api/dashboard", async (c) => {
     heatmap: data.heatmap,
     trend: data.trend,
     series,
-    providers: data.providers,
     selectedDay: null,
     remoteSync: undefined,
   });
