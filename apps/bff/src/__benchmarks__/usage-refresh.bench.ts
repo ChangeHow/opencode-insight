@@ -28,6 +28,7 @@ let tempRoot = "";
 let dbPath = "";
 let loadUsageSnapshot: typeof import("../services/usage/index").loadUsageSnapshot | undefined;
 let refreshSnapshot: typeof import("../controllers/shared").refreshSnapshot | undefined;
+let app: typeof import("../app").default | undefined;
 let flushSnapshotCacheWrites:
   | typeof import("../services/usage/snapshot").flushSnapshotCacheWrites
   | undefined;
@@ -81,10 +82,11 @@ async function createBenchmarkDatabase(databasePath: string) {
     );
   }
 
-  const baseTime = Date.UTC(2026, 2, 1, 9, 0, 0);
+  const rangeMs = 30 * 24 * 60 * 60 * 1000;
+  const baseTime = Date.now() - rangeMs;
   for (let index = 0; index < MESSAGE_COUNT; index++) {
     const sessionId = `ses_bench_${index % 12}`;
-    const createdAt = baseTime + index * 60_000;
+    const createdAt = baseTime + Math.floor((index / MESSAGE_COUNT) * rangeMs);
     insertMessage.run(
       `msg_bench_${index}`,
       sessionId,
@@ -161,6 +163,10 @@ async function setupBenchmark() {
   ({ flushSnapshotCacheWrites } = await import("../services/usage/snapshot"));
   await loadUsageSnapshot({ forceRefresh: true });
   ({ refreshSnapshot } = await import("../controllers/shared"));
+  ({ default: app } = await import("../app"));
+
+  const response = await app.request("/api/dashboard?range=month&timeZone=UTC");
+  await response.arrayBuffer();
 }
 
 function ensureBenchmarkReady() {
@@ -223,6 +229,16 @@ describe("usage refresh benchmark", () => {
     async () => {
       await ensureBenchmarkReady();
       await loadUsageSnapshot!();
+    },
+    { iterations: 30, warmupIterations: 5 },
+  );
+
+  bench(
+    "dashboard API query",
+    async () => {
+      await ensureBenchmarkReady();
+      const response = await app!.request("/api/dashboard?range=month&timeZone=UTC");
+      await response.arrayBuffer();
     },
     { iterations: 30, warmupIterations: 5 },
   );
