@@ -48,7 +48,7 @@ This gives you a single command to start, a single command to stop, and a predic
 
 ```bash
 pnpm build
-pnpm daemon:start
+opendash server
 ```
 
 Open the dashboard at:
@@ -58,7 +58,7 @@ Open the dashboard at:
 To listen on all interfaces (e.g. for LAN access):
 
 ```bash
-pnpm daemon:start -- --host 0.0.0.0
+opendash server --lan
 ```
 
 The daemon command prints:
@@ -74,6 +74,8 @@ The daemon command prints:
 pnpm daemon:start
 pnpm daemon:stop
 pnpm daemon:restart
+opendash server --port 9000
+opendash server --lan --port 9000
 ```
 
 Useful log command:

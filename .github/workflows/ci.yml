@@ -120,7 +120,7 @@ jobs:
             root="$1"
             label="$2"
             pnpm --dir "$root" install --frozen-lockfile
-            pnpm --dir "$root" --filter @opencode-dashboard/shared build
+            pnpm --dir "$root" exec tsc -p packages/shared/tsconfig.json
             pnpm --dir "$root" --filter @opencode-dashboard/bff exec vitest bench --run \
               --outputJson "$results/$label-bff.json"
             pnpm --dir "$root" --filter @opencode-dashboard/web exec vitest bench --run \

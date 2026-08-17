@@ -11,7 +11,7 @@ import { registerQueryCommands } from "./opendash-query.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PID_FILE = path.join(ROOT, ".telescope-daemon.pid");
 const LOG_DIR = path.join(ROOT, "logs");
-const BFF_ENTRY = path.join(ROOT, "apps", "bff", "src", "index.ts");
+const BFF_ENTRY = path.join(ROOT, "apps", "bff", "dist", "index.js");
 const WEB_DIST = path.join(ROOT, "apps", "web", "dist");
 const LOG_FILE = path.join(LOG_DIR, "bff.log");
 const ERR_FILE = path.join(LOG_DIR, "bff-error.log");
@@ -41,7 +41,7 @@ function removePidFile() {
   }
 }
 
-function startCommand({ port: portOpt, host: hostOpt }) {
+function serverCommand({ port: portOpt, host: hostOpt, lan }) {
   if (!existsSync(path.join(WEB_DIST, "index.html"))) {
     console.error("Web app is not built. Run 'pnpm build' first.");
     process.exit(1);
@@ -55,7 +55,11 @@ function startCommand({ port: portOpt, host: hostOpt }) {
   removePidFile();
 
   const port = Number(portOpt ?? process.env.PORT ?? 8787);
-  const host = hostOpt ?? process.env.HOST ?? "127.0.0.1";
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error("Port must be an integer between 1 and 65535.");
+    process.exit(1);
+  }
+  const host = lan ? "0.0.0.0" : (hostOpt ?? process.env.HOST ?? "127.0.0.1");
 
   const env = {
     ...process.env,
@@ -71,7 +75,7 @@ function startCommand({ port: portOpt, host: hostOpt }) {
   const outFd = openSync(LOG_FILE, "a");
   const errFd = openSync(ERR_FILE, "a");
 
-  const child = spawn("bun", ["run", BFF_ENTRY], {
+  const child = spawn(process.execPath, [BFF_ENTRY], {
     detached: true,
     stdio: ["ignore", outFd, errFd],
     env,
@@ -101,7 +105,7 @@ function startCommand({ port: portOpt, host: hostOpt }) {
         `Port   : ${port}`,
         `Host   : ${host}`,
         `Access : ${url}`,
-        `Runtime: bun`,
+        `Runtime: node`,
         `Log    : logs/bff.log`,
         `Errors : logs/bff-error.log`,
       ].join("\n"),
@@ -207,19 +211,22 @@ program
 program.addHelpText(
   "after",
   `\nQuick start:
-  opendash start                 # launch the dashboard daemon
+  opendash server                # launch the dashboard daemon
+  opendash server --lan          # expose it on the local network
   opendash summary --range month # query this month's usage
   opendash models --json         # per-model data as JSON`,
 );
 
 program
-  .command("start")
+  .command("server")
+  .alias("start")
   .description(
     "Start the dashboard daemon in the background.\nServes the built web app and the REST API on the configured port.",
   )
   .option("--port <port>", "Port to listen on", process.env.PORT ?? "8787")
   .option("--host <host>", "Host to bind to", process.env.HOST ?? "127.0.0.1")
-  .action(startCommand);
+  .option("--lan", "Bind to 0.0.0.0 so other devices on the local network can connect")
+  .action(serverCommand);
 
 program.command("stop").description("Stop the running dashboard daemon.").action(stopCommand);
 
