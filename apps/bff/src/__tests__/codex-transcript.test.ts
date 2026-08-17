@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { buildCodexMessagePayloads } from "../services/codex-transcript";
 import { buildSessionMessagePayloads } from "../services/messages";
 
@@ -149,5 +149,33 @@ describe("Codex transcript reader", () => {
     ]);
     const cachedPage = (await buildSessionMessagePayloads("codex:session-abc")).listFn(0, 20);
     expect(cachedPage.total).toBe(2);
+  });
+
+  test("avoids rescanning session directories for a cached transcript", async () => {
+    const filePath = path.join(sessionDir, "session-cached.jsonl");
+    fs.writeFileSync(
+      filePath,
+      JSON.stringify({
+        timestamp: "2026-07-14T10:00:00.000Z",
+        type: "event_msg",
+        payload: { type: "user_message", message: "Hello" },
+      }),
+      "utf8",
+    );
+
+    for (let index = 0; index < 100; index++) {
+      const unrelatedDir = path.join(sessionDir, "unrelated", String(index));
+      fs.mkdirSync(unrelatedDir, { recursive: true });
+      fs.writeFileSync(path.join(unrelatedDir, `session-${index}.jsonl`), "{}", "utf8");
+    }
+
+    const sessionDirs = [path.join(tempRoot, "sessions")];
+    await buildCodexMessagePayloads(sessionDirs, "codex:session-cached");
+
+    const readdirSync = vi.spyOn(fs, "readdirSync");
+    await buildCodexMessagePayloads(sessionDirs, "codex:session-cached");
+
+    expect(readdirSync).not.toHaveBeenCalled();
+    readdirSync.mockRestore();
   });
 });

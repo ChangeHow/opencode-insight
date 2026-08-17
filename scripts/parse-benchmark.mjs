@@ -40,7 +40,16 @@ function formatMean(result) {
 function formatChange(current, baseline) {
   if (!baseline) return "—";
   const change = (current.mean / baseline.mean - 1) * 100;
-  const marker = Math.abs(change) < 0.05 ? "" : change < 0 ? " ↓" : " ↑";
+  const currentLowerBound = current.mean * (1 - current.rme / 100);
+  const currentUpperBound = current.mean * (1 + current.rme / 100);
+  const baselineLowerBound = baseline.mean * (1 - baseline.rme / 100);
+  const baselineUpperBound = baseline.mean * (1 + baseline.rme / 100);
+  const marker =
+    currentUpperBound < baselineLowerBound
+      ? " ↓"
+      : currentLowerBound > baselineUpperBound
+        ? " ↑"
+        : " ≈";
   return `${change >= 0 ? "+" : ""}${change.toFixed(1)}%${marker}`;
 }
 
@@ -50,7 +59,7 @@ export function generateMarkdown(current, previous, main, refs) {
     "",
     `Current: \`${refs.current.slice(0, 7)}\` · Previous: \`${refs.previous.slice(0, 7)}\` · Main: \`${refs.main.slice(0, 7)}\``,
     "",
-    "Lower mean latency is better. ↓ indicates an improvement; ↑ indicates a regression.",
+    "Lower mean latency is better. ↓/↑ require non-overlapping Vitest RME intervals; ≈ is noise.",
     "",
     "| Package | Group | Benchmark | Current | Previous commit | Δ vs previous | Main | Δ vs main |",
     "|---|---|---|---:|---:|---:|---:|---:|",

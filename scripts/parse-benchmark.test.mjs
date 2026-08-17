@@ -28,6 +28,17 @@ test("reports previous commit and main comparisons", () => {
   assert.match(markdown, /\+60\.0% ↑/);
 });
 
+test("does not mark overlapping error intervals as a regression", () => {
+  const markdown = generateMarkdown(
+    new Map([[key, { ...result, mean: 10, rme: 2 }]]),
+    new Map([[key, { ...result, mean: 10.1, rme: 2 }]]),
+    new Map([[key, { ...result, mean: 10.1, rme: 2 }]]),
+    { current: "123456789", previous: "abcdefghi", main: "987654321" },
+  );
+
+  assert.match(markdown, /-1\.0% ≈/);
+});
+
 test("reads Vitest JSON reports for both packages", async (context) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "benchmark-report-"));
   context.after(() => fs.rm(directory, { recursive: true, force: true }));

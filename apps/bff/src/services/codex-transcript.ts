@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import type {
   ContextSegmentStat,
   MessageDetail,
@@ -7,14 +6,8 @@ import type {
   TokenBreakdown,
 } from "@opencode-dashboard/shared";
 import { buildMessagePayloadsFromMessages, type MessagePayloads } from "./message-payloads";
-import {
-  cleanCodexUserText,
-  isInjectedCodexContext,
-  listCodexSessionFiles,
-} from "./usage/codex-reader";
-
-const MAX_CACHE_ENTRIES = 100;
-const payloadCache = new Map<string, MessagePayloads>();
+import { cacheCodexTranscriptPayload, getCodexTranscriptCache } from "./codex-transcript-cache";
+import { cleanCodexUserText, isInjectedCodexContext } from "./usage/codex-reader";
 
 function emptyTokens(): TokenBreakdown {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
@@ -66,44 +59,18 @@ function responseText(payload: Record<string, unknown>): string | undefined {
     .join("");
 }
 
-function cacheKey(filePath: string): string | undefined {
-  try {
-    const stat = fs.statSync(filePath);
-    return `${filePath}:${stat.size}:${stat.mtimeMs}`;
-  } catch {
-    return undefined;
-  }
-}
-
-function cache(payloadKey: string, payloads: MessagePayloads): MessagePayloads {
-  payloadCache.set(payloadKey, payloads);
-  while (payloadCache.size > MAX_CACHE_ENTRIES) {
-    const oldest = payloadCache.keys().next().value;
-    if (!oldest) break;
-    payloadCache.delete(oldest);
-  }
-  return payloads;
-}
-
 export async function buildCodexMessagePayloads(
   sessionDirs: string[],
   sessionId: string,
 ): Promise<MessagePayloads> {
   const slug = sessionId.startsWith("codex:") ? sessionId.slice("codex:".length) : "";
-  const filePath = slug
-    ? listCodexSessionFiles(sessionDirs).find(
-        (candidate) => path.basename(candidate, ".jsonl") === slug,
-      )
-    : undefined;
-  if (!filePath) return buildMessagePayloadsFromMessages([]);
-  const key = cacheKey(filePath);
-  if (!key) return buildMessagePayloadsFromMessages([]);
-  const cached = payloadCache.get(key);
-  if (cached) return cached;
+  const cached = slug ? getCodexTranscriptCache(sessionDirs, slug) : undefined;
+  if (!cached) return buildMessagePayloadsFromMessages([]);
+  if (cached.payloads) return cached.payloads;
 
   let content: string;
   try {
-    content = fs.readFileSync(filePath, "utf8");
+    content = fs.readFileSync(cached.filePath, "utf8");
   } catch {
     return buildMessagePayloadsFromMessages([]);
   }
@@ -377,8 +344,8 @@ export async function buildCodexMessagePayloads(
         : scaled;
   }
 
-  return cache(
-    key,
+  return cacheCodexTranscriptPayload(
+    cached.payloadKey,
     buildMessagePayloadsFromMessages(messages, {
       reportedContextWindow: contextWindow,
       reportedFirstRequestTokens: firstRequestTokens,
