@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  pull-requests: write
 
 jobs:
   release:
@@ -25,18 +26,36 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
-      - id: release-plan
+      - id: changesets
+        uses: changesets/action@v1
+        with:
+          commit: "chore(release): version packages"
+          publish: "true"
+          title: "chore(release): version packages"
+      - if: steps.changesets.outputs.hasChangesets == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ steps.changesets.outputs.pullRequestNumber }}
+        run: gh pr merge "$RELEASE_PR" --auto --squash
+      - if: steps.changesets.outputs.hasChangesets == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR: ${{ steps.changesets.outputs.pullRequestNumber }}
         run: |
-          pnpm changeset status --output "$RUNNER_TEMP/release-plan.json"
-          node -e 'const plan = require(process.argv[1]); console.log(`has_releases=${plan.releases.length > 0}`)' "$RUNNER_TEMP/release-plan.json" >> "$GITHUB_OUTPUT"
-      - if: steps.release-plan.outputs.has_releases == 'true'
-        run: |
-          pnpm changeset version
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A .changeset package.json pnpm-lock.yaml
-          if [ -f CHANGELOG.md ]; then git add CHANGELOG.md; fi
-          git commit -m "chore(release): version packages"
-          git push
-      - if: steps.release-plan.outputs.has_releases == 'true'
-        run: pnpm changeset publish
+          for attempt in {1..120}; do
+            state=$(gh pr view "$RELEASE_PR" --json state --jq .state)
+            if [ "$state" = "MERGED" ]; then
+              git fetch origin main
+              git checkout --detach origin/main
+              pnpm install --frozen-lockfile
+              pnpm changeset publish
+              exit 0
+            fi
+            if [ "$state" != "OPEN" ]; then
+              echo "Release PR #$RELEASE_PR closed without merging."
+              exit 1
+            fi
+            sleep 15
+          done
+          echo "Timed out waiting for release PR #$RELEASE_PR to merge."
+          exit 1
