@@ -22,7 +22,7 @@ The public package is `@changehow/opencode-token-dashbord`. Do not publish an un
 2. Use `patch`, `minor`, or `major` according to the intended SemVer change.
 3. Run `pnpm changeset status` and confirm the planned version before committing.
 4. Merge the change to `main`.
-5. The `Release` workflow runs build and tests, consumes Changesets, commits the generated version and changelog to `main`, then publishes through npm Trusted Publishing.
+5. The `Release` workflow runs build and tests, creates a Release PR with the generated version and changelog, auto-merges it, then publishes through npm Trusted Publishing.
 
 ## Publishing Requirements
 
