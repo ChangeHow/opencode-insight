@@ -5,7 +5,7 @@ description: Use when preparing a release, adding a Changeset, changing package 
 
 # Npm Release
 
-The public package is `@changehow/opencode-token-dashbord`. Do not publish an unscoped package.
+The public package is `@changehow/oc-insight`. Do not publish an unscoped package.
 
 ## Release Flow
 
@@ -13,7 +13,7 @@ The public package is `@changehow/opencode-token-dashbord`. Do not publish an un
 
    ```md
    ---
-   "@changehow/opencode-token-dashbord": patch
+   "@changehow/oc-insight": patch
    ---
 
    Describe the release.
@@ -47,5 +47,5 @@ pnpm test
 After the Release workflow finishes, confirm the published version with:
 
 ```bash
-npm view @changehow/opencode-token-dashbord version --cache-min=0
+npm view @changehow/oc-insight version --cache-min=0
 ```

@@ -29,18 +29,18 @@ jobs:
       - id: changesets
         uses: changesets/action@v1
         with:
-          commit: "chore(release): version packages"
-          publish: "true"
-          title: "chore(release): version packages"
-      - if: steps.changesets.outputs.hasChangesets == 'true'
+          commit-message: "chore(release): version packages"
+          publish-script: "pnpm changeset publish"
+          pr-title: "chore(release): version packages"
+      - if: steps.changesets.outputs.has-changesets == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PR: ${{ steps.changesets.outputs.pullRequestNumber }}
+          RELEASE_PR: ${{ steps.changesets.outputs.pr-number }}
         run: gh pr merge "$RELEASE_PR" --auto --squash
-      - if: steps.changesets.outputs.hasChangesets == 'true'
+      - if: steps.changesets.outputs.has-changesets == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PR: ${{ steps.changesets.outputs.pullRequestNumber }}
+          RELEASE_PR: ${{ steps.changesets.outputs.pr-number }}
         run: |
           for attempt in {1..120}; do
             state=$(gh pr view "$RELEASE_PR" --json state --jq .state)
