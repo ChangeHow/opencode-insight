@@ -20,6 +20,14 @@ Local-first token usage dashboard for OpenCode sessions.
 The BFF reads OpenCode usage from the directory configured in `.env.local`.
 It queries `opencode.db` via the `better-sqlite3` native binding, which compiles against the system toolchain at install time. Older distributions (e.g. Debian 10, Ubuntu 18.04) ship glibc and GCC versions that are too old for this dependency.
 
+When `opendash` is installed globally, load a project-local environment file by setting `OPENDASH_ENV`. Relative paths are resolved from the directory where you run the command:
+
+```bash
+OPENDASH_ENV=.env.local opendash server
+```
+
+The daemon logs whether the configured file was loaded. Values in the file are not logged.
+
 Expected files inside that directory:
 
 - `opencode.db`
