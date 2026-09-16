@@ -1,5 +1,11 @@
 # @changehow/oc-insight
 
+## 1.0.1
+
+### Patch Changes
+
+- f727bd2: Allow `opendash` to load a specified environment file through `OPENDASH_ENV`.
+
 ## 1.0.0
 
 ### Major Changes
