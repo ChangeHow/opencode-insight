@@ -1,5 +1,12 @@
 # @changehow/oc-insight
 
+## 1.0.2
+
+### Patch Changes
+
+- f42ea88: Report the published package version from the `opendash` CLI, support `-v`, and document
+  `OPENDASH_ENV` in its help output.
+
 ## 1.0.1
 
 ### Patch Changes
