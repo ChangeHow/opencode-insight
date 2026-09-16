@@ -60,9 +60,11 @@ function serverCommand({ port: portOpt, host: hostOpt, lan }) {
     process.exit(1);
   }
   const host = lan ? "0.0.0.0" : (hostOpt ?? process.env.HOST ?? "127.0.0.1");
+  const configuredEnvPath = process.env.OPENDASH_ENV?.trim();
 
   const env = {
     ...process.env,
+    ...(configuredEnvPath ? { OPENDASH_ENV: path.resolve(process.cwd(), configuredEnvPath) } : {}),
     PORT: String(port),
     HOST: host,
     WEB_DIST_DIR: WEB_DIST,
