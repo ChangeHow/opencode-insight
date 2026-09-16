@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { box } from "@clack/prompts";
 import { registerQueryCommands } from "./opendash-query.mjs";
+import packageJson from "../package.json" with { type: "json" };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PID_FILE = path.join(ROOT, ".telescope-daemon.pid");
@@ -208,7 +209,7 @@ program
   .description(
     "Manage the opencode-telescope dashboard daemon and query usage data.\n\nDaemon commands keep the local web dashboard running in the background.\nQuery commands read live usage data from the daemon (start it first).",
   )
-  .version("0.1.0");
+  .version(packageJson.version, "-v, --version");
 
 program.addHelpText(
   "after",
@@ -216,7 +217,11 @@ program.addHelpText(
   opendash server                # launch the dashboard daemon
   opendash server --lan          # expose it on the local network
   opendash summary --range month # query this month's usage
-  opendash models --json         # per-model data as JSON`,
+  opendash models --json         # per-model data as JSON
+
+Environment:
+  OPENDASH_ENV=<path>  Load environment variables from a file
+                        e.g. OPENDASH_ENV=.env.local opendash server`,
 );
 
 program
