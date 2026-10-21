@@ -1,4 +1,4 @@
-import { mountBadge, mountBanner, mountButton, mountEmpty, mountTabs } from "@openchamber/sdk/ui";
+import { mountBadge, mountBanner, mountButton, mountEmpty } from "@openchamber/sdk/ui";
 import { summarizeSession } from "@opencode-insight/telemetry/summary";
 import type { PanelState } from "./controller";
 import { createSpeedChart } from "./chart";
@@ -7,26 +7,16 @@ import { duration, number } from "./format";
 import { createTokenView } from "./token-view";
 import { createTimingView } from "./timing-view";
 
-const tabItems = [
-  { id: "speed", label: "Speed" },
-  { id: "token", label: "Token" },
-  { id: "time", label: "Time" },
-];
-type Tab = "speed" | "token" | "time";
-
 export function createPanelView(root: HTMLElement, retry: () => void) {
-  let latest: PanelState;
   let target = "";
-  let active: Tab = "speed";
   let disposed = false;
   let lastError = "";
   let lastEmpty = "";
   root.setAttribute("aria-label", "Session insight");
   const header = element("header", "section-head panel-header");
-  header.append(element("h1", "sr-only", "Session insight"));
-  const tabsSlot = element("div");
+  header.append(element("h1", "", "Session insight"));
   const retrySlot = element("div");
-  header.append(tabsSlot, retrySlot);
+  header.append(retrySlot);
   const errorSlot = element("div");
   const emptySlot = element("div");
   const content = element("div", "insight-data");
@@ -35,8 +25,8 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
   const panels = { speed: element("section"), token: element("section"), time: element("section") };
   for (const [id, panel] of Object.entries(panels)) {
     panel.id = `insight-${id}`;
-    panel.setAttribute("role", "tabpanel");
-    panel.setAttribute("aria-labelledby", `tab-${id}`);
+    panel.className = "insight-section";
+    panel.setAttribute("aria-labelledby", `insight-${id}-heading`);
   }
   content.append(metrics, qualitySlot, ...Object.values(panels));
   root.append(header, errorSlot, emptySlot, content);
@@ -69,28 +59,17 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
   const speed = createSpeedChart(panels.speed);
   const token = createTokenView(panels.token);
   const timing = createTimingView(panels.time);
-  function linkTabs() {
-    tabsSlot.querySelector('[role="tablist"]')?.setAttribute("aria-label", "Insight views");
-    tabsSlot.querySelectorAll<HTMLElement>('[role="tab"]').forEach((tab) => {
-      const id = tab.dataset.id!;
-      tab.id = `tab-${id}`;
-      tab.setAttribute("aria-controls", `insight-${id}`);
-    });
+  for (const [id, label] of [
+    ["speed", "Speed"],
+    ["token", "Tokens"],
+    ["time", "Times"],
+  ] as const) {
+    const heading = element("h2", "", label);
+    heading.id = `insight-${id}-heading`;
+    panels[id].prepend(heading);
   }
-  const tabs = mountTabs(tabsSlot, {
-    items: tabItems,
-    activeId: active,
-    onChange(id) {
-      active = id as Tab;
-      tabs.update({ activeId: active });
-      linkTabs();
-      if (latest) render(latest);
-    },
-  });
-  linkTabs();
   function render(state: PanelState) {
     if (disposed) return;
-    latest = state;
     const key = `${state.directory}\0${state.sessionID}`;
     if (key !== target) {
       target = key;
@@ -119,7 +98,6 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
         "No telemetry captured for this session yet. Start a model request with the capture plugin enabled.";
     emptySlot.hidden = !message;
     content.hidden = !!message;
-    tabsSlot.hidden = !!message;
     if (message !== lastEmpty) {
       empty.update({ title: message });
       lastEmpty = message;
@@ -139,12 +117,9 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
     ];
     metricsNext.forEach((value, index) => setText(values[index], value));
     qualitySlot.hidden = !summary.capturePartial;
-    Object.entries(panels).forEach(([id, panel]) => {
-      panel.hidden = id !== active;
-    });
-    if (active === "speed") speed.update(state.series?.points ?? [], session);
-    else if (active === "token") token.update(session);
-    else timing.update(session);
+    speed.update(state.series?.points ?? [], session);
+    token.update(session);
+    timing.update(session);
   }
   return {
     render,
@@ -154,7 +129,6 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
       speed.dispose();
       token.dispose();
       timing.dispose();
-      tabs.dispose();
       retryButton.dispose();
       banner.dispose();
       empty.dispose();

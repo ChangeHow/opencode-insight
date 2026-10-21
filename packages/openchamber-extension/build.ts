@@ -12,6 +12,7 @@ await build({
   target: "es2023",
 });
 await copyFile("panel/index.html", "dist/panel/index.html");
+await copyFile("panel/trace.css", "dist/panel/trace.css");
 await build({
   entryPoints: ["src/service/main.ts"],
   outfile: "dist/service/main.js",

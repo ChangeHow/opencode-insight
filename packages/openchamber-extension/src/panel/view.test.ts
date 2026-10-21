@@ -2,6 +2,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
 import { createPanelView } from "./view";
+import { stubPopover } from "./popover.test-helper";
+
+stubPopover();
 
 const session: SessionInsight = {
   version: 1,
@@ -104,7 +107,7 @@ describe("panel view", () => {
     expect(root.querySelector("table")).toBeNull();
   });
 
-  test("renders compact normalized totals and all tabs without request tables", () => {
+  test("renders compact normalized totals and simultaneous ordered sections without request tables", () => {
     const { root, view } = mount();
     view.render({
       sessionID: "one",
@@ -113,6 +116,24 @@ describe("panel view", () => {
       session,
       error: "Offline",
     });
+    expect(root.querySelector("header h1")?.textContent).toBe("Session insight");
+    expect(root.querySelector("header h1")?.classList.contains("sr-only")).toBe(false);
+    expect(root.querySelector('[role="tablist"], [role="tab"], [role="tabpanel"]')).toBeNull();
+    const sections = [...root.querySelectorAll<HTMLElement>(".insight-data > section")];
+    expect(sections.map((section) => section.id)).toEqual([
+      "insight-speed",
+      "insight-token",
+      "insight-time",
+    ]);
+    expect(sections.map((section) => section.querySelector("h2")?.textContent)).toEqual([
+      "Speed",
+      "Tokens",
+      "Times",
+    ]);
+    for (const section of sections) {
+      expect(section.closest("[hidden]")).toBeNull();
+      expect(section.getAttribute("aria-labelledby")).toBe(section.querySelector("h2")?.id);
+    }
     expect(root.textContent).toContain("Previous captured data is retained");
     expect(root.textContent).toContain("Partial capture");
     const metrics = [...root.querySelectorAll(".top-metrics strong")].map(
@@ -120,7 +141,6 @@ describe("panel view", () => {
     );
     expect(metrics[0]).toBe("40");
     expect(metrics[1]).toBe("165");
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!.click();
     expect(root.textContent).toContain("Unclassified Skill");
     expect(root.textContent).toContain("skill-123");
     expect(root.querySelector(".donut")).not.toBeNull();
@@ -135,15 +155,155 @@ describe("panel view", () => {
     expect(root.querySelector(".scope-slot")?.getAttribute("title")).toContain(
       "including repeated context",
     );
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="time"]')!.click();
     expect(root.textContent).toContain("Background 2 s");
-    expect(root.querySelector(".phase-stack")).not.toBeNull();
-    expect(root.querySelectorAll(".phase-segment:not([hidden])")).toHaveLength(1);
+    expect(root.querySelector(".phase-stack, .phase-legend")).toBeNull();
+    expect(root.textContent).not.toContain("Foreground phases");
+    expect(root.querySelectorAll(".trace-view")).toHaveLength(1);
     expect(root.querySelector(".timeline")).toBeNull();
     expect(root.querySelector(".timing-meta [title]")?.getAttribute("title")).toContain(
       "Child-session usage is not merged",
     );
     expect(root.querySelector("table")).toBeNull();
+  });
+
+  test("groups token controls, details and empty states in two ordered labelled blocks", () => {
+    const { root, view } = mount();
+    const state = { sessionID: "one", directory: "/local", loading: false, session };
+    view.render({
+      ...state,
+      session: { ...session, requests: [{ ...session.requests[0], cost: 0.25 }] },
+    });
+    const grid = root.querySelector("#insight-token > .token-grid")!;
+    const blocks = [...grid.querySelectorAll<HTMLElement>(":scope > section.token-block")];
+    expect(blocks).toHaveLength(2);
+    expect(blocks.map((block) => block.querySelector("h2")?.textContent)).toEqual([
+      "Input composition",
+      "Reported cumulative usage",
+    ]);
+    for (const block of blocks) {
+      expect(block.getAttribute("aria-labelledby")).toBe(block.querySelector("h2")?.id);
+      expect(block.querySelector("h2")?.id).toBeTruthy();
+    }
+    const [input, usage] = blocks;
+    const scope = input.querySelector('[aria-haspopup="listbox"]')!;
+    const quality = input.querySelector<HTMLElement>(".quality-slot")!;
+    const details = input.querySelector<HTMLDetailsElement>('[data-source="attribution"]')!;
+    const inputEmpty = [...input.querySelectorAll<HTMLElement>("div")].find(
+      (node) => node.textContent === "Input source attribution unavailable." && node.hidden,
+    )!;
+    const usageEmpty = [...usage.querySelectorAll<HTMLElement>("div")].find(
+      (node) => node.textContent === "Provider usage unavailable." && node.hidden,
+    )!;
+    const cost = usage.querySelector<HTMLElement>('[title="Reported cost for captured requests"]')!;
+    const compositions = blocks.map((block) => block.querySelector(".composition")!);
+    expect(scope).not.toBeNull();
+    expect(quality.hidden).toBe(false);
+    expect(details.hidden).toBe(false);
+    expect(inputEmpty).toBeDefined();
+    expect(usageEmpty).toBeDefined();
+    expect(cost.textContent).toContain("0.25");
+    expect(usage.querySelector(".scope-slot, .quality-slot, details")).toBeNull();
+    expect(input.contains(cost)).toBe(false);
+
+    view.render({
+      ...state,
+      session: {
+        ...session,
+        revision: 2,
+        requests: [{ ...session.requests[0], context: [], usage: undefined }],
+      },
+    });
+    expect(inputEmpty.hidden).toBe(false);
+    expect(usageEmpty.hidden).toBe(false);
+    expect(quality.hidden).toBe(true);
+    expect(details.hidden).toBe(true);
+    expect(cost.hidden).toBe(true);
+    for (const composition of compositions) expect(composition.parentElement?.hidden).toBe(true);
+    view.render({ ...state, session: { ...session, revision: 3 } });
+    expect(root.querySelector(".token-grid")).toBe(grid);
+    blocks.forEach((block, index) => expect(grid.children[index]).toBe(block));
+    expect(input.querySelector('[aria-haspopup="listbox"]')).toBe(scope);
+    expect(input.querySelector('[data-source="attribution"]')).toBe(details);
+    expect(inputEmpty.hidden).toBe(true);
+    expect(usageEmpty.hidden).toBe(true);
+    blocks.forEach((block, index) => {
+      expect(block.querySelector(".composition")).toBe(compositions[index]);
+      expect(compositions[index].parentElement?.hidden).toBe(false);
+    });
+  });
+
+  test("refreshes Speed, Tokens and Times together without replacing their nodes", () => {
+    const { root, view } = mount();
+    const state = {
+      sessionID: "one",
+      directory: "/local",
+      loading: false,
+      session,
+      series: {
+        revision: 1,
+        unchanged: false,
+        points: [0, 1000].map((at) => ({
+          at,
+          requestID: "request",
+          model: "model",
+          outputTps: 10,
+          reasoningTps: 0,
+          summaryTps: 0,
+          quality: "partial" as const,
+        })),
+      },
+    };
+    view.render(state);
+    const path = root.querySelector("#insight-speed path.output")!;
+    const previousPath = path.getAttribute("d");
+    const total = root.querySelector("#insight-token .donut strong")!;
+    const span = root.querySelector<HTMLButtonElement>(
+      '#insight-time [data-trace-key="request:request"] .trace-plot',
+    )!;
+    expect(total.textContent).toBe("40");
+    expect(span.getAttribute("aria-label")).toContain("2 s");
+    view.render({
+      ...state,
+      session: {
+        ...session,
+        revision: 2,
+        requests: [
+          {
+            ...session.requests[0],
+            endedAt: 3000,
+            streamedAt: 3000,
+            context: [{ ...session.requests[0].context[0], tokens: 60 }],
+          },
+        ],
+      },
+      series: {
+        ...state.series,
+        revision: 2,
+        points: state.series.points.map((point, index) => ({
+          ...point,
+          outputTps: index ? 20 : 5,
+        })),
+      },
+    });
+    expect(root.querySelector("#insight-speed path.output")).toBe(path);
+    expect(path.getAttribute("d")).not.toBe(previousPath);
+    expect(root.querySelector("#insight-token .donut strong")).toBe(total);
+    expect(total.textContent).toBe("60");
+    expect(root.querySelector('[data-trace-key="request:request"] .trace-plot')).toBe(span);
+    expect(span.getAttribute("aria-label")).toContain("3 s");
+    expect(root.querySelector(".top-metrics strong")?.textContent).toBe("60");
+
+    const svg = root.querySelector<SVGSVGElement>("#insight-speed svg")!;
+    svg.focus();
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
+    span.click();
+    expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBe("0");
+    const inspector = root.querySelector<HTMLElement>("#insight-time .trace-inspector")!;
+    expect(inspector.dataset.open).toBe("true");
+    view.render({ ...state, sessionID: "two", session: { ...session, sessionID: "two" } });
+    expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBeUndefined();
+    expect(root.querySelector<HTMLElement>("#insight-speed .tooltip")!.hidden).toBe(true);
+    expect(inspector.dataset.open).toBe("false");
   });
 
   test("keeps inspected time and source drill-down open across polling renders", () => {
@@ -176,7 +336,6 @@ describe("panel view", () => {
     expect(document.activeElement).toBe(svg);
     expect(root.querySelector<HTMLElement>(".tooltip")!.hidden).toBe(false);
     expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBe("0");
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!.click();
     const details = root.querySelector<HTMLDetailsElement>('[data-source="attribution"]')!;
     const row = details.querySelector("li")!;
     const summary = details.querySelector("summary")!;
@@ -219,12 +378,17 @@ describe("panel view", () => {
         ],
       },
     });
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="time"]')!.click();
     expect(root.textContent).toContain("Duration unavailable");
     expect(root.querySelector(".lane-track")).toBeNull();
-    expect(root.querySelector<HTMLElement>(".phase-stack")?.hidden).toBe(true);
-    expect(root.querySelectorAll(".phase-segment:not([hidden])")).toHaveLength(0);
-    expect(root.textContent).toContain("No measured foreground intervals");
+    expect(root.querySelector(".trace-stats strong")?.textContent).toBe("Unavailable");
+    [...root.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "Show tools")!
+      .click();
+    const span = root.querySelector('[data-trace-key="tool:interrupted"]')!;
+    expect(span.querySelector<HTMLElement>(".trace-plot")?.dataset.duration).toBe("unknown");
+    expect(span.querySelector(".trace-value")?.textContent).toBe("Unavailable");
+    expect(span.querySelector(".trace-line-main")?.getAttribute("d")).toBe("");
+    expect(span.querySelector(".trace-line-unknown")?.getAttribute("d")).toContain(" L");
   });
 
   test("keeps reported Code Mode calls in optional details without invented child timing", () => {
@@ -239,6 +403,7 @@ describe("panel view", () => {
           {
             ...session.tools[0],
             name: "execute",
+            requestID: "request",
             reportedCalls: Array.from({ length: 3 }, () => ({
               name: "files.read_text_file",
               status: "completed" as const,
@@ -247,7 +412,8 @@ describe("panel view", () => {
         ],
       },
     });
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="time"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label^="Expand Request"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Inspect Code Mode"]')!.click();
     expect(root.textContent).toContain("files.read_text_file ×3 · completed");
     expect(root.textContent).toContain("Per-call timing unavailable");
     expect(root.querySelector<HTMLDetailsElement>('[data-source="reported-calls"]')?.open).toBe(
@@ -256,51 +422,51 @@ describe("panel view", () => {
     expect(root.querySelectorAll(".lane-track")).toHaveLength(0);
   });
 
-  test("phase descriptions support hover, keyboard focus, tap and escape", () => {
+  test("span details require activation instead of hover or focus and close on Escape", () => {
     const { root, view } = mount();
     view.render({ sessionID: "one", directory: "/local", loading: false, session });
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="time"]')!.click();
-    const segment = root.querySelector<HTMLButtonElement>(".phase-segment:not([hidden])")!;
-    const tip = root.querySelector<HTMLElement>(`#${segment.getAttribute("aria-describedby")}`)!;
-    expect(tip.hidden).toBe(true);
-    segment.dispatchEvent(new Event("pointerenter"));
-    expect(tip.hidden).toBe(false);
-    segment.dispatchEvent(new Event("pointerleave"));
-    expect(tip.hidden).toBe(true);
-    segment.dispatchEvent(new Event("focus"));
-    expect(tip.hidden).toBe(false);
-    segment.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    expect(tip.hidden).toBe(true);
-    segment.click();
-    expect(tip.hidden).toBe(false);
+    const span = root.querySelector<HTMLButtonElement>(
+      '[data-trace-key="request:request"] .trace-plot',
+    )!;
+    const inspector = root.querySelector<HTMLElement>(".trace-inspector")!;
+    span.dispatchEvent(new Event("pointerenter"));
+    span.focus();
+    expect(inspector.dataset.open).not.toBe("true");
+    span.click();
+    expect(inspector.dataset.open).toBe("true");
+    inspector.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(inspector.dataset.open).toBe("false");
+    expect(document.activeElement).toBe(span);
   });
 
-  test("keeps keyboard phase inspection focused across polling renders", () => {
+  test("keeps span inspection and keyboard focus intact across polling renders", () => {
     const { root, view } = mount();
     const state = { sessionID: "one", directory: "/local", loading: false, session };
     view.render(state);
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="time"]')!.click();
-    const segment = root.querySelector<HTMLButtonElement>(".phase-segment:not([hidden])")!;
-    segment.focus();
+    const span = root.querySelector<HTMLButtonElement>(
+      '[data-trace-key="request:request"] .trace-plot',
+    )!;
+    span.click();
+    const close = root.querySelector<HTMLButtonElement>('[aria-label="Close span details"]')!;
+    expect(document.activeElement).toBe(close);
     view.render({
       ...state,
       session: {
         ...session,
+        revision: 2,
         requests: [{ ...session.requests[0], streamedAt: 3000, endedAt: 3000 }],
       },
     });
-    expect(root.querySelector(".phase-segment:not([hidden])")).toBe(segment);
-    expect(document.activeElement).toBe(segment);
-    expect(segment.getAttribute("aria-label")).toContain("3 s");
-    expect(root.querySelector<HTMLElement>(".phase-tip:not([hidden])")).not.toBeNull();
+    expect(root.querySelector('[data-trace-key="request:request"] .trace-plot')).toBe(span);
+    expect(document.activeElement).toBe(close);
+    expect(span.getAttribute("aria-label")).toContain("3 s");
+    expect(root.querySelector<HTMLElement>(".trace-inspector")?.dataset.open).toBe("true");
   });
 
   test("keeps the SDK scope popup and keyboard selection intact across polling", () => {
     const { root, view } = mount();
     const state = { sessionID: "one", directory: "/local", loading: false, session };
     view.render(state);
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!.click();
-    const tab = root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!;
     const trigger = root.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
     trigger.click();
     const popup = root.querySelector<HTMLElement>('[role="listbox"]')!;
@@ -309,7 +475,6 @@ describe("panel view", () => {
     const option = popup.querySelector('[data-active="true"]');
     expect(option?.textContent).toBe("Cumulative inputs");
     view.render({ ...state, session: { ...session, revision: 2 } });
-    expect(root.querySelector('[role="tab"][data-id="token"]')).toBe(tab);
     expect(root.querySelector('[aria-haspopup="listbox"]')).toBe(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(root.querySelector('[role="listbox"]')).toBe(popup);
@@ -323,7 +488,7 @@ describe("panel view", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  test("retains cumulative scope across tabs and polling but resets for a new session", () => {
+  test("retains cumulative scope across polling but resets for a new session", () => {
     const { root, view } = mount();
     const captured = {
       ...session,
@@ -340,21 +505,25 @@ describe("panel view", () => {
     };
     const state = { sessionID: "one", directory: "/local", loading: false, session: captured };
     view.render(state);
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!.click();
     expect(root.querySelector(".donut strong")?.textContent).toBe("60");
     selectScope(root, "Cumulative inputs");
     expect(root.querySelector(".donut strong")?.textContent).toBe("100");
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="time"]')!.click();
+    const blocks = [...root.querySelectorAll(".token-block")];
+    const trigger = blocks[0].querySelector('[aria-haspopup="listbox"]')!;
+    const donut = blocks[0].querySelector(".donut")!;
+    const details = blocks[0].querySelector<HTMLDetailsElement>('[data-source="attribution"]')!;
+    details.open = true;
     view.render({ ...state, session: { ...captured, revision: 2 } });
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="speed"]')!.click();
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!.click();
+    blocks.forEach((block, index) => {
+      expect(root.querySelectorAll(".token-block")[index]).toBe(block);
+    });
+    expect(blocks[0].querySelector('[aria-haspopup="listbox"]')).toBe(trigger);
+    expect(blocks[0].querySelector(".donut")).toBe(donut);
+    expect(blocks[0].querySelector('[data-source="attribution"]')).toBe(details);
+    expect(details.open).toBe(true);
     expect(root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe("Cumulative inputs");
     expect(root.querySelector(".donut strong")?.textContent).toBe("100");
-    const details = root.querySelector<HTMLDetailsElement>('[data-source="attribution"]')!;
-    details.open = true;
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="speed"]')!.click();
     view.render({ ...state, sessionID: "two", session: { ...captured, sessionID: "two" } });
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!.click();
     expect(root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe("Current context");
     expect(root.querySelector(".donut strong")?.textContent).toBe("60");
     expect(details.open).toBe(false);
@@ -368,7 +537,6 @@ describe("panel view", () => {
     const svg = root.querySelector<SVGSVGElement>("#insight-speed svg")!;
     const speed = root.querySelector<HTMLElement>("#insight-speed")!;
     const retryButton = root.querySelector<HTMLButtonElement>("#retry")!;
-    root.querySelector<HTMLButtonElement>('[role="tab"][data-id="token"]')!.click();
     const trigger = root.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
     trigger.click();
     const popup = root.querySelector('[role="listbox"]')!;

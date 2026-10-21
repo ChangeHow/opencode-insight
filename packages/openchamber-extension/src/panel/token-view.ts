@@ -10,8 +10,15 @@ import { createSourceDetails } from "./source-details";
 export function createTokenView(root: HTMLElement) {
   let cumulative = false;
   let latest: SessionInsight | undefined;
+  const grid = element("div", "token-grid");
+  const inputBlock = element("section", "token-block");
+  inputBlock.setAttribute("aria-labelledby", "insight-input-heading");
+  const usageBlock = element("section", "token-block");
+  usageBlock.setAttribute("aria-labelledby", "insight-usage-heading");
   const header = element("div", "section-head");
-  header.append(element("h2", "", "Input composition"));
+  const inputTitle = element("h2", "", "Input composition");
+  inputTitle.id = "insight-input-heading";
+  header.append(inputTitle);
   const scopeSlot = element("div", "scope-slot");
   header.append(scopeSlot);
   const inputSlot = element("div");
@@ -20,6 +27,7 @@ export function createTokenView(root: HTMLElement) {
   const detailsSlot = element("div");
   const usageHeader = element("div", "section-head");
   const usageTitle = element("h2", "", "Reported cumulative usage");
+  usageTitle.id = "insight-usage-heading";
   usageTitle.title =
     "Normalized disjoint input categories. Output and reasoning are separate from input composition.";
   const cost = element("span", "muted");
@@ -27,16 +35,10 @@ export function createTokenView(root: HTMLElement) {
   usageHeader.append(usageTitle, cost);
   const usageSlot = element("div");
   const unavailableSlot = element("div");
-  root.append(
-    header,
-    inputSlot,
-    qualitySlot,
-    emptySlot,
-    detailsSlot,
-    usageHeader,
-    usageSlot,
-    unavailableSlot,
-  );
+  inputBlock.append(header, inputSlot, qualitySlot, emptySlot, detailsSlot);
+  usageBlock.append(usageHeader, usageSlot, unavailableSlot);
+  grid.append(inputBlock, usageBlock);
+  root.append(grid);
   const input = createComposition(inputSlot, "Input composition");
   const usage = createComposition(usageSlot, "Reported usage");
   const details = createSourceDetails(detailsSlot);
