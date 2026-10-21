@@ -141,11 +141,9 @@ describe("panel view", () => {
     );
     expect(metrics[0]).toBe("40");
     expect(metrics[1]).toBe("165");
-    expect(root.textContent).toContain("Unclassified Skill");
-    expect(root.textContent).toContain("skill-123");
     expect(root.querySelector(".donut")).not.toBeNull();
     expect(root.querySelector(".donut strong")?.textContent).toBe("40");
-    expect(root.querySelector("details")?.open).toBe(false);
+    expect(root.querySelector('[data-source="attribution"]')).toBeNull();
     expect(root.querySelector(".composition-legend")?.textContent).toContain("100%");
     expect(root.querySelector(".quality-slot")?.textContent).toContain("Estimated attribution");
     expect(root.querySelector("h2[title]")?.getAttribute("title")).toContain(
@@ -166,7 +164,7 @@ describe("panel view", () => {
     expect(root.querySelector("table")).toBeNull();
   });
 
-  test("groups token controls, details and empty states in two ordered labelled blocks", () => {
+  test("groups token controls and empty states in two ordered labelled blocks", () => {
     const { root, view } = mount();
     const state = { sessionID: "one", directory: "/local", loading: false, session };
     view.render({
@@ -187,7 +185,6 @@ describe("panel view", () => {
     const [input, usage] = blocks;
     const scope = input.querySelector('[aria-haspopup="listbox"]')!;
     const quality = input.querySelector<HTMLElement>(".quality-slot")!;
-    const details = input.querySelector<HTMLDetailsElement>('[data-source="attribution"]')!;
     const inputEmpty = [...input.querySelectorAll<HTMLElement>("div")].find(
       (node) => node.textContent === "Input source attribution unavailable." && node.hidden,
     )!;
@@ -198,7 +195,6 @@ describe("panel view", () => {
     const compositions = blocks.map((block) => block.querySelector(".composition")!);
     expect(scope).not.toBeNull();
     expect(quality.hidden).toBe(false);
-    expect(details.hidden).toBe(false);
     expect(inputEmpty).toBeDefined();
     expect(usageEmpty).toBeDefined();
     expect(cost.textContent).toContain("0.25");
@@ -216,14 +212,12 @@ describe("panel view", () => {
     expect(inputEmpty.hidden).toBe(false);
     expect(usageEmpty.hidden).toBe(false);
     expect(quality.hidden).toBe(true);
-    expect(details.hidden).toBe(true);
     expect(cost.hidden).toBe(true);
     for (const composition of compositions) expect(composition.parentElement?.hidden).toBe(true);
     view.render({ ...state, session: { ...session, revision: 3 } });
     expect(root.querySelector(".token-grid")).toBe(grid);
     blocks.forEach((block, index) => expect(grid.children[index]).toBe(block));
     expect(input.querySelector('[aria-haspopup="listbox"]')).toBe(scope);
-    expect(input.querySelector('[data-source="attribution"]')).toBe(details);
     expect(inputEmpty.hidden).toBe(true);
     expect(usageEmpty.hidden).toBe(true);
     blocks.forEach((block, index) => {
@@ -254,11 +248,11 @@ describe("panel view", () => {
       },
     };
     view.render(state);
-    const path = root.querySelector("#insight-speed path.output")!;
+    const path = root.querySelector("#insight-speed path.speed")!;
     const previousPath = path.getAttribute("d");
     const total = root.querySelector("#insight-token .donut strong")!;
     const span = root.querySelector<HTMLButtonElement>(
-      '#insight-time [data-trace-key="request:request"] .trace-plot',
+      '#insight-time [data-trace-key="tool:child-tool"] .trace-plot',
     )!;
     expect(total.textContent).toBe("40");
     expect(span.getAttribute("aria-label")).toContain("2 s");
@@ -267,6 +261,7 @@ describe("panel view", () => {
       session: {
         ...session,
         revision: 2,
+        tools: [{ ...session.tools[0], endedAt: 3500 }],
         requests: [
           {
             ...session.requests[0],
@@ -285,11 +280,11 @@ describe("panel view", () => {
         })),
       },
     });
-    expect(root.querySelector("#insight-speed path.output")).toBe(path);
+    expect(root.querySelector("#insight-speed path.speed")).toBe(path);
     expect(path.getAttribute("d")).not.toBe(previousPath);
     expect(root.querySelector("#insight-token .donut strong")).toBe(total);
     expect(total.textContent).toBe("60");
-    expect(root.querySelector('[data-trace-key="request:request"] .trace-plot')).toBe(span);
+    expect(root.querySelector('[data-trace-key="tool:child-tool"] .trace-plot')).toBe(span);
     expect(span.getAttribute("aria-label")).toContain("3 s");
     expect(root.querySelector(".top-metrics strong")?.textContent).toBe("60");
 
@@ -304,58 +299,6 @@ describe("panel view", () => {
     expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBeUndefined();
     expect(root.querySelector<HTMLElement>("#insight-speed .tooltip")!.hidden).toBe(true);
     expect(inspector.dataset.open).toBe("false");
-  });
-
-  test("keeps inspected time and source drill-down open across polling renders", () => {
-    const { root, view } = mount();
-    const state = {
-      sessionID: "one",
-      directory: "/local",
-      loading: false,
-      session,
-      series: {
-        revision: 1,
-        unchanged: false,
-        points: [0, 1000].map((at) => ({
-          at,
-          requestID: "request",
-          model: "model",
-          outputTps: 10,
-          reasoningTps: 0,
-          summaryTps: 0,
-          quality: "partial" as const,
-        })),
-      },
-    };
-    view.render(state);
-    const svg = root.querySelector<SVGSVGElement>("#insight-speed svg")!;
-    svg.focus();
-    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
-    view.render({ ...state, series: { ...state.series, revision: 2 } });
-    expect(root.querySelector("#insight-speed svg")).toBe(svg);
-    expect(document.activeElement).toBe(svg);
-    expect(root.querySelector<HTMLElement>(".tooltip")!.hidden).toBe(false);
-    expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBe("0");
-    const details = root.querySelector<HTMLDetailsElement>('[data-source="attribution"]')!;
-    const row = details.querySelector("li")!;
-    const summary = details.querySelector("summary")!;
-    details.open = true;
-    summary.focus();
-    view.render({
-      ...state,
-      session: {
-        ...session,
-        revision: 2,
-        requests: [
-          { ...session.requests[0], context: [{ ...session.requests[0].context[0], tokens: 60 }] },
-        ],
-      },
-    });
-    expect(root.querySelector('[data-source="attribution"]')).toBe(details);
-    expect(details.open).toBe(true);
-    expect(details.querySelector("li")).toBe(row);
-    expect(row.textContent).toContain("60 · estimated");
-    expect(document.activeElement).toBe(summary);
   });
 
   test("does not turn interrupted activity without an end into ongoing elapsed time", () => {
@@ -381,9 +324,6 @@ describe("panel view", () => {
     expect(root.textContent).toContain("Duration unavailable");
     expect(root.querySelector(".lane-track")).toBeNull();
     expect(root.querySelector(".trace-stats strong")?.textContent).toBe("Unavailable");
-    [...root.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent === "Show tools")!
-      .click();
     const span = root.querySelector('[data-trace-key="tool:interrupted"]')!;
     expect(span.querySelector<HTMLElement>(".trace-plot")?.dataset.duration).toBe("unknown");
     expect(span.querySelector(".trace-value")?.textContent).toBe("Unavailable");
@@ -391,7 +331,7 @@ describe("panel view", () => {
     expect(span.querySelector(".trace-line-unknown")?.getAttribute("d")).toContain(" L");
   });
 
-  test("keeps reported Code Mode calls in optional details without invented child timing", () => {
+  test("shows reported Code Mode calls directly without invented child timing", () => {
     const { root, view } = mount();
     view.render({
       sessionID: "one",
@@ -412,13 +352,10 @@ describe("panel view", () => {
         ],
       },
     });
-    root.querySelector<HTMLButtonElement>('[aria-label^="Expand Request"]')!.click();
     root.querySelector<HTMLButtonElement>('[aria-label="Inspect Code Mode"]')!.click();
     expect(root.textContent).toContain("files.read_text_file ×3 · completed");
-    expect(root.textContent).toContain("Per-call timing unavailable");
-    expect(root.querySelector<HTMLDetailsElement>('[data-source="reported-calls"]')?.open).toBe(
-      false,
-    );
+    expect(root.querySelector<HTMLElement>('[data-source="reported-calls"]')?.hidden).toBe(false);
+    expect(root.querySelector(".trace-inspector details")).toBeNull();
     expect(root.querySelectorAll(".lane-track")).toHaveLength(0);
   });
 
@@ -426,7 +363,7 @@ describe("panel view", () => {
     const { root, view } = mount();
     view.render({ sessionID: "one", directory: "/local", loading: false, session });
     const span = root.querySelector<HTMLButtonElement>(
-      '[data-trace-key="request:request"] .trace-plot',
+      '[data-trace-key="tool:child-tool"] .trace-plot',
     )!;
     const inspector = root.querySelector<HTMLElement>(".trace-inspector")!;
     span.dispatchEvent(new Event("pointerenter"));
@@ -444,7 +381,7 @@ describe("panel view", () => {
     const state = { sessionID: "one", directory: "/local", loading: false, session };
     view.render(state);
     const span = root.querySelector<HTMLButtonElement>(
-      '[data-trace-key="request:request"] .trace-plot',
+      '[data-trace-key="tool:child-tool"] .trace-plot',
     )!;
     span.click();
     const close = root.querySelector<HTMLButtonElement>('[aria-label="Close span details"]')!;
@@ -454,10 +391,10 @@ describe("panel view", () => {
       session: {
         ...session,
         revision: 2,
-        requests: [{ ...session.requests[0], streamedAt: 3000, endedAt: 3000 }],
+        tools: [{ ...session.tools[0], endedAt: 3500 }],
       },
     });
-    expect(root.querySelector('[data-trace-key="request:request"] .trace-plot')).toBe(span);
+    expect(root.querySelector('[data-trace-key="tool:child-tool"] .trace-plot')).toBe(span);
     expect(document.activeElement).toBe(close);
     expect(span.getAttribute("aria-label")).toContain("3 s");
     expect(root.querySelector<HTMLElement>(".trace-inspector")?.dataset.open).toBe("true");
@@ -511,22 +448,17 @@ describe("panel view", () => {
     const blocks = [...root.querySelectorAll(".token-block")];
     const trigger = blocks[0].querySelector('[aria-haspopup="listbox"]')!;
     const donut = blocks[0].querySelector(".donut")!;
-    const details = blocks[0].querySelector<HTMLDetailsElement>('[data-source="attribution"]')!;
-    details.open = true;
     view.render({ ...state, session: { ...captured, revision: 2 } });
     blocks.forEach((block, index) => {
       expect(root.querySelectorAll(".token-block")[index]).toBe(block);
     });
     expect(blocks[0].querySelector('[aria-haspopup="listbox"]')).toBe(trigger);
     expect(blocks[0].querySelector(".donut")).toBe(donut);
-    expect(blocks[0].querySelector('[data-source="attribution"]')).toBe(details);
-    expect(details.open).toBe(true);
     expect(root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe("Cumulative inputs");
     expect(root.querySelector(".donut strong")?.textContent).toBe("100");
     view.render({ ...state, sessionID: "two", session: { ...captured, sessionID: "two" } });
     expect(root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe("Current context");
     expect(root.querySelector(".donut strong")?.textContent).toBe("60");
-    expect(details.open).toBe(false);
   });
 
   test("disposal closes SDK popups, removes listeners and ignores later renders", () => {

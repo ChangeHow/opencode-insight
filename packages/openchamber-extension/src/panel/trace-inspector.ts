@@ -72,14 +72,13 @@ export function createTraceInspector(root: HTMLElement) {
   observer?.observe(panel);
   const id = element("div", "trace-id muted");
   const fields = element("dl", "trace-fields");
-  const note = element("p", "trace-note muted");
-  const details = element("details", "source trace-reported");
-  details.dataset.source = "reported-calls";
-  details.append(element("summary", "", "Reported tool calls"));
-  details.append(element("p", "muted", "Per-call timing unavailable"));
+  const reported = element("section", "source trace-reported");
+  reported.dataset.source = "reported-calls";
+  reported.setAttribute("aria-label", "Reported tool calls");
+  reported.append(element("div", "muted", "Reported tool calls"));
   const list = element("ul");
   const truncated = element("small", "muted", "Details truncated");
-  panel.append(header, id, fields, note, details);
+  panel.append(header, id, fields, reported);
   root.append(panel);
   let key = "";
   let page = 0;
@@ -90,10 +89,10 @@ export function createTraceInspector(root: HTMLElement) {
     page = next;
     renderReported();
   });
-  details.append(list, truncated, pager.node);
+  reported.append(list, truncated, pager.node);
   function renderReported() {
     const groups = summarizeReportedCalls(tool?.reportedCalls);
-    details.hidden = !groups.length;
+    reported.hidden = !groups.length;
     page = clampTracePage(page, groups.length);
     const visible = groups.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
     const active = new Set<string>();
@@ -117,7 +116,6 @@ export function createTraceInspector(root: HTMLElement) {
       if (key !== item.key) {
         key = item.key;
         page = 0;
-        details.open = false;
       }
       const info = describeItem(item, model, now);
       setText(title, info.label);
@@ -149,7 +147,6 @@ export function createTraceInspector(root: HTMLElement) {
         }),
       );
       for (const label of values.keys()) if (!active.has(label)) values.delete(label);
-      setText(note, info.note);
       tool = info.reported;
       renderReported();
     },
@@ -166,7 +163,6 @@ export function createTraceInspector(root: HTMLElement) {
       trigger = undefined;
       key = "";
       page = 0;
-      details.open = false;
     },
     dispose() {
       panel.removeEventListener("toggle", onToggle);

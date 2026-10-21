@@ -85,7 +85,7 @@ describe("collapsible trace view", () => {
     }
   });
 
-  test("expands only explicit request relationships and keeps unmatched tools in an orphan bucket", () => {
+  test("groups native tools across requests and preserves explicit request and parent metadata", () => {
     const { root } = mount(
       session(
         [request(), request({ id: "other", model: "other-model" })],
@@ -97,27 +97,23 @@ describe("collapsible trace view", () => {
         ],
       ),
     );
-    expect(root.querySelectorAll('.trace-row[data-kind="tool"]')).toHaveLength(0);
-    fold(row(root, "request:request")).click();
+    expect(root.querySelectorAll('.trace-row[data-kind="request"]')).toHaveLength(0);
+    expect(inspect(row(root, "group:bash")).textContent).toBe("bash ×3");
+    expect(row(root, "tool:other-tool").style.getPropertyValue("--depth")).toBe("1");
+    fold(row(root, "group:bash")).click();
     expect(row(root, "tool:tool").style.getPropertyValue("--depth")).toBe("2");
-    expect(root.querySelector('[data-trace-key="tool:other-tool"]')).toBeNull();
-    expect(root.querySelector('[data-trace-key="tool:missing"]')).toBeNull();
-    fold(row(root, "request:other")).click();
-    expect(row(root, "tool:other-tool")).toBeDefined();
-    expect(root.querySelector('[data-trace-key="tool:tool"]')).toBeNull();
-    const orphan = row(root, "request:unassociated");
-    inspect(orphan).click();
-    expect(inspector(root).textContent).toContain("No parent request is inferred");
-    expect(field(root, "Native tools")).toBe("2");
-    fold(orphan).click();
-    fold(row(root, "group:unassociated:bash")).click();
-    expect(row(root, "tool:missing")).toBeDefined();
-    expect(row(root, "tool:dangling")).toBeDefined();
+    inspect(row(root, "tool:missing")).click();
+    expect(field(root, "Request ID")).toBe("Unassociated");
+    expect(field(root, "Recorded parent call")).toBe("tool");
+    inspect(row(root, "tool:dangling")).click();
+    expect(field(root, "Request ID")).toBe("absent");
+    inspect(row(root, "tool:other-tool")).click();
+    expect(field(root, "Request ID")).toBe("other");
   });
 
   test("hover and focus never replace details or expand rows; only explicit selection opens a non-flow inspector", () => {
-    const { root } = mount();
-    const requestRow = row(root, "request:request");
+    const { root } = mount(session([request()], [tool(), tool({ id: "second" })]));
+    const requestRow = row(root, "group:bash");
     const panel = inspector(root);
     const title = panel.querySelector("h3")!.textContent;
     inspect(requestRow).dispatchEvent(new Event("pointerenter"));
@@ -129,7 +125,7 @@ describe("collapsible trace view", () => {
     expect(panel.dataset.open).not.toBe("true");
     inspect(requestRow).click();
     expect(panel.dataset.open).toBe("true");
-    expect(panel.querySelector("h3")!.textContent).toContain("Request 1");
+    expect(panel.querySelector("h3")!.textContent).toBe("bash ×2");
     button(panel, "Close span details").click();
     expect(panel.dataset.open).toBe("false");
     expect(document.activeElement).toBe(inspect(requestRow));
@@ -160,10 +156,10 @@ describe("collapsible trace view", () => {
     inspect(invocation).click();
     expect(field(root, "Native tool")).toBe("execute");
     expect(field(root, "Invocation")).toBe("100 ms");
-    const details = root.querySelector<HTMLDetailsElement>(".trace-reported")!;
-    expect(details.open).toBe(false);
-    details.open = true;
-    expect(details.textContent).toContain("Per-call timing unavailable");
+    const details = inspector(root).querySelector<HTMLElement>(".trace-reported")!;
+    expect(details.hidden).toBe(false);
+    expect(details.previousElementSibling?.className).toBe("trace-fields");
+    expect(inspector(root).querySelector("details, summary")).toBeNull();
     expect([...details.querySelectorAll("li")].map((node) => node.textContent)).toEqual([
       "read ×2 · completed",
       "read ×1 · error",
@@ -171,9 +167,8 @@ describe("collapsible trace view", () => {
     ]);
     expect(details.querySelector("script, svg, .trace-plot")).toBeNull();
     expect(details.querySelector<HTMLElement>("small")!.hidden).toBe(false);
-    expect(root.querySelectorAll(".trace-row")).toHaveLength(3);
+    expect(root.querySelectorAll(".trace-row")).toHaveLength(2);
     expect(field(root, "Request ID")).toBe("request");
-    expect(inspector(root).textContent).toContain("child calls have no independent timing or cost");
     expect(root.querySelectorAll(".trace-stats strong")[4].textContent).toBe("1");
     expect(root.querySelectorAll(".trace-stats strong")[5].textContent).toBe("0");
   });
@@ -199,9 +194,52 @@ describe("collapsible trace view", () => {
     root.querySelector(".trace-scroll")!.dispatchEvent(new Event("scroll"));
     expect(panel.dataset.open).toBe("false");
     source.click();
-    fold(row(root, "request:request")).click();
+    fold(row(root, "session")).click();
     expect(panel.dataset.open).toBe("false");
     expect(source.isConnected).toBe(false);
+  });
+
+  test("pages visible reported summaries and preserves their page, focus and scroll across polling", () => {
+    const input = session(
+      [request()],
+      [
+        tool({
+          name: "execute",
+          reportedCalls: Array.from({ length: 21 }, (_, index) => ({
+            name: `read${index}`,
+            status: "completed",
+          })),
+        }),
+      ],
+    );
+    const { root, view } = mount(input);
+    button(root, "Show tools").click();
+    inspect(row(root, "tool:tool")).click();
+    const panel = inspector(root);
+    const summaries = panel.querySelector<HTMLElement>(".trace-reported")!;
+    expect(summaries.querySelectorAll("li")).toHaveLength(20);
+    expect(summaries.querySelector<HTMLElement>("small")!.hidden).toBe(true);
+    const next = button(summaries, "Next summaries");
+    next.click();
+    expect(summaries.querySelectorAll("li")).toHaveLength(1);
+    expect(summaries.querySelector("li")?.textContent).toBe("read20 ×1 · completed");
+    const previous = button(summaries, "Previous summaries");
+    previous.focus();
+    panel.scrollTop = 80;
+    view.update({ ...input, revision: 2 });
+    expect(panel.dataset.open).toBe("true");
+    expect(document.activeElement).toBe(previous);
+    expect(panel.scrollTop).toBe(80);
+    expect(summaries.querySelector("li")?.textContent).toBe("read20 ×1 · completed");
+    previous.click();
+    expect(summaries.querySelectorAll("li")).toHaveLength(20);
+    expect(summaries.querySelector("li")?.textContent).toBe("read0 ×1 · completed");
+    next.click();
+    inspect(row(root, "session")).click();
+    expect(summaries.hidden).toBe(true);
+    inspect(row(root, "tool:tool")).click();
+    expect(summaries.hidden).toBe(false);
+    expect(summaries.querySelector("li")?.textContent).toBe("read0 ×1 · completed");
   });
 
   test("does not invent elapsed time for unknown endpoints but accepts measured zero", () => {
@@ -209,7 +247,7 @@ describe("collapsible trace view", () => {
     const { root, view } = mount(input);
     button(root, "Show tools").click();
     expect(root.querySelector(".trace-stats strong")?.textContent).toBe("Unavailable");
-    for (const key of ["session", "request:request", "tool:tool"]) {
+    for (const key of ["session", "tool:tool"]) {
       const node = row(root, key);
       expect(node.querySelector(".trace-value")?.textContent).toBe("Unavailable");
       expect(node.querySelector<HTMLElement>(".trace-plot")?.dataset.duration).toBe("unknown");
@@ -231,7 +269,7 @@ describe("collapsible trace view", () => {
     expect(button(root, "Zoom selected").disabled).toBe(false);
   });
 
-  test("bounds 2000 tools to 61 axis rows and pages requests, tool groups and calls by 20", () => {
+  test("bounds 2000 tools to 41 axis rows and pages tool groups and calls by 20", () => {
     const requests = Array.from({ length: 21 }, (_, index) =>
       request({ id: `r${index}`, startedAt: index }),
     );
@@ -251,23 +289,20 @@ describe("collapsible trace view", () => {
         tool({ id: `other${index}`, requestID: `r${index + 1}` }),
       ),
     ];
-    const { root } = mount(session(requests, tools));
+    const input = session(requests, tools);
+    const { root, view } = mount(input);
     const bounded = () => {
       const count = root.querySelectorAll(".trace-row").length;
-      expect(count).toBeLessThanOrEqual(61);
+      expect(count).toBeLessThanOrEqual(41);
       expect(root.querySelector<HTMLElement>(".trace-view")?.dataset.visibleRows).toBe(
         String(count),
       );
     };
-    expect(root.querySelectorAll('.trace-row[data-kind="request"]')).toHaveLength(1);
-    button(root, "Previous requests").click();
-    expect(root.querySelectorAll('.trace-row[data-kind="request"]')).toHaveLength(20);
-    fold(row(root, "request:r0")).click();
     expect(
       root.querySelectorAll('.trace-row[data-kind="group"], .trace-row[data-kind="tool"]'),
     ).toHaveLength(20);
-    fold(row(root, "group:r0:bash")).click();
-    expect(root.querySelectorAll(".trace-row")).toHaveLength(61);
+    fold(row(root, "group:bash")).click();
+    expect(root.querySelectorAll(".trace-row")).toHaveLength(41);
     expect(row(root, "tool:bulk0")).toBeDefined();
     expect(row(root, "tool:bulk19")).toBeDefined();
     bounded();
@@ -275,15 +310,29 @@ describe("collapsible trace view", () => {
     expect(row(root, "tool:bulk20")).toBeDefined();
     expect(row(root, "tool:bulk39")).toBeDefined();
     expect(root.querySelector('[data-trace-key="tool:bulk0"]')).toBeNull();
+    const invocation = row(root, "tool:bulk20");
+    const focused = inspect(invocation);
+    focused.focus();
+    const scroll = root.querySelector<HTMLElement>(".trace-scroll")!;
+    scroll.scrollTop = 120;
+    view.update({ ...input, revision: 2 });
+    expect(row(root, "tool:bulk20")).toBe(invocation);
+    expect(document.activeElement).toBe(focused);
+    expect(scroll.scrollTop).toBe(120);
     bounded();
     button(root, "Next tool groups").click();
     expect(row(root, "tool:single19")).toBeDefined();
-    expect(root.querySelector('[data-trace-key="group:r0:bash"]')).toBeNull();
+    expect(root.querySelector('[data-trace-key="group:bash"]')).toBeNull();
     bounded();
-    button(root, "Next requests").click();
-    expect(row(root, "request:r20")).toBeDefined();
-    expect(root.querySelectorAll('.trace-row[data-kind="request"]')).toHaveLength(1);
-    expect(button(root, "Next requests").disabled).toBe(true);
+    expect(root.querySelectorAll(".trace-row")).toHaveLength(2);
+    expect(button(root, "Next tool groups").disabled).toBe(true);
+    view.update({ ...input, revision: 3 });
+    expect(row(root, "tool:single19")).toBeDefined();
+    expect(root.querySelector('[data-trace-key="group:bash"]')).toBeNull();
+    button(root, "Previous tool groups").click();
+    expect(row(root, "group:bash")).toBeDefined();
+    button(root, "Latest tools").click();
+    expect(row(root, "tool:single19")).toBeDefined();
     bounded();
   });
 
@@ -294,7 +343,7 @@ describe("collapsible trace view", () => {
     );
     const { root, view } = mount(input);
     button(root, "Show tools").click();
-    const group = row(root, "group:request:bash");
+    const group = row(root, "group:bash");
     inspect(group).click();
     expect(field(root, "Execution union U")).toBe("Unavailable");
     expect(button(root, "Zoom selected").disabled).toBe(true);
@@ -309,7 +358,7 @@ describe("collapsible trace view", () => {
     expect(button(root, "Zoom selected").disabled).toBe(false);
   });
 
-  test("shows selected request details, splits first delta and zooms a short-call marker", () => {
+  test("keeps request totals at session level and zooms a short-call marker", () => {
     const { root } = mount(
       session(
         [
@@ -322,16 +371,13 @@ describe("collapsible trace view", () => {
         [tool({ startedAt: 5000, endedAt: 5001 })],
       ),
     );
-    const requestRow = row(root, "request:request");
+    const requestRow = row(root, "session");
     inspect(requestRow).focus();
     inspect(requestRow).click();
     expect(requestRow.dataset.selected).toBe("true");
-    expect(field(root, "First delta")).toBe("1 s");
     expect(field(root, "Reported cost")).toBe("$0.00");
-    expect(field(root, "Output / reasoning")).toBe("2 / 3");
-    expect(requestRow.querySelector(".trace-line-waiting")?.getAttribute("d")).toContain("H");
-    expect(requestRow.querySelector(".trace-line-streaming")?.getAttribute("d")).toContain("H");
-    fold(requestRow).click();
+    expect(field(root, "Reported tokens")).toBe("15");
+    expect(field(root, "Model requests")).toBe("1");
     const invocation = row(root, "tool:tool");
     const path = invocation.querySelector(".trace-line-main")!;
     expect(path.getAttribute("d")).toMatch(/^M[^,]+,13 L[^,]+,17$/);
@@ -362,8 +408,7 @@ describe("collapsible trace view", () => {
     const focus = inspect(invocation);
     focus.focus();
     button(root, "Zoom selected").click();
-    const details = root.querySelector<HTMLDetailsElement>(".trace-reported")!;
-    details.open = true;
+    const details = root.querySelector<HTMLElement>(".trace-reported")!;
     const scroll = root.querySelector<HTMLElement>(".trace-scroll")!;
     scroll.scrollTop = 123;
     scroll.scrollLeft = 45;
@@ -377,7 +422,7 @@ describe("collapsible trace view", () => {
     expect(scroll.scrollTop).toBe(123);
     expect(scroll.scrollLeft).toBe(45);
     expect(root.querySelector(".trace-reported")).toBe(details);
-    expect(details.open).toBe(true);
+    expect(details.hidden).toBe(false);
     expect(invocation.dataset.selected).toBe("true");
     expect(root.querySelector<HTMLElement>(".trace-view")?.dataset.zoomed).toBe("tool:tool");
     expect(field(root, "Invocation")).toBe("200 ms");
@@ -386,10 +431,10 @@ describe("collapsible trace view", () => {
     view.update({ ...input, sessionID: "next", directory: "/next" });
     expect(row(root, "session").dataset.selected).toBe("true");
     expect(root.querySelector<HTMLElement>(".trace-view")?.dataset.zoomed).toBe("");
-    expect(root.querySelector('[data-trace-key="tool:tool"]')).toBeNull();
-    expect(details.open).toBe(false);
+    expect(row(root, "tool:tool").dataset.selected).toBe("false");
+    expect(details.hidden).toBe(true);
     expect(inspector(root).querySelector(".trace-id")?.textContent).toBe("next");
-    expect(fold(row(root, "request:request")).getAttribute("aria-expanded")).toBe("false");
+    expect(fold(row(root, "session")).getAttribute("aria-expanded")).toBe("true");
   });
 
   test("refreshes running durations on the same revision without mutating source telemetry", () => {
@@ -407,7 +452,6 @@ describe("collapsible trace view", () => {
     expect(row(root, "tool:tool")).toBe(invocation);
     expect(field(root, "Invocation")).toBe("1.9 s");
     expect(root.querySelector(".trace-stats strong")?.textContent).toBe("2 s");
-    expect(inspector(root).textContent).toContain("Ongoing durations are provisional");
     expect(input).toEqual(before);
   });
 });

@@ -5,7 +5,6 @@ import { createComposition } from "./composition";
 import { element, setText } from "./dom";
 import { money } from "./format";
 import { sourceColors, usageColors } from "./theme";
-import { createSourceDetails } from "./source-details";
 
 export function createTokenView(root: HTMLElement) {
   let cumulative = false;
@@ -24,7 +23,6 @@ export function createTokenView(root: HTMLElement) {
   const inputSlot = element("div");
   const emptySlot = element("div");
   const qualitySlot = element("div", "quality-slot");
-  const detailsSlot = element("div");
   const usageHeader = element("div", "section-head");
   const usageTitle = element("h2", "", "Reported cumulative usage");
   usageTitle.id = "insight-usage-heading";
@@ -35,16 +33,14 @@ export function createTokenView(root: HTMLElement) {
   usageHeader.append(usageTitle, cost);
   const usageSlot = element("div");
   const unavailableSlot = element("div");
-  inputBlock.append(header, inputSlot, qualitySlot, emptySlot, detailsSlot);
+  inputBlock.append(header, inputSlot, qualitySlot, emptySlot);
   usageBlock.append(usageHeader, usageSlot, unavailableSlot);
   grid.append(inputBlock, usageBlock);
   root.append(grid);
   const input = createComposition(inputSlot, "Input composition");
   const usage = createComposition(usageSlot, "Reported usage");
-  const details = createSourceDetails(detailsSlot);
   const quality = mountBadge(qualitySlot, { label: "Estimated attribution", tone: "neutral" });
-  qualitySlot.title =
-    "Source attribution estimates need not equal provider usage. Individual source quality is in Source details.";
+  qualitySlot.title = "Source attribution estimates need not equal provider usage.";
   const empty = mountEmpty(emptySlot, { title: "Input source attribution unavailable." });
   const unavailable = mountEmpty(unavailableSlot, { title: "Provider usage unavailable." });
   const scope = mountSelect(scopeSlot, {
@@ -79,7 +75,6 @@ export function createTokenView(root: HTMLElement) {
         ? "Reported"
         : "Estimated attribution",
     });
-    details.update(groups);
     const hasUsage = session.requests.some((request) => request.usage);
     usageSlot.hidden = !hasUsage;
     unavailableSlot.hidden = hasUsage;
@@ -111,7 +106,6 @@ export function createTokenView(root: HTMLElement) {
         cumulative = false;
         scope.update({ value: "current" });
       }
-      details.reset();
     },
     dispose() {
       scope.dispose();

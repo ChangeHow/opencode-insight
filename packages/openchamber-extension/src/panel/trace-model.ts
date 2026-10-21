@@ -21,18 +21,11 @@ export interface TraceGroup {
   backgroundCount: number;
 }
 
-export interface TraceRequest {
-  id: string;
-  label: string;
-  request?: RequestInsight;
-  groups: TraceGroup[];
-}
-
 export interface TraceModel {
   start: number;
   end: number;
   elapsedMs?: number;
-  requests: TraceRequest[];
+  groups: TraceGroup[];
   running: boolean;
   summary: {
     requestCount: number;
@@ -48,16 +41,6 @@ export interface TraceModel {
 
 function interval(start: number, end: number | undefined): TraceInterval | undefined {
   return end === undefined ? undefined : { start, end: Math.max(start, end) };
-}
-
-export function requestInterval(
-  request: RequestInsight,
-  now = Date.now(),
-): TraceInterval | undefined {
-  return interval(
-    request.startedAt,
-    request.streamedAt ?? request.endedAt ?? (request.status === "running" ? now : undefined),
-  );
 }
 
 export function toolInterval(tool: ToolInsight, now = Date.now()): TraceInterval | undefined {
@@ -114,21 +97,6 @@ function createGroups(tools: ToolInsight[], now: number): TraceGroup[] {
 
 export function createTraceModel(session: SessionInsight, now = Date.now()): TraceModel {
   const snapshot = structuredClone(session);
-  const requests: TraceRequest[] = snapshot.requests
-    .sort((a, b) => a.startedAt - b.startedAt)
-    .map((request, index) => ({
-      id: request.id,
-      label: `Request ${index + 1}`,
-      request,
-      groups: [],
-    }));
-  const byID = new Map(requests.map((request) => [request.id, request]));
-  const buckets = new Map<TraceRequest, ToolInsight[]>();
-  const unassociated: TraceRequest = {
-    id: "unassociated",
-    label: "Unassociated tools",
-    groups: [],
-  };
   let start: number | undefined;
   let end: number | undefined;
   let hasEndpoint = false;
@@ -172,19 +140,12 @@ export function createTraceModel(session: SessionInsight, now = Date.now()): Tra
   }
   for (const tool of snapshot.tools.sort((a, b) => a.startedAt - b.startedAt)) {
     record(tool, toolInterval(tool, now));
-    const request =
-      (tool.requestID === undefined ? undefined : byID.get(tool.requestID)) ?? unassociated;
-    const bucket = buckets.get(request);
-    if (bucket) bucket.push(tool);
-    else buckets.set(request, [tool]);
   }
-  if (buckets.has(unassociated)) requests.push(unassociated);
-  for (const request of requests) request.groups = createGroups(buckets.get(request) ?? [], now);
   return {
     start: start ?? 0,
     end: end ?? 0,
     elapsedMs: hasEndpoint ? end! - start! : undefined,
-    requests,
+    groups: createGroups(snapshot.tools, now),
     running,
     summary,
   };
@@ -198,17 +159,10 @@ export function advanceTraceClock(model: TraceModel, now: number): TraceModel {
     ...model,
     end,
     elapsedMs: end - model.start,
-    requests: model.requests.map((request) => {
-      if (!request.groups.some((group) => group.tools.some((tool) => tool.status === "running")))
-        return request;
-      return {
-        ...request,
-        groups: request.groups.map((group) =>
-          group.tools.some((tool) => tool.status === "running")
-            ? createGroups(group.tools, now)[0]
-            : group,
-        ),
-      };
-    }),
+    groups: model.groups.map((group) =>
+      group.tools.some((tool) => tool.status === "running")
+        ? createGroups(group.tools, now)[0]
+        : group,
+    ),
   };
 }

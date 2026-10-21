@@ -37,8 +37,7 @@
       small {
         font-size: 0.8rem;
       }
-      .chart svg:focus-visible,
-      .source summary:focus-visible {
+      .chart svg:focus-visible {
         outline: none;
         background-image: linear-gradient(var(--oc-hover), var(--oc-hover));
       }
@@ -91,33 +90,6 @@
         font-variant-numeric: tabular-nums;
         margin: 3px 0;
       }
-      .legend {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        font-size: 0.8rem;
-      }
-      .legend > span {
-        display: inline-flex;
-        gap: 5px;
-        align-items: center;
-        color: var(--oc-fg);
-      }
-      .legend i {
-        display: inline-block;
-        width: 14px;
-      }
-      .output {
-        stroke: var(--insight-speed-output);
-      }
-      .reasoning {
-        stroke: var(--insight-speed-reasoning);
-        stroke-dasharray: 6 3;
-      }
-      .summary {
-        stroke: var(--insight-speed-summary);
-        stroke-dasharray: 2 3;
-      }
       .chart {
         position: relative;
         min-width: 0;
@@ -144,28 +116,24 @@
         vector-effect: non-scaling-stroke;
         stroke-linecap: round;
       }
-      .mean {
-        stroke: var(--insight-speed-mean);
-        stroke-dasharray: 7 5;
-        opacity: 0.7;
-      }
       .cursor {
         stroke: var(--oc-muted, GrayText);
         stroke-dasharray: 3 3;
       }
-      .tooltip {
-        position: absolute;
-        top: 14px;
-        padding: 9px;
-        background: var(--oc-elevated, Canvas);
-        color: var(--oc-elevated-fg, CanvasText);
-        border: 1px solid var(--oc-border, GrayText);
-        border-radius: var(--oc-radius, 6px);
-        max-width: min(280px, 100%);
-        max-height: calc(100% - 20px);
-        overflow: auto;
+      .speed-inspection {
+        height: 2.5em;
         font-size: 0.8rem;
-        z-index: 1;
+        padding-top: 6px;
+      }
+      .tooltip {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--oc-muted, GrayText);
+      }
+      .tooltip strong {
+        color: var(--oc-fg, CanvasText);
+        font-variant-numeric: tabular-nums;
       }
       [hidden] {
         display: none !important;
@@ -173,10 +141,6 @@
       .source {
         padding: 9px 0;
         border-bottom: 1px solid var(--oc-border, GrayText);
-      }
-      .source summary {
-        cursor: pointer;
-        color: var(--oc-muted, GrayText);
       }
       ul,
       ol {

@@ -43,13 +43,42 @@ describe("speed chart", () => {
     vi.restoreAllMocks();
     document.body.replaceChildren();
   });
-  test("breaks paths at gaps and request boundaries with nonzero axes", () => {
+  test("keeps missing samples unknown without breaking at request boundaries", () => {
     const g = chartGeometry([point(0), point(1000), point(4000), point(5000, "next")]);
-    expect(g.path("outputTps").match(/M/g)).toHaveLength(3);
-    expect(g.path("outputTps").match(/L/g)).toHaveLength(1);
+    expect(g.path.match(/M/g)).toHaveLength(2);
+    expect(g.path.match(/L/g)).toHaveLength(2);
     expect(chartGeometry([]).max).toBe(1);
     const single = chartGeometry([point(0)]);
     expect(single.end).toBeGreaterThan(single.start);
+  });
+
+  test("combines captured streams and concurrent requests into one curve joined through known idle seconds", () => {
+    const g = chartGeometry(
+      [
+        point(0),
+        point(1000),
+        { ...point(4000, "next"), reasoningTps: 2, summaryTps: 3 },
+        point(4000, "parallel"),
+        point(5000, "next"),
+      ],
+      640,
+      [
+        { ...session.requests[0], endedAt: 1000, streamedAt: 1000 },
+        { ...session.requests[0], id: "next", startedAt: 4000, endedAt: 5000, streamedAt: 5000 },
+      ],
+    );
+    expect(g.points).toEqual([
+      { at: 0, tps: 20 },
+      { at: 1000, tps: 20 },
+      { at: 2000, tps: 0 },
+      { at: 3000, tps: 0 },
+      { at: 4000, tps: 45 },
+      { at: 5000, tps: 20 },
+    ]);
+    expect(g.path.match(/M/g)).toHaveLength(1);
+    const missing = chartGeometry([point(1000), point(4000)], 640, session.requests);
+    expect(missing.points.map((sample) => sample.at)).toEqual([1000, 4000]);
+    expect(missing.path.match(/M/g)).toHaveLength(2);
   });
 
   test("uses an actual ten-minute window without a sample count cap", () => {
@@ -75,7 +104,7 @@ describe("speed chart", () => {
     expect(root.querySelector("table")).toBeNull();
   });
 
-  test("keyboard time inspection shows request, bucket, rolling rate, mean and quality", () => {
+  test("keyboard inspection shows only time and unified TPS and preserves chart navigation", () => {
     const root = document.createElement("div");
     document.body.append(root);
     createSpeedChart(root).update([point(1000), point(2000)], session);
@@ -83,14 +112,10 @@ describe("speed chart", () => {
     chart.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     const tip = root.querySelector<HTMLElement>(".tooltip")!;
     expect(tip.hidden).toBe(false);
-    expect(tip.textContent).toContain("Request request");
-    expect(tip.textContent).toContain("Output bucket: 12");
-    expect(tip.textContent).toContain("Rolling output: 20");
-    expect(tip.textContent).toContain("Whole-request mean (output + reasoning): 10");
-    expect(tip.textContent).toContain("Quality: estimated");
-    expect(tip.textContent).toContain("Visible reasoning: not captured");
-    expect(tip.querySelector("safe")).toBeNull();
-    expect(root.querySelector(".mean")).not.toBeNull();
+    expect(tip.querySelector("time")?.textContent).toBeTruthy();
+    expect(tip.querySelector("strong")?.textContent).toBe("20 tokens/s");
+    expect(tip.children).toHaveLength(2);
+    expect(root.querySelectorAll("path.line")).toHaveLength(1);
     expect(root.querySelector("table")).toBeNull();
     expect(root.querySelector("input")).toBeNull();
     chart.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
@@ -100,7 +125,7 @@ describe("speed chart", () => {
     root.remove();
   });
 
-  test("pointer inspection stays in the chart and distinguishes summary from visible reasoning", () => {
+  test("pointer inspection uses a separate readout without obscuring the curve", () => {
     const root = document.createElement("div");
     createSpeedChart(root).update([{ ...point(1000), summaryTps: 3 }], session);
     const chart = root.querySelector<HTMLElement>(".chart")!;
@@ -110,19 +135,16 @@ describe("speed chart", () => {
     svg.dispatchEvent(new MouseEvent("pointermove", { clientX: 319 }));
     const tip = root.querySelector<HTMLElement>(".tooltip")!;
     expect(tip.hidden).toBe(false);
-    expect(parseFloat(tip.style.left)).toBeGreaterThanOrEqual(0);
-    expect(parseFloat(tip.style.left)).toBeLessThanOrEqual(320);
-    expect(root.querySelector(".legend .summary")?.getAttribute("title")).toContain(
-      "not hidden reasoning",
-    );
-    expect(root.querySelector("path.reasoning")?.hasAttribute("hidden")).toBe(true);
+    expect(tip.parentElement?.className).toBe("speed-inspection");
+    expect(tip.parentElement?.previousElementSibling).toBe(svg);
+    expect(tip.querySelector("strong")?.textContent).toBe("23 tokens/s");
     chart.dispatchEvent(new Event("pointerleave"));
     expect(tip.hidden).toBe(true);
     svg.dispatchEvent(new MouseEvent("pointerdown", { clientX: 319 }));
     expect(tip.hidden).toBe(false);
   });
 
-  test("retains SVG, focus, tooltip and request identity across polling", () => {
+  test("retains SVG, focus, readout and selected timestamp across polling", () => {
     const root = document.createElement("div");
     document.body.append(root);
     const controller = createSpeedChart(root);
@@ -131,9 +153,8 @@ describe("speed chart", () => {
     const tip = root.querySelector<HTMLElement>(".tooltip")!;
     svg.focus();
     svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
-    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
-    expect(root.dataset.inspectedRequestId).toBe("other");
-    const before = root.querySelector("path.output")!.getAttribute("d");
+    expect(root.dataset.inspectedAt).toBe("1000");
+    const before = root.querySelector("path.speed")!.getAttribute("d");
     controller.update(
       [point(500), point(1000), { ...point(1000, "other"), outputTps: 40 }, point(2000)],
       session,
@@ -142,10 +163,10 @@ describe("speed chart", () => {
     expect(document.activeElement).toBe(svg);
     expect(root.querySelector(".tooltip")).toBe(tip);
     expect(tip.hidden).toBe(false);
-    expect(tip.textContent).toContain("Request other");
-    expect(tip.textContent).toContain("Rolling output: 40");
-    expect(root.querySelector("path.output")!.getAttribute("d")).not.toBe(before);
-    controller.update([point(1000), point(2000)], session);
+    expect(root.dataset.inspectedAt).toBe("1000");
+    expect(tip.querySelector("strong")?.textContent).toBe("60 tokens/s");
+    expect(root.querySelector("path.speed")!.getAttribute("d")).not.toBe(before);
+    controller.update([point(2000)], session);
     expect(tip.hidden).toBe(true);
     expect(root.dataset.inspectedAt).toBeUndefined();
     controller.dispose();
@@ -170,9 +191,9 @@ describe("speed chart", () => {
     svg.dispatchEvent(new Event("focus"));
     svg.dispatchEvent(new MouseEvent("pointerdown", { clientX: 100 }));
     expect(root.querySelector<HTMLElement>(".tooltip")!.hidden).toBe(true);
-    const path = root.querySelector("path.output")!.getAttribute("d");
+    const path = root.querySelector("path.speed")!.getAttribute("d");
     controller.update([], session);
-    expect(root.querySelector("path.output")!.getAttribute("d")).toBe(path);
+    expect(root.querySelector("path.speed")!.getAttribute("d")).toBe(path);
   });
 
   test("observes width changes including hidden to visible and disconnects", () => {
@@ -196,12 +217,12 @@ describe("speed chart", () => {
     controller.update([point(1000), point(2000)], session);
     const svg = root.querySelector("svg")!;
     expect(svg.getAttribute("viewBox")).toBe("0 0 640 230");
-    const before = root.querySelector("path.output")!.getAttribute("d");
+    const before = root.querySelector("path.speed")!.getAttribute("d");
     width = 320;
     resize();
     expect(root.querySelector("svg")).toBe(svg);
     expect(svg.getAttribute("viewBox")).toBe("0 0 320 230");
-    expect(root.querySelector("path.output")!.getAttribute("d")).not.toBe(before);
+    expect(root.querySelector("path.speed")!.getAttribute("d")).not.toBe(before);
     expect(observe).toHaveBeenCalledWith(root);
     controller.dispose();
     expect(disconnect).toHaveBeenCalledOnce();
@@ -210,26 +231,22 @@ describe("speed chart", () => {
     expect(svg.getAttribute("viewBox")).toBe("0 0 320 230");
   });
 
-  test("only shows final means for completed requests and uses theme tokens", () => {
+  test("uses only observed throughput for the curve and scale, not whole-request means", () => {
     const root = document.createElement("div");
     const controller = createSpeedChart(root);
     vi.spyOn(Date, "now").mockReturnValue(5000);
-    controller.update([point(1000)], {
+    controller.update([{ ...point(1000), requestTps: 999 }], {
       ...session,
       requests: [{ ...session.requests[0], status: "running" }],
     });
-    expect(root.querySelector("path.mean")!.getAttribute("d")).toBe("");
     root.querySelector("svg")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
-    expect(root.querySelector(".tooltip")!.textContent).toContain(
-      "Whole-request mean (output + reasoning): unavailable",
-    );
+    expect(root.querySelector(".tooltip strong")?.textContent).toBe("20 tokens/s");
+    expect(root.querySelectorAll("path.line")).toHaveLength(1);
+    expect(chartGeometry([{ ...point(1000), requestTps: 999 }]).max).toBe(20);
     controller.update([point(1000)], session);
-    expect(root.querySelector("path.mean")!.getAttribute("d")).toContain("M");
-    for (const name of ["output", "reasoning", "summary", "mean"]) {
-      expect(root.querySelector(`path.${name}`)!.getAttribute("style")).toContain(
-        `var(--insight-speed-${name})`,
-      );
-    }
+    expect(root.querySelector("path.speed")!.getAttribute("style")).toContain(
+      "var(--insight-speed-output)",
+    );
     controller.dispose();
   });
 });

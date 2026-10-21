@@ -3,7 +3,7 @@ import { EMPTY_GUEST_CONNECTION, type HostReadyContext } from "@openchamber/sdk"
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
-import { applyPanelTheme, phaseColors, sourceColors, usageColors } from "./theme";
+import { applyPanelTheme, sourceColors, usageColors } from "./theme";
 
 function ready(mode: "light" | "dark" = "light"): HostReadyContext {
   return {
@@ -135,17 +135,10 @@ describe("panel theme", () => {
     });
     applyPanelTheme(snapshot, root);
     expect(palette(root)).toEqual(before);
-    for (const color of [
-      ...Object.values(sourceColors),
-      ...Object.values(usageColors),
-      ...Object.values(phaseColors),
-    ]) {
+    for (const color of [...Object.values(sourceColors), ...Object.values(usageColors)]) {
       expect(color).toMatch(/^var\(--insight-chart-[1-7]\)$/);
     }
     expect(root.style.getPropertyValue("--insight-speed-output")).toBe(usageColors.output);
-    expect(root.style.getPropertyValue("--insight-speed-reasoning")).toBe(usageColors.reasoning);
-    expect(root.style.getPropertyValue("--insight-speed-summary")).toBe("var(--insight-chart-2)");
-    expect(root.style.getPropertyValue("--insight-speed-mean")).toBe("var(--oc-fg)");
   });
 
   test("defaults to the document root", () => {
@@ -162,7 +155,7 @@ describe("panel theme", () => {
     document.head.append(style);
     document.body.append(root);
     try {
-      for (const name of ["section-head", "legend", "phase-stack", "timing-meta"]) {
+      for (const name of ["section-head", "tooltip", "timing-meta"]) {
         const container = document.createElement("div");
         container.className = name;
         container.hidden = true;

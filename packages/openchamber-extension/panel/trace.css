@@ -114,10 +114,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.trace-row-count {
-  flex: 0 0 auto;
-  font-size: 0.7rem;
-}
 .trace-plot {
   min-width: 0;
   height: 30px;
@@ -145,12 +141,6 @@
   stroke: var(--trace-color);
   stroke-width: 7px;
   stroke-linecap: round;
-}
-.trace-line-waiting {
-  stroke: var(--insight-chart-2);
-}
-.trace-line-streaming {
-  stroke: var(--insight-chart-3);
 }
 .trace-line-error {
   stroke: var(--oc-error);
@@ -216,10 +206,6 @@
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
-}
-.trace-note {
-  font-size: 0.72rem;
-  margin: 9px 0 0;
 }
 .trace-reported ul {
   margin: 8px 0;

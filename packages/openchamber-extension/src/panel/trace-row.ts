@@ -1,10 +1,9 @@
 import { mountButton } from "@openchamber/sdk/ui";
 import { toolInterval } from "./trace-model";
 import type { TraceInterval } from "./trace-model";
-import { itemLabel, itemRange, itemValue, toolCount } from "./trace-presentation";
+import { itemLabel, itemRange, itemValue } from "./trace-presentation";
 import type { TraceItem } from "./trace-presentation";
 import { element, setText } from "./dom";
-import { phaseColors } from "./theme";
 
 export interface TraceRowState {
   item: TraceItem;
@@ -31,8 +30,7 @@ export function createTraceRow(
   const label = element("div", "trace-row-label");
   const foldSlot = element("span", "trace-fold");
   const nameSlot = element("span", "trace-name");
-  const suffix = element("span", "trace-row-count muted");
-  label.append(foldSlot, nameSlot, suffix);
+  label.append(foldSlot, nameSlot);
   const fold = mountButton(foldSlot, {
     label: "▸",
     size: "xs",
@@ -57,7 +55,7 @@ export function createTraceRow(
   envelope.setAttribute("class", "trace-envelope");
   envelope.setAttribute("y", "7");
   envelope.setAttribute("height", "16");
-  const paths = ["main", "waiting", "streaming", "error", "unknown"].map((kind) => {
+  const paths = ["main", "error", "unknown"].map((kind) => {
     const path = svgElement("path");
     path.setAttribute("class", `trace-line trace-line-${kind}`);
     path.setAttribute("vector-effect", "non-scaling-stroke");
@@ -92,8 +90,6 @@ export function createTraceRow(
       fold.update({ label: state.expanded ? "▾" : "▸", disabled: !state.expandable });
       foldButton.setAttribute("aria-label", `${state.expanded ? "Collapse" : "Expand"} ${caption}`);
       foldButton.setAttribute("aria-expanded", String(state.expanded));
-      const count = item.kind === "request" ? toolCount(item.entry) : 0;
-      setText(suffix, count ? `+${count}` : "");
       const valueText = itemValue(item, now);
       setText(value, valueText);
       graph.setAttribute("aria-label", `${caption}: ${valueText}`);
@@ -118,44 +114,28 @@ export function createTraceRow(
             return `M${a},15 H${b}`;
           })
           .join(" ");
-      const data = ["", "", "", "", ""];
+      const data = ["", "", ""];
       let color = "var(--oc-border)";
-      if (item.kind === "request" && item.entry.request && range) {
-        const request = item.entry.request;
-        color = phaseColors.unsplit;
-        if (request.firstDeltaAt === undefined) data[0] = path([range]);
-        else {
-          const split = Math.max(range.start, Math.min(range.end, request.firstDeltaAt));
-          if (split > range.start) data[1] = path([{ start: range.start, end: split }]);
-          if (range.end > split) data[2] = path([{ start: split, end: range.end }]);
-          if (range.end === range.start) data[0] = path([range]);
-        }
-      } else if (item.kind === "group" || (item.kind === "request" && !item.entry.request)) {
-        const groups = item.kind === "group" ? [item.entry] : item.entry.groups;
+      if (item.kind === "group") {
+        const group = item.entry;
         color = "var(--insight-chart-6)";
-        data[0] = path(
-          groups.flatMap((group) => [
-            ...group.intervals,
-            ...group.tools.flatMap((tool) => {
-              const interval = toolInterval(tool, now);
-              return interval && interval.start === interval.end ? [interval] : [];
-            }),
-          ]),
+        data[0] = path([
+          ...group.intervals,
+          ...group.tools.flatMap((tool) => {
+            const interval = toolInterval(tool, now);
+            return interval && interval.start === interval.end ? [interval] : [];
+          }),
+        ]);
+        data[1] = path(
+          group.tools.flatMap((tool) => {
+            const interval = toolInterval(tool, now);
+            return tool.status === "error" && interval ? [interval] : [];
+          }),
         );
-        data[3] = path(
-          groups.flatMap((group) =>
-            group.tools.flatMap((tool) => {
-              const interval = toolInterval(tool, now);
-              return tool.status === "error" && interval ? [interval] : [];
-            }),
-          ),
-        );
-        data[4] = path(
-          groups.flatMap((group) =>
-            group.tools
-              .filter((tool) => !toolInterval(tool, now))
-              .map((tool) => ({ start: tool.startedAt, end: tool.startedAt })),
-          ),
+        data[2] = path(
+          group.tools
+            .filter((tool) => !toolInterval(tool, now))
+            .map((tool) => ({ start: tool.startedAt, end: tool.startedAt })),
           true,
         );
       } else if (range) {
@@ -172,12 +152,10 @@ export function createTraceRow(
         const start =
           item.kind === "tool"
             ? item.entry.startedAt
-            : item.kind === "request"
-              ? item.entry.request?.startedAt
-              : item.kind === "session"
-                ? item.model.start
-                : undefined;
-        if (start !== undefined) data[4] = path([{ start, end: start }], true);
+            : item.kind === "session"
+              ? item.model.start
+              : undefined;
+        if (start !== undefined) data[2] = path([{ start, end: start }], true);
       }
       node.style.setProperty("--trace-color", color);
       paths.forEach((entry, index) => entry.setAttribute("d", data[index]));

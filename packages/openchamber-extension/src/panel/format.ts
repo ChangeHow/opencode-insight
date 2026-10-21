@@ -1,8 +1,3 @@
-export const escape = (value: string) =>
-  value.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  );
 export const number = (value: number) =>
   new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(value);
 export const time = (value: number) => new Date(value).toLocaleTimeString("en", { hour12: false });

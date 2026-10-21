@@ -4,7 +4,7 @@ import type {
   SessionInsight,
   ToolInsight,
 } from "@opencode-insight/telemetry/schema";
-import { advanceTraceClock, createTraceModel, requestInterval, toolInterval } from "./trace-model";
+import { advanceTraceClock, createTraceModel, toolInterval } from "./trace-model";
 
 const request = (overrides: Partial<RequestInsight> = {}): RequestInsight => ({
   id: "request",
@@ -51,7 +51,7 @@ describe("trace model", () => {
       start: 0,
       end: 0,
       elapsedMs: undefined,
-      requests: [],
+      groups: [],
       running: false,
       summary: {
         requestCount: 0,
@@ -66,29 +66,27 @@ describe("trace model", () => {
 
   test("retains closed unknown records without inventing durations or bars", () => {
     for (const status of ["completed", "error", "interrupted"] as const) {
-      expect(requestInterval(request({ status }), 100)).toBeUndefined();
       expect(toolInterval(tool({ status }), 100)).toBeUndefined();
     }
     const model = createTraceModel(session([request()], [tool()]), 100);
     expect(model).toMatchObject({ start: 10, end: 20, running: false });
     expect(model.elapsedMs).toBeUndefined();
     expect(model.summary.unknownCount).toBe(2);
-    expect(model.requests[0].groups[0]).toMatchObject({
+    expect(model.groups[0]).toMatchObject({
       tools: [tool()],
       intervals: [],
       unknownCount: 1,
       accumulatedMs: 0,
       unionMs: 0,
     });
-    expect(model.requests[0].groups[0].spanMs).toBeUndefined();
+    expect(model.groups[0].spanMs).toBeUndefined();
   });
 
   test("distinguishes measured zero and clamped negative intervals from unknown", () => {
-    expect(requestInterval(request({ endedAt: 0 }), 100)).toEqual({ start: 10, end: 10 });
     expect(toolInterval(tool({ endedAt: 0 }), 100)).toEqual({ start: 20, end: 20 });
     const model = createTraceModel(session([], [tool({ startedAt: 0, endedAt: 0 })]), 100);
     expect(model.elapsedMs).toBe(0);
-    expect(model.requests[0].groups[0]).toMatchObject({
+    expect(model.groups[0]).toMatchObject({
       intervals: [],
       spanMs: 0,
       accumulatedMs: 0,
@@ -99,26 +97,22 @@ describe("trace model", () => {
 
   test("uses provisional now only for captured running records", () => {
     const input = session([request({ status: "running" })], [tool({ status: "running" })]);
-    expect(requestInterval(input.requests[0], 100)).toEqual({ start: 10, end: 100 });
     expect(toolInterval(input.tools[0], 100)).toEqual({ start: 20, end: 100 });
     const model = createTraceModel(input, 100);
     expect(model).toMatchObject({ start: 10, end: 100, elapsedMs: 90, running: true });
     expect(model.summary.unknownCount).toBe(0);
-    expect(model.requests[0].groups[0].unionMs).toBe(80);
+    expect(model.groups[0].unionMs).toBe(80);
     expect(toolInterval(tool({ status: "running", endedAt: 30 }), 100)?.end).toBe(30);
     expect(createTraceModel(session([], [tool({ status: "running" })]), 100).running).toBe(true);
   });
 
-  test("plots streamed end while retaining settled end for session elapsed", () => {
+  test("retains settled request endpoints for session elapsed, falling back to streamed end", () => {
     const item = request({ startedAt: 0, streamedAt: 30, endedAt: 70 });
-    expect(requestInterval(item, 100)).toEqual({ start: 0, end: 30 });
     expect(createTraceModel(session([item]), 100)).toMatchObject({ end: 70, elapsedMs: 70 });
-    expect(requestInterval({ ...item, status: "running" }, 100)?.end).toBe(30);
     expect(createTraceModel(session([{ ...item, endedAt: undefined }]), 100).end).toBe(30);
-    expect(requestInterval({ ...item, streamedAt: undefined }, 100)?.end).toBe(70);
   });
 
-  test("associates only exact request IDs and retains all orphan tools in one bucket", () => {
+  test("groups by tool name across requests without changing recorded association metadata", () => {
     const input = session(
       [request({ id: "agent" }), request({ id: "empty" })],
       [
@@ -129,17 +123,17 @@ describe("trace model", () => {
       ],
     );
     const model = createTraceModel(input, 100);
-    expect(model.requests.map((item) => [item.id, item.label])).toEqual([
-      ["agent", "Request 1"],
-      ["empty", "Request 2"],
-      ["unassociated", "Unassociated tools"],
-    ]);
-    expect(model.requests[0].groups[0].tools.map((item) => item.id)).toEqual(["matched"]);
-    expect(model.requests[1].groups).toEqual([]);
-    expect(model.requests[2].request).toBeUndefined();
-    expect(model.requests[2].groups.map((group) => [group.name, group.tools.length])).toEqual([
+    expect(model.groups.map((group) => [group.name, group.tools.length])).toEqual([
+      ["task", 2],
       ["agent", 2],
-      ["task", 1],
+    ]);
+    expect(model.groups[0].tools.map((item) => [item.id, item.requestID])).toEqual([
+      ["matched", "agent"],
+      ["case", "Agent"],
+    ]);
+    expect(model.groups[1].tools.map((item) => [item.requestID, item.parentID])).toEqual([
+      [undefined, "matched"],
+      ["absent", undefined],
     ]);
     expect(model.summary).toMatchObject({ requestCount: 2, toolCount: 4 });
   });
@@ -150,14 +144,14 @@ describe("trace model", () => {
         [request()],
         [
           tool({ id: "later", startedAt: 30, endedAt: 40, background: true }),
-          tool({ id: "overlap", startedAt: 5, endedAt: 15 }),
+          tool({ id: "overlap", startedAt: 5, endedAt: 15, requestID: "other" }),
           tool({ id: "first", startedAt: 0, endedAt: 10 }),
           tool({ id: "unknown", startedAt: 100 }),
         ],
       ),
       200,
     );
-    expect(model.requests[0].groups[0]).toMatchObject({
+    expect(model.groups[0]).toMatchObject({
       intervals: [
         { start: 0, end: 15 },
         { start: 30, end: 40 },
@@ -228,7 +222,7 @@ describe("trace model", () => {
       ),
     );
     expect(model.summary).toMatchObject({ errorCount: 2, toolCount: 3 });
-    expect(model.requests[0].groups.map((group) => group.errorCount)).toEqual([1, 0]);
+    expect(model.groups.map((group) => group.errorCount)).toEqual([1, 0]);
     expect(model.summary.tokens).toBeUndefined();
   });
 
@@ -254,17 +248,9 @@ describe("trace model", () => {
     const before = structuredClone(input);
     const model = createTraceModel(freeze(input), 100);
     expect(input).toEqual(before);
-    expect(model.requests.map((item) => item.id)).toEqual(["early", "tie", "late"]);
-    expect(model.requests[0].groups.map((group) => group.name)).toEqual(["bash", "Bash"]);
-    expect(model.requests[0].groups[0].tools.map((item) => item.id)).toEqual(["first", "tie-tool"]);
-    model.requests[0].request!.context.push({
-      kind: "user",
-      id: "x",
-      label: "x",
-      tokens: 1,
-      quality: "estimated",
-    });
-    model.requests[0].groups[0].tools[0].reportedCalls![0].name = "changed";
+    expect(model.groups.map((group) => group.name)).toEqual(["bash", "Bash"]);
+    expect(model.groups[0].tools.map((item) => item.id)).toEqual(["first", "tie-tool"]);
+    model.groups[0].tools[0].reportedCalls![0].name = "changed";
     expect(input).toEqual(before);
     expect(createTraceModel(input, 100)).not.toEqual(model);
   });
@@ -283,10 +269,9 @@ describe("trace model", () => {
       }),
     );
     const model = createTraceModel(session([request({ endedAt: 20 })], tools), 9999);
-    const groups = model.requests.flatMap((item) => item.groups);
+    const groups = model.groups;
     const retained = groups.flatMap((group) => group.tools);
-    expect(model.requests).toHaveLength(2);
-    expect(groups).toHaveLength(10);
+    expect(groups).toHaveLength(5);
     expect(new Set(retained.map((item) => item.id)).size).toBe(2000);
     expect(model.summary).toMatchObject({
       toolCount: 2000,
@@ -323,7 +308,7 @@ describe("trace model", () => {
     }
   });
 
-  test("clock refresh advances running groups but reuses closed requests and groups", () => {
+  test("clock refresh advances running groups but reuses closed groups", () => {
     const input = freeze(
       session(
         [request({ status: "running" }), request({ id: "closed", endedAt: 80 })],
@@ -340,16 +325,14 @@ describe("trace model", () => {
     const advanced = advanceTraceClock(model, 200);
     expect(advanced).toMatchObject({ start: 10, end: 200, elapsedMs: 190, running: true });
     expect(advanced.summary).toBe(model.summary);
-    expect(advanced.requests[1]).toBe(model.requests[1]);
-    expect(advanced.requests[0].request).toBe(model.requests[0].request);
-    expect(advanced.requests[0].groups[1]).toBe(model.requests[0].groups[1]);
-    expect(advanced.requests[0].groups[0]).not.toBe(model.requests[0].groups[0]);
-    expect(advanced.requests[0].groups[0]).toMatchObject({
+    expect(advanced.groups[1]).toBe(model.groups[1]);
+    expect(advanced.groups[0]).not.toBe(model.groups[0]);
+    expect(advanced.groups[0]).toMatchObject({
       intervals: [{ start: 20, end: 200 }],
       unionMs: 180,
-      accumulatedMs: 180,
+      accumulatedMs: 220,
     });
-    expect(advanceTraceClock(model, 300).requests[0].groups[0].unionMs).toBe(280);
+    expect(advanceTraceClock(model, 300).groups[0].unionMs).toBe(280);
     expect(input).toEqual(before);
     expect(model).toEqual(snapshot);
     expect(input.tools[0].endedAt).toBeUndefined();
@@ -361,7 +344,6 @@ describe("trace model", () => {
     );
     const advanced = advanceTraceClock(model, 250);
     expect(advanced.elapsedMs).toBe(240);
-    expect(advanced.requests[0]).toBe(model.requests[0]);
-    expect(requestInterval(advanced.requests[0].request!, 250)).toEqual({ start: 10, end: 250 });
+    expect(advanced.groups[0]).toBe(model.groups[0]);
   });
 });

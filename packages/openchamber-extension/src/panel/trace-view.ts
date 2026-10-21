@@ -1,7 +1,7 @@
 import { mountBadge, mountButton } from "@openchamber/sdk/ui";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
 import { advanceTraceClock, createTraceModel } from "./trace-model";
-import type { TraceModel, TraceRequest } from "./trace-model";
+import type { TraceModel } from "./trace-model";
 import { createTraceInspector } from "./trace-inspector";
 import {
   createTracePager,
@@ -16,15 +16,14 @@ import type { TraceRowState } from "./trace-row";
 import { element, setText, syncChildren } from "./dom";
 import { duration, money, number } from "./format";
 
-const requestKey = (id: string) => `request:${id}`;
-const groupKey = (owner: TraceRequest, name: string) => `group:${owner.id}:${name}`;
+const groupKey = (name: string) => `group:${name}`;
 
 export function createTraceView(root: HTMLElement) {
   const container = element("section", "trace-view");
-  container.setAttribute("aria-label", "Request and tool waterfall");
+  container.setAttribute("aria-label", "Tool waterfall");
   const heading = element("div", "section-head");
   const liveSlot = element("span");
-  heading.append(element("h3", "", "Request & tool trace"), liveSlot);
+  heading.append(element("h3", "", "Tool trace"), liveSlot);
   const live = mountBadge(liveSlot, { label: "Captured", tone: "neutral" });
   const stats = element("div", "trace-stats");
   const labels = [
@@ -60,12 +59,7 @@ export function createTraceView(root: HTMLElement) {
   const footer = element("div", "trace-footer");
   const rowCount = element("span", "muted");
   footer.append(rowCount);
-  const note = element(
-    "p",
-    "trace-note muted",
-    "U = execution union. Click a span for details. Overlapping row durations must not be added together.",
-  );
-  container.append(heading, stats, toolbar, scroll, footer, note);
+  container.append(heading, stats, toolbar, scroll, footer);
   root.append(container);
   let session: SessionInsight | undefined;
   let cached: TraceModel | undefined;
@@ -75,9 +69,7 @@ export function createTraceView(root: HTMLElement) {
   let selected = "session";
   let zoomed: string | undefined;
   let sessionOpen = true;
-  let openRequest: string | undefined;
   let openGroup: string | undefined;
-  let requestPage = 0;
   let groupPage = 0;
   let callPage = 0;
   let disposed = false;
@@ -91,22 +83,17 @@ export function createTraceView(root: HTMLElement) {
   }
   const expand = button("Show tools", () => {
     const item = items.get(selected);
-    const owner =
-      item?.kind === "request"
-        ? item.entry
-        : item?.kind === "tool" || item?.kind === "group"
-          ? item.owner
-          : model.requests.find((entry) => entry.groups.length);
-    if (!owner) return;
     sessionOpen = true;
-    requestPage = Math.floor(model.requests.indexOf(owner) / PAGE_SIZE);
-    openRequest = owner.id;
-    groupPage = callPage = 0;
-    if (item?.kind === "group") openGroup = item.entry.name;
+    if (item?.kind === "group" || item?.kind === "tool") {
+      const group = model.groups.find((entry) => entry.name === item.entry.name)!;
+      groupPage = Math.floor(model.groups.indexOf(group) / PAGE_SIZE);
+      openGroup = group.name;
+      callPage = item.kind === "tool" ? Math.floor(group.tools.indexOf(item.entry) / PAGE_SIZE) : 0;
+    }
     render();
   });
-  const collapse = button("Collapse requests", () => {
-    openRequest = openGroup = undefined;
+  const collapse = button("Collapse tools", () => {
+    openGroup = undefined;
     render();
   });
   const zoom = button("Zoom selected", () => {
@@ -123,28 +110,27 @@ export function createTraceView(root: HTMLElement) {
       render();
     });
   }
-  const showRequests = (page: number) => {
-    requestPage = page;
-    openRequest = openGroup = undefined;
-    scroll.scrollTop = 0;
-  };
-  const requestsPager = pager("requests", showRequests);
   const groupsPager = pager("tool groups", (page) => {
     groupPage = page;
     openGroup = undefined;
+    callPage = 0;
+    scroll.scrollTop = 0;
   });
   const callsPager = pager("calls", (page) => {
     callPage = page;
   });
-  footer.append(requestsPager.node);
+  footer.append(groupsPager.node);
   const latestSlot = element("span");
   footer.append(latestSlot);
   const latest = mountButton(latestSlot, {
-    label: "Latest requests",
+    label: "Latest tools",
     size: "xs",
     variant: "ghost",
     onClick: () => {
-      showRequests(lastTracePage(model.requests.length));
+      groupPage = lastTracePage(model.groups.length);
+      openGroup = undefined;
+      callPage = 0;
+      scroll.scrollTop = 0;
       render();
     },
   });
@@ -155,11 +141,7 @@ export function createTraceView(root: HTMLElement) {
   }
   function toggle(item: TraceItem) {
     if (item.kind === "session") sessionOpen = !sessionOpen;
-    else if (item.kind === "request") {
-      openRequest = openRequest === item.entry.id ? undefined : item.entry.id;
-      openGroup = undefined;
-      groupPage = callPage = 0;
-    } else if (item.kind === "group") {
+    else if (item.kind === "group") {
       openGroup = openGroup === item.entry.name ? undefined : item.entry.name;
       callPage = 0;
     }
@@ -178,19 +160,15 @@ export function createTraceView(root: HTMLElement) {
       sessionID: session.sessionID,
     };
     items.set(rootItem.key, rootItem);
-    for (const entry of model.requests) {
-      items.set(requestKey(entry.id), { key: requestKey(entry.id), kind: "request", entry });
-      for (const group of entry.groups) {
-        const key = groupKey(entry, group.name);
-        items.set(key, { key, kind: "group", entry: group, owner: entry });
-        for (const tool of group.tools)
-          items.set(`tool:${tool.id}`, {
-            key: `tool:${tool.id}`,
-            kind: "tool",
-            entry: tool,
-            owner: entry,
-          });
-      }
+    for (const group of model.groups) {
+      const key = groupKey(group.name);
+      items.set(key, { key, kind: "group", entry: group });
+      for (const tool of group.tools)
+        items.set(`tool:${tool.id}`, {
+          key: `tool:${tool.id}`,
+          kind: "tool",
+          entry: tool,
+        });
     }
     const active = items.get(selected) ?? rootItem;
     selected = active.key;
@@ -242,54 +220,41 @@ export function createTraceView(root: HTMLElement) {
       label: model.running ? "Live" : "Captured",
       tone: model.running ? "info" : "neutral",
     });
-    requestPage = clampTracePage(requestPage, model.requests.length);
-    requestsPager.update(requestPage, model.requests.length);
-    latest.update({ disabled: requestPage === lastTracePage(model.requests.length) });
+    groupPage = clampTracePage(groupPage, model.groups.length);
+    groupsPager.update(groupPage, model.groups.length);
+    latest.update({ disabled: groupPage === lastTracePage(model.groups.length) });
     const visible: Array<TraceRowState | HTMLElement> = [
       { item: rootItem, depth: 0, expandable: true, expanded: sessionOpen },
     ];
     if (sessionOpen)
-      for (const owner of pageOf(model.requests, requestPage)) {
-        const item = items.get(requestKey(owner.id))!;
-        visible.push({
-          item,
-          depth: 1,
-          expandable: !!owner.groups.length,
-          expanded: openRequest === owner.id,
-        });
-        if (openRequest !== owner.id) continue;
-        groupPage = clampTracePage(groupPage, owner.groups.length);
-        groupsPager.update(groupPage, owner.groups.length);
-        for (const group of pageOf(owner.groups, groupPage)) {
-          if (group.tools.length === 1) {
-            const tool = group.tools[0];
+      for (const group of pageOf(model.groups, groupPage)) {
+        if (group.tools.length === 1) {
+          const tool = group.tools[0];
+          visible.push({
+            item: items.get(`tool:${tool.id}`)!,
+            depth: 1,
+            expandable: false,
+            expanded: false,
+          });
+        } else {
+          visible.push({
+            item: items.get(groupKey(group.name))!,
+            depth: 1,
+            expandable: true,
+            expanded: openGroup === group.name,
+          });
+          if (openGroup !== group.name) continue;
+          callPage = clampTracePage(callPage, group.tools.length);
+          callsPager.update(callPage, group.tools.length);
+          for (const tool of pageOf(group.tools, callPage))
             visible.push({
               item: items.get(`tool:${tool.id}`)!,
               depth: 2,
               expandable: false,
               expanded: false,
             });
-          } else {
-            visible.push({
-              item: items.get(groupKey(owner, group.name))!,
-              depth: 2,
-              expandable: true,
-              expanded: openGroup === group.name,
-            });
-            if (openGroup !== group.name) continue;
-            callPage = clampTracePage(callPage, group.tools.length);
-            callsPager.update(callPage, group.tools.length);
-            for (const tool of pageOf(group.tools, callPage))
-              visible.push({
-                item: items.get(`tool:${tool.id}`)!,
-                depth: 3,
-                expandable: false,
-                expanded: false,
-              });
-            visible.push(callsPager.node);
-          }
+          visible.push(callsPager.node);
         }
-        visible.push(groupsPager.node);
       }
     const activeKeys = new Set<string>();
     const nodes = visible.map((state) => {
@@ -313,7 +278,7 @@ export function createTraceView(root: HTMLElement) {
     container.dataset.visibleRows = String(activeKeys.size);
     container.dataset.zoomed = zoomed ?? "";
     inspector.refresh();
-    expand.update({ disabled: !model.requests.some((entry) => entry.groups.length) });
+    expand.update({ disabled: !model.groups.length });
   }
   const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(render);
   observer?.observe(scroll);
@@ -331,7 +296,6 @@ export function createTraceView(root: HTMLElement) {
       session = next;
       if (!cached || revision !== next.revision) {
         cached = createTraceModel(next, now);
-        if (revision === -1) requestPage = lastTracePage(cached.requests.length);
         revision = next.revision;
       }
       render();
@@ -341,9 +305,9 @@ export function createTraceView(root: HTMLElement) {
       cached = undefined;
       revision = -1;
       selected = "session";
-      zoomed = openRequest = openGroup = undefined;
+      zoomed = openGroup = undefined;
       sessionOpen = true;
-      requestPage = groupPage = callPage = 0;
+      groupPage = callPage = 0;
       inspector.reset();
     },
     dispose() {
@@ -353,7 +317,7 @@ export function createTraceView(root: HTMLElement) {
       inspector.dispose();
       live.dispose();
       [expand, collapse, zoom, resetZoom, latest].forEach((control) => control.dispose());
-      [requestsPager, groupsPager, callsPager].forEach((control) => control.dispose());
+      [groupsPager, callsPager].forEach((control) => control.dispose());
       container.remove();
     },
   };

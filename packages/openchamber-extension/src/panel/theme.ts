@@ -20,17 +20,6 @@ export const usageColors: Record<keyof TokenUsage, string> = {
   cacheWrite: "var(--insight-chart-6)",
 };
 
-export const phaseColors: Record<
-  "waiting" | "streaming" | "unsplit" | "parallel" | "tools",
-  string
-> = {
-  waiting: "var(--insight-chart-2)",
-  streaming: "var(--insight-chart-3)",
-  unsplit: "var(--insight-chart-1)",
-  parallel: "var(--insight-chart-5)",
-  tools: "var(--insight-chart-4)",
-};
-
 export function applyPanelTheme(
   ready: HostReadyContext,
   root: HTMLElement = document.documentElement,
@@ -54,7 +43,4 @@ export function applyPanelTheme(
     );
   });
   root.style.setProperty("--insight-speed-output", usageColors.output);
-  root.style.setProperty("--insight-speed-reasoning", usageColors.reasoning);
-  root.style.setProperty("--insight-speed-summary", "var(--insight-chart-2)");
-  root.style.setProperty("--insight-speed-mean", "var(--oc-fg)");
 }
