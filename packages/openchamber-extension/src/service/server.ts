@@ -1,7 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
-import { createBridge } from "./bridge";
-import { BridgeError } from "./connection";
+import { BridgeError, createBridge } from "@opencode-insight/client";
 
 const BODY_LIMIT = 16384;
 const OUTPUT_LIMIT = 7_000_000;

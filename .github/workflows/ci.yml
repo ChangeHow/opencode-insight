@@ -37,7 +37,7 @@ jobs:
 
       - name: Typecheck V2 extensions
         run: |
-          pnpm --filter @opencode-insight/telemetry --filter @changehow/opencode-insight-plugin --filter @changehow/openchamber-insight typecheck
+          pnpm --filter @opencode-insight/telemetry --filter @opencode-insight/client --filter @changehow/opencode-insight-plugin --filter @changehow/openchamber-insight typecheck
           pnpm exec tsc -p tsconfig.extensions.json --noEmit
 
       - name: Test V2 extensions

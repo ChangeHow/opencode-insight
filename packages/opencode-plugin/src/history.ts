@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode/plugin";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
+import { toolMetadata } from "./events";
 
 type Messages = Awaited<ReturnType<Plugin.Context["session"]["context"]>>;
 
@@ -50,6 +51,10 @@ export function seedHistory(session: SessionInsight, messages: Messages): boolea
           "background" in input &&
           input.background === true,
       });
+      toolMetadata(
+        session.tools.at(-1)!,
+        "metadata" in part.state ? part.state.metadata : undefined,
+      );
     }
   }
   if (session.tools.length > 2048) session.tools.splice(0, session.tools.length - 2048);

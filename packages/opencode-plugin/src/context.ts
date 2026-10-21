@@ -8,6 +8,10 @@ type AssembledContext = Extract<Context, { tools: unknown }>;
 export function captureContext(
   input: Pick<AssembledContext, "system" | "messages" | "tools">,
   skills: ReadonlyMap<string, { id: string; name: string }> = new Map(),
+  attachments: ReadonlyMap<
+    string,
+    readonly { id: string; name: string; text: string }[]
+  > = new Map(),
 ): {
   sources: ContextSource[];
   partial: boolean;
@@ -47,6 +51,7 @@ export function captureContext(
       if (part.type === "compaction") text = part.text ?? undefined;
       if (text === undefined) continue;
       const skill = message.id ? skills.get(message.id) : undefined;
+      const attached = message.id ? attachments.get(message.id) : undefined;
       const skillResult = part.type === "tool-result" && part.name === "skill";
       if (skill || skillResult) {
         sources.push({
@@ -59,6 +64,8 @@ export function captureContext(
         continue;
       }
       // The native skill wrapper remains recognizable after prompt attachments are lowered.
+      // The wrapper text is only matched transiently; ids and names come solely from
+      // authoritative native attachments, never from the prompt string itself.
       const wrapped = /<skill_content\b[^>]*>[\s\S]*?<\/skill_content>/g;
       let end = 0;
       for (const match of text.matchAll(wrapped)) {
@@ -71,10 +78,11 @@ export function captureContext(
             tokens: estimateTokens(text.slice(end, match.index)),
             quality: "estimated",
           });
+        const named = attached?.find((definition) => definition.text === match[0]);
         sources.push({
           kind: "skill",
-          id: "skill:unclassified",
-          label: "Unclassified Skill",
+          id: named?.id ?? "skill:unclassified",
+          label: named?.name ?? "Unclassified Skill",
           tokens: estimateTokens(match[0]),
           quality: "estimated",
         });

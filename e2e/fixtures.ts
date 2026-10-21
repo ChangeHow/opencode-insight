@@ -18,6 +18,8 @@ import type {
 
 const FIXED_NOW = new Date("2026-07-11T12:00:00.000Z");
 
+export { makeMockSessionInsight } from "./fixtures/session-insight";
+
 function getRelativeDate(daysOffset: number): string {
   const date = new Date(FIXED_NOW);
   date.setUTCDate(date.getUTCDate() + daysOffset);

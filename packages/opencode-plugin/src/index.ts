@@ -62,7 +62,20 @@ export default Plugin.define({
                 .filter((m) => m.type === "skill")
                 .map((m) => [m.id, { id: m.skill, name: m.name }]),
             );
-            const { sources, partial } = captureContext(input, skills);
+            // Native user messages carry authoritative attached-skill provenance; the
+            // wrapper text is matched transiently and never persisted.
+            const attachments = new Map(
+              messages.flatMap((m) => {
+                if (m.type !== "user") return [];
+                const attached = (m.skills ?? []).flatMap((skill) =>
+                  typeof skill.text === "string"
+                    ? [{ id: skill.id, name: skill.name, text: skill.text }]
+                    : [],
+                );
+                return attached.length ? ([[m.id, attached]] as const) : [];
+              }),
+            );
+            const { sources, partial } = captureContext(input, skills, attachments);
             collector.context(session, sources, partial);
           }),
         );

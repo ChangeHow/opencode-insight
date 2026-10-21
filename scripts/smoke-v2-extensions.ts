@@ -13,6 +13,7 @@ const password = randomUUID();
 const auth = `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`;
 let child: ChildProcess | undefined;
 let bridge: ChildProcess | undefined;
+let dashboard: ChildProcess | undefined;
 let childOutput = "";
 
 async function freePort() {
@@ -59,6 +60,7 @@ async function waitFor(url: string, headers: HeadersInit, process: ChildProcess)
 try {
   await readFile(path.join(root, "server.js"));
   await readFile(path.join(root, "openchamber/service/main.js"));
+  await readFile(path.join(root, "apps/bff/dist/index.js"));
   const project = path.join(temporary, "project");
   await mkdir(project);
   await writeFile(
@@ -160,10 +162,46 @@ try {
   if (!response.ok) throw new Error(`Built bridge returned ${response.status}.`);
   const bridged = await response.json();
   if (bridged.sessionID !== session.id) throw new Error("Built bridge returned another session.");
+  const dashboardPort = await freePort();
+  dashboard = spawn(process.execPath, [path.join(root, "apps/bff/dist/index.js")], {
+    cwd: temporary,
+    env: {
+      ...env,
+      HOME: connectionHome,
+      USERPROFILE: connectionHome,
+      OPENDASH_ENV: "",
+      OPENCODE_DATA_DIR: path.join(temporary, "dashboard-data"),
+      CODEX_HOME: path.join(temporary, "codex"),
+      LOG_DIR: path.join(temporary, "dashboard-logs"),
+      WEB_DIST_DIR: path.join(root, "apps/web/dist"),
+      HOST: "127.0.0.1",
+      PORT: String(dashboardPort),
+    },
+    stdio: "ignore",
+  });
+  dashboard.on("error", () => {});
+  const dashboardBase = `http://127.0.0.1:${dashboardPort}`;
+  await waitFor(`${dashboardBase}/`, {}, dashboard);
+  const insightResponse = await fetch(`${dashboardBase}/api/session/${session.id}/insight`);
+  if (!insightResponse.ok) throw new Error(`Dashboard Insight returned ${insightResponse.status}.`);
+  const insight = await insightResponse.json();
+  if (insight.session.sessionID !== session.id || insight.session.directory !== project)
+    throw new Error("Dashboard Insight returned a different session scope.");
+  if (JSON.stringify(insight).includes(password))
+    throw new Error("Dashboard exposed upstream authentication.");
+  const unchanged = await fetch(
+    `${dashboardBase}/api/session/${session.id}/insight?after=${insight.session.revision}`,
+  );
+  if (!unchanged.ok || !(await unchanged.json()).series.unchanged)
+    throw new Error("Dashboard revision cursor was not preserved.");
+  const legacy = await fetch(`${dashboardBase}/api/session/${session.id}`);
+  if (legacy.status !== 404)
+    throw new Error("Isolated V2 session unexpectedly entered the legacy usage ledger.");
   console.log(
-    "V2 plugin loaded; native RPC and built authenticated bridge passed. No model requests were sent.",
+    "V2 plugin loaded; native RPC, built authenticated bridge and dashboard Insight passed without legacy usage. No model requests were sent.",
   );
 } finally {
+  await stop(dashboard);
   await stop(bridge);
   await stop(child);
   await rm(temporary, { recursive: true, force: true });

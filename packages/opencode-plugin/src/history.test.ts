@@ -54,4 +54,54 @@ describe("persisted V2 history", () => {
     });
     expect(JSON.stringify(snapshot)).not.toContain("PRIVATE");
   });
+
+  test("recovers reported Code Mode calls from native tool metadata", () => {
+    const snapshot: SessionInsight = {
+      version: 1,
+      sessionID: "ses_code",
+      directory: "/project",
+      updatedAt: 9000,
+      revision: 0,
+      requests: [],
+      tools: [],
+      interruptedCapture: true,
+    };
+    const messages = [
+      {
+        type: "assistant",
+        id: "msg_code",
+        agent: "build",
+        model: { providerID: "openai", id: "gpt-5" },
+        time: { created: 1000, streamed: 2000, completed: 3000 },
+        content: [
+          {
+            type: "tool",
+            id: "tool_code",
+            name: "execute",
+            time: { created: 2000, ran: 2001, completed: 3000 },
+            state: {
+              status: "completed",
+              input: { code: "PRIVATE_CODE" },
+              content: [{ type: "text", text: "PRIVATE_RESULT" }],
+              metadata: {
+                toolCalls: [
+                  {
+                    tool: "files.read_text_file",
+                    status: "completed",
+                    input: { path: "PRIVATE_PATH" },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    ] as Parameters<typeof seedHistory>[1];
+    expect(seedHistory(snapshot, messages)).toBe(true);
+    expect(snapshot.tools).toHaveLength(1);
+    expect(snapshot.tools[0].reportedCalls).toEqual([
+      { name: "files.read_text_file", status: "completed" },
+    ]);
+    expect(JSON.stringify(snapshot)).not.toContain("PRIVATE");
+  });
 });

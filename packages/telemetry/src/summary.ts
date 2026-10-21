@@ -1,4 +1,30 @@
-import type { ContextSource, RequestInsight, SessionInsight, TokenUsage } from "./schema";
+import type {
+  ContextSource,
+  RequestInsight,
+  SessionInsight,
+  TokenUsage,
+  ToolInsight,
+} from "./schema";
+
+export { phaseBreakdown, speedWindow, tokenBreakdown } from "./visuals";
+
+export function summarizeReportedCalls(calls: ToolInsight["reportedCalls"] = []) {
+  const groups = new Map<
+    string,
+    {
+      name: string;
+      status: NonNullable<ToolInsight["reportedCalls"]>[number]["status"];
+      count: number;
+    }
+  >();
+  for (const call of calls) {
+    const key = `${call.name}\0${call.status}`;
+    const group = groups.get(key);
+    if (group) group.count++;
+    else groups.set(key, { ...call, count: 1 });
+  }
+  return [...groups.values()];
+}
 
 type Interval = [number, number];
 function union(intervals: Interval[]): Interval[] {

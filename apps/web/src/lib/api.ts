@@ -14,9 +14,19 @@ import type {
   RemoteSyncActionPayload,
   RemoteUsagePayload,
   SessionDetailBreakdown,
+  SessionInsightPayload,
   TimeRange,
   TrendPoint,
 } from "@opencode-dashboard/shared";
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 async function getJson<T>(url: string) {
   const cached = inflightJsonRequests.get(url) as Promise<T> | undefined;
@@ -28,7 +38,7 @@ async function getJson<T>(url: string) {
     const response = await fetch(url);
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(payload?.error ?? "Request failed.");
+      throw new ApiError(payload?.error ?? "Request failed.", response.status);
     }
     return (await response.json()) as T;
   })();
@@ -93,6 +103,13 @@ export function fetchDay(
 export function fetchSession(sessionId: string) {
   const params = new URLSearchParams({ timeZone: getCurrentTimeZone(), range: "all" });
   return getJson<SessionDetailBreakdown>(`/api/session/${sessionId}?${params.toString()}`);
+}
+
+export function fetchSessionInsight(sessionId: string, after?: number) {
+  const query = after === undefined ? "" : `?${new URLSearchParams({ after: String(after) })}`;
+  return getJson<SessionInsightPayload>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight${query}`,
+  );
 }
 
 export function fetchSeries(

@@ -33,6 +33,21 @@ export function toolMetadata(
   if (typeof metadata.parentID === "string") entry.parentID = metadata.parentID;
   if (typeof metadata.parentCallID === "string") entry.parentID = metadata.parentCallID;
   if (metadata.background === true) entry.background = true;
+  if (Array.isArray(metadata.toolCalls)) {
+    const calls: NonNullable<ToolInsight["reportedCalls"]> = [];
+    for (const call of metadata.toolCalls.slice(0, 2048)) {
+      if (!call || typeof call !== "object" || typeof call.tool !== "string") continue;
+      const status =
+        call.status === "running" || call.status === "completed"
+          ? call.status
+          : call.status === "error" || call.status === "failed"
+            ? "error"
+            : "unknown";
+      calls.push({ name: call.tool, status });
+    }
+    entry.reportedCalls = calls;
+    entry.reportedCallsTruncated = metadata.toolCalls.length > 2048;
+  }
 }
 
 export { tool as ensureTool };

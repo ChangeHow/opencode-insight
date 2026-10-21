@@ -64,6 +64,15 @@ export const toolSchema = z.object({
   status: z.enum(["running", "completed", "error", "interrupted"]),
   background: z.boolean(),
   resultTokens: z.number().nonnegative().optional(),
+  reportedCalls: z
+    .array(
+      z.object({
+        name: z.string(),
+        status: z.enum(["running", "completed", "error", "unknown"]),
+      }),
+    )
+    .optional(),
+  reportedCallsTruncated: z.boolean().optional(),
 });
 export type ToolInsight = z.infer<typeof toolSchema>;
 

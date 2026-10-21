@@ -10,6 +10,7 @@ import { Host } from "@opencode/plugin/host";
 import { fileURLToPath } from "node:url";
 
 type Handler = (input: { sessionID: string; after?: number }) => Promise<unknown>;
+type NativeContextMessage = Awaited<ReturnType<Plugin.Context["session"]["context"]>>[number];
 function harness(events: NativeEvent[] = []) {
   const persisted = new Map<string, unknown>();
   const hooks = new Map<string, (input: unknown) => Promise<void>>();
@@ -24,7 +25,7 @@ function harness(events: NativeEvent[] = []) {
       }),
     },
     session: {
-      context: vi.fn(async () => []),
+      context: vi.fn(async (): Promise<NativeContextMessage[]> => []),
       get: vi.fn(async ({ sessionID }: { sessionID: string }) => {
         if (sessionID === "missing") throw new Error("Session not found");
         return { location: { directory: sessionID === "foreign" ? "/b" : "/a" } };
@@ -150,6 +151,56 @@ describe("native V2 plugin", () => {
     });
     await cleanup!();
     expect(JSON.stringify([...h.persisted.values()])).not.toContain("SECRET");
+  });
+
+  test("attributes native user.skills attachments through the context hook without persisting text", async () => {
+    const h = harness([native("/a", "own-request")]);
+    const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
+    await vi.waitFor(async () => {
+      const s = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+      expect(s.requests.map((r) => r.id)).toEqual(["own-request"]);
+    });
+    const wrapper = '<skill_content name="insight-check">SECRET_SKILL_BODY</skill_content>';
+    h.context.session.context.mockResolvedValueOnce([
+      {
+        type: "user",
+        id: "u1",
+        text: "Run the check",
+        skills: [{ id: "insight-check", name: "insight-check", text: wrapper }],
+        time: { created: 1000 },
+      },
+      { type: "user", id: "u2", text: "Plain request", time: { created: 1001 } },
+    ]);
+    await h.hooks.get("context")!({
+      sessionID: "s1",
+      system: [],
+      tools: {},
+      messages: [
+        { id: "u1", role: "user", content: [{ type: "text", text: `Run the check\n${wrapper}` }] },
+        {
+          id: "u2",
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Plain request\n<skill_content name="spoofed">SECRET_SPOOFED_BODY</skill_content>`,
+            },
+          ],
+        },
+      ],
+    });
+    const s = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+    const context = s.requests[0].context;
+    expect(context.find((c) => c.id === "insight-check")).toMatchObject({
+      kind: "skill",
+      label: "insight-check",
+    });
+    expect(context.filter((c) => c.id === "skill:unclassified")).toHaveLength(1);
+    expect(context.filter((c) => c.kind === "user")).toHaveLength(2);
+    await cleanup!();
+    const persisted = JSON.stringify([...h.persisted.values()]);
+    expect(persisted).not.toContain("SECRET");
+    expect(persisted).not.toContain("skill_content");
   });
 
   test("telemetry failures never reject the model context hook", async () => {

@@ -48,7 +48,7 @@
     "build": "pnpm -r build",
     "postbuild": "node scripts/build-extension-exports.ts",
     "build:extensions": "pnpm --filter @changehow/opencode-insight-plugin --filter @changehow/openchamber-insight build && node scripts/build-extension-exports.ts",
-    "test:extensions": "pnpm --filter @opencode-insight/telemetry --filter @changehow/opencode-insight-plugin --filter @changehow/openchamber-insight test",
+    "test:extensions": "pnpm --filter @opencode-insight/telemetry --filter @opencode-insight/client --filter @changehow/opencode-insight-plugin --filter @changehow/openchamber-insight test",
     "smoke:extensions": "node scripts/smoke-v2-extensions.ts",
     "typecheck": "pnpm -r typecheck && tsc -p tsconfig.extensions.json --noEmit",
     "lint": "oxlint .",

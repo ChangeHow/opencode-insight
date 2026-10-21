@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@openchamber/sdk": "2.5.0",
+    "@opencode-insight/client": "workspace:*",
     "@opencode-insight/telemetry": "workspace:*",
-    "@opencode/client": "2.0.26",
     "zod": "^4.3.6"
   },
   "devDependencies": {

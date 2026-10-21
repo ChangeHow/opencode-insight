@@ -206,6 +206,38 @@ describe("numeric telemetry collector", () => {
     expect(JSON.stringify(sources)).not.toContain("SECRET");
   });
 
+  test("attributes attached native skills by exact wrapper text and keeps spoofed wrappers unclassified", () => {
+    const wrapper = '<skill_content name="insight-check">SECRET_SKILL_BODY</skill_content>';
+    const spoofed = '<skill_content name="spoofed">SECRET_SPOOFED_BODY</skill_content>';
+    const { sources } = captureContext(
+      {
+        system: [],
+        tools: {},
+        messages: [
+          {
+            id: "u1",
+            role: "user",
+            content: [{ type: "text", text: `Run the check\n${wrapper}` }],
+          },
+          {
+            id: "u2",
+            role: "user",
+            content: [{ type: "text", text: `Plain request\n${spoofed}` }],
+          },
+        ],
+      } as Parameters<typeof captureContext>[0],
+      new Map(),
+      new Map([["u1", [{ id: "insight-check", name: "insight-check", text: wrapper }]]]),
+    );
+    expect(sources.find((s) => s.id === "insight-check")).toMatchObject({
+      kind: "skill",
+      label: "insight-check",
+    });
+    expect(sources.filter((s) => s.id === "skill:unclassified")).toHaveLength(1);
+    expect(sources.filter((s) => s.kind === "user")).toHaveLength(2);
+    expect(JSON.stringify(sources)).not.toContain("SECRET");
+  });
+
   test("maps native request IDs, summary channels and separate provider reasoning usage", async () => {
     const store = storage();
     const c = new Collector(store as unknown as Plugin.Context["storage"], "/a");

@@ -10,6 +10,8 @@ Local-first token usage dashboard for OpenCode sessions.
 
 The optional [V2 telemetry plugin and OpenChamber panel](docs/v2-insight.md) add live output curves, context-source estimates, and foreground timing without running the dashboard daemon or modifying OpenChamber.
 
+The web dashboard also displays these metrics on OpenCode session detail pages. Use **Inspect an OpenCode V2 session** on the overview to open a session by ID, including sessions absent from the legacy usage ledger. This web view requires the dashboard server and an already-running OpenCode V2 instance with the plugin loaded.
+
 ## Requirements
 
 | Dependency  | Minimum | Notes                                                               |
