@@ -67,7 +67,7 @@ This implementation uses the existing SDK extension support for web and desktop.
 
 # Beta releases
 
-The existing Release workflow can publish a topic branch to npm's `beta` tag through Trusted Publishing. Select the `beta` channel and an unused explicit version such as `1.1.0-beta.0`. This does not merge the branch, create a stable release PR, or change `latest`. The workflow checks the package, builds both platform exports with the beta version, and verifies both dist-tags after publishing.
+The existing Release workflow can publish a topic branch to npm's `beta` tag through Trusted Publishing. Select the `beta` channel and an unused explicit version such as `1.1.0-beta.0`. This does not merge the branch, create a stable release PR, or change `latest`. The workflow checks the package, builds both platform exports with the beta version, and completes when `npm publish` succeeds, without polling registry availability. npm may still be processing the package after accepting the upload.
 
 On a test machine, install the published beta:
 

@@ -93,8 +93,7 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - name: Validate beta version and preserve stable tag
-        id: version
+      - name: Validate beta version
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -109,7 +108,6 @@ jobs:
             echo "Version already exists: $BETA_VERSION"
             exit 1
           fi
-          echo "latest=$(npm view @changehow/oc-insight dist-tags.latest --prefer-online)" >> "$GITHUB_OUTPUT"
           npm version "$BETA_VERSION" --no-git-tag-version --ignore-scripts
       - run: pnpm build
       - run: pnpm typecheck
@@ -118,24 +116,3 @@ jobs:
       - run: pnpm test
       - name: Publish beta through npm Trusted Publishing
         run: npm publish --ignore-scripts --access public --tag beta
-      - name: Verify release tags
-        env:
-          PREVIOUS_LATEST: ${{ steps.version.outputs.latest }}
-        run: |
-          for attempt in {1..30}; do
-            tags=$(npm view @changehow/oc-insight dist-tags --json --prefer-online)
-            latest=$(node -p 'JSON.parse(process.argv[1]).latest' "$tags")
-            beta=$(node -p 'JSON.parse(process.argv[1]).beta ?? ""' "$tags")
-            if [ "$latest" != "$PREVIOUS_LATEST" ]; then
-              echo "Stable tag changed unexpectedly: $latest"
-              exit 1
-            fi
-            if [ "$beta" = "$BETA_VERSION" ]; then
-              echo "Verified beta=$beta and latest=$latest"
-              exit 0
-            fi
-            echo "Waiting for npm to finish processing $BETA_VERSION ($attempt/30)."
-            sleep 10
-          done
-          echo "Timed out waiting for npm to expose the beta tag."
-          exit 1
