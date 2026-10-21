@@ -9,3 +9,5 @@ Expose the same context, speed, and timing insights in the web dashboard's sessi
 Attribute native skill attachments by their durable source identity and capture reported Code Mode child-call counts without inventing per-child timing or storing tool arguments.
 
 Simplify both Insight surfaces with a following ten-minute speed chart, token composition donuts, and mutually exclusive timing phase bars with hover details.
+
+Use OpenChamber SDK controls and host-derived chart colors, apply theme changes without remounting, and preserve panel focus, open pickers, and chart inspection across telemetry refreshes.

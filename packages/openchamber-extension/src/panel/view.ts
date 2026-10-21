@@ -1,109 +1,165 @@
+import { mountBadge, mountBanner, mountButton, mountEmpty, mountTabs } from "@openchamber/sdk/ui";
 import { summarizeSession } from "@opencode-insight/telemetry/summary";
 import type { PanelState } from "./controller";
-import { mountChart } from "./chart";
-import { bindPhaseInspection, metric, timingMarkup, tokenMarkup } from "./breakdown-view";
-import { duration, escape, number } from "./format";
+import { createSpeedChart } from "./chart";
+import { element, setText } from "./dom";
+import { duration, number } from "./format";
+import { createTokenView } from "./token-view";
+import { createTimingView } from "./timing-view";
 
+const tabItems = [
+  { id: "speed", label: "Speed" },
+  { id: "token", label: "Token" },
+  { id: "time", label: "Time" },
+];
 type Tab = "speed" | "token" | "time";
 
 export function createPanelView(root: HTMLElement, retry: () => void) {
-  let tab: Tab = "speed";
-  let cumulative = false;
   let latest: PanelState;
   let target = "";
+  let active: Tab = "speed";
+  let disposed = false;
+  let lastError = "";
+  let lastEmpty = "";
+  root.setAttribute("aria-label", "Session insight");
+  const header = element("header", "section-head panel-header");
+  header.append(element("h1", "sr-only", "Session insight"));
+  const tabsSlot = element("div");
+  const retrySlot = element("div");
+  header.append(tabsSlot, retrySlot);
+  const errorSlot = element("div");
+  const emptySlot = element("div");
+  const content = element("div", "insight-data");
+  const metrics = element("div", "metrics top-metrics");
+  const qualitySlot = element("div", "capture-quality");
+  const panels = { speed: element("section"), token: element("section"), time: element("section") };
+  for (const [id, panel] of Object.entries(panels)) {
+    panel.id = `insight-${id}`;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", `tab-${id}`);
+  }
+  content.append(metrics, qualitySlot, ...Object.values(panels));
+  root.append(header, errorSlot, emptySlot, content);
+  const retryButton = mountButton(retrySlot, {
+    label: "Retry",
+    variant: "ghost",
+    size: "sm",
+    onClick: retry,
+  });
+  retrySlot.querySelector("button")!.id = "retry";
+  const banner = mountBanner(errorSlot, { tone: "error", title: "Telemetry unavailable" });
+  const empty = mountEmpty(emptySlot, { title: "Select an active OpenCode session" });
+  const quality = mountBadge(qualitySlot, { label: "Partial capture", tone: "neutral" });
+  qualitySlot.title = "Totals and timing cover only observed activity.";
+  const metricLabels = ["Current context", "Cumulative tokens", "Request mean", "Foreground"];
+  const descriptions = [
+    "Latest input snapshot · estimated/reported.",
+    "Reported repeated input + cache + output + reasoning.",
+    "Reported output + reasoning / whole request elapsed.",
+    "Union of model and blocking tools; background separate.",
+  ];
+  const values = metricLabels.map((label, index) => {
+    const metric = element("div", "metric");
+    metric.title = descriptions[index];
+    const value = element("strong");
+    metric.append(element("span", "muted", label), value);
+    metrics.append(metric);
+    return value;
+  });
+  const speed = createSpeedChart(panels.speed);
+  const token = createTokenView(panels.token);
+  const timing = createTimingView(panels.time);
+  function linkTabs() {
+    tabsSlot.querySelector('[role="tablist"]')?.setAttribute("aria-label", "Insight views");
+    tabsSlot.querySelectorAll<HTMLElement>('[role="tab"]').forEach((tab) => {
+      const id = tab.dataset.id!;
+      tab.id = `tab-${id}`;
+      tab.setAttribute("aria-controls", `insight-${id}`);
+    });
+  }
+  const tabs = mountTabs(tabsSlot, {
+    items: tabItems,
+    activeId: active,
+    onChange(id) {
+      active = id as Tab;
+      tabs.update({ activeId: active });
+      linkTabs();
+      if (latest) render(latest);
+    },
+  });
+  linkTabs();
   function render(state: PanelState) {
+    if (disposed) return;
     latest = state;
     const key = `${state.directory}\0${state.sessionID}`;
-    const changedTarget = target !== key;
-    if (changedTarget) {
+    if (key !== target) {
       target = key;
-      cumulative = false;
+      token.reset();
+      timing.reset();
+      speed.update([]);
     }
-    const active = root.contains(document.activeElement)
-      ? (document.activeElement as HTMLElement)
-      : null;
-    const focusLabel = active?.getAttribute("aria-label");
-    const focusTab = active?.dataset.tab;
-    const focusPhase = active?.dataset.phase;
-    const focusPhaseSegment = active?.classList.contains("phase-segment");
-    const focusID = active?.id;
-    const focusSource = active?.closest<HTMLElement>("details")?.dataset.source;
-    const openSources = changedTarget
-      ? []
-      : [...root.querySelectorAll<HTMLDetailsElement>("details[open]")].map(
-          (el) => el.dataset.source,
-        );
-    const inspectedAt = changedTarget
-      ? undefined
-      : root.querySelector<HTMLElement>("#speed-chart")?.dataset.inspectedAt;
-    const session = state.session;
-    let content: string;
-    if (!state.sessionID)
-      content =
-        '<p class="empty">Select an active OpenCode session to inspect local telemetry.</p>';
+    errorSlot.hidden = !state.error;
+    const error = state.error
+      ? `${state.error}${state.session ? " Previous captured data is retained; it may be stale." : ""}`
+      : "";
+    if (error !== lastError) {
+      banner.update({ title: error });
+      lastError = error;
+    }
+    let message = "";
+    if (!state.sessionID) message = "Select an active OpenCode session to inspect local telemetry.";
     else if (!state.directory)
-      content =
-        '<p class="empty">Session location unavailable. Select a local project directory.</p>';
-    else if (!session)
-      content = `<p class="empty">${state.loading ? "Loading local session telemetry…" : "Telemetry unavailable. The local service must verify this session location."}</p>`;
-    else if (!session.requests.length && !session.tools.length)
-      content =
-        '<p class="empty">No telemetry captured for this session yet. Start a model request with the capture plugin enabled.</p>';
-    else {
-      const summary = summarizeSession(session);
-      content = `<div class="metrics top-metrics">${metric("Current context", summary.currentContext.length ? number(summary.currentContext.reduce((sum, source) => sum + source.tokens, 0)) : "Unavailable", "Latest input snapshot · estimated/reported.")}${metric("Cumulative tokens", session.requests.some((request) => request.usage) ? number(Object.values(summary.usage).reduce((sum, tokens) => sum + tokens, 0)) : "Unavailable", "Reported repeated input + cache + output + reasoning.")}${metric("Request mean", summary.tps === undefined ? "Unavailable" : `${number(summary.tps)} tokens/s`, "Reported output + reasoning / whole request elapsed.")}${metric("Foreground", duration(summary.foregroundMs), "Union of model and blocking tools; background separate.")}</div>
-        ${summary.capturePartial ? '<span class="badge" title="Totals and timing cover only observed activity.">Partial capture</span>' : ""}
-        <div role="tablist" aria-label="Insight views">${(["speed", "token", "time"] as Tab[]).map((name) => `<button role="tab" id="tab-${name}" aria-controls="insight-content" aria-selected="${tab === name}" tabindex="${tab === name ? 0 : -1}" data-tab="${name}">${name[0].toUpperCase() + name.slice(1)}</button>`).join("")}</div>
-        <section role="tabpanel" id="insight-content" aria-labelledby="tab-${tab}">${tab === "speed" ? '<div id="speed-chart"></div>' : tab === "token" ? tokenMarkup(session, cumulative) : timingMarkup(session)}</section>`;
+      message = "Session location unavailable. Select a local project directory.";
+    else if (!state.session)
+      message = state.loading
+        ? "Loading local session telemetry…"
+        : "Telemetry unavailable. The local service must verify this session location.";
+    else if (!state.session.requests.length && !state.session.tools.length)
+      message =
+        "No telemetry captured for this session yet. Start a model request with the capture plugin enabled.";
+    emptySlot.hidden = !message;
+    content.hidden = !!message;
+    tabsSlot.hidden = !!message;
+    if (message !== lastEmpty) {
+      empty.update({ title: message });
+      lastEmpty = message;
     }
-    root.innerHTML = `<header class="section-head"><h1>Session insight</h1><button id="retry" type="button">Retry</button></header>
-      ${state.error ? `<div class="notice error" role="alert">${escape(state.error)}${session ? " Previous captured data is retained; it may be stale." : ""}</div>` : ""}
-      ${content}`;
-    root.querySelector("#retry")?.addEventListener("click", retry);
-    root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
-      button.addEventListener("click", () => {
-        tab = button.dataset.tab as Tab;
-        render(latest);
-      });
-      button.addEventListener("keydown", (event) => {
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-        event.preventDefault();
-        const tabs: Tab[] = ["speed", "token", "time"];
-        tab = tabs[(tabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : 2)) % 3];
-        render(latest);
-        root.querySelector<HTMLButtonElement>(`[data-tab="${tab}"]`)?.focus();
-      });
+    if (message || !state.session) return;
+    const session = state.session;
+    const summary = summarizeSession(session);
+    const metricsNext = [
+      summary.currentContext.length
+        ? number(summary.currentContext.reduce((sum, source) => sum + source.tokens, 0))
+        : "Unavailable",
+      session.requests.some((request) => request.usage)
+        ? number(Object.values(summary.usage).reduce((sum, value) => sum + value, 0))
+        : "Unavailable",
+      summary.tps === undefined ? "Unavailable" : `${number(summary.tps)} tokens/s`,
+      duration(summary.foregroundMs),
+    ];
+    metricsNext.forEach((value, index) => setText(values[index], value));
+    qualitySlot.hidden = !summary.capturePartial;
+    Object.entries(panels).forEach(([id, panel]) => {
+      panel.hidden = id !== active;
     });
-    root.querySelector<HTMLSelectElement>("select")?.addEventListener("change", (event) => {
-      cumulative = (event.target as HTMLSelectElement).value === "cumulative";
-      render(latest);
-    });
-    const chart = root.querySelector<HTMLElement>("#speed-chart");
-    if (chart)
-      mountChart(
-        chart,
-        state.series?.points ?? [],
-        session,
-        inspectedAt === undefined ? undefined : Number(inspectedAt),
-      );
-    bindPhaseInspection(root);
-    root.querySelectorAll<HTMLDetailsElement>("details").forEach((el) => {
-      el.open = openSources.includes(el.dataset.source);
-    });
-    if (focusPhase) {
-      root
-        .querySelector<HTMLElement>(
-          `${focusPhaseSegment ? ".phase-segment" : ".legend-row"}[data-phase="${focusPhase}"]`,
-        )
-        ?.focus();
-    } else if (focusLabel) {
-      [...root.querySelectorAll<HTMLElement>("[aria-label]")]
-        .find((el) => el.getAttribute("aria-label") === focusLabel)
-        ?.focus();
-    } else if (focusTab) root.querySelector<HTMLElement>(`[data-tab="${focusTab}"]`)?.focus();
-    else if (focusID === "retry") root.querySelector<HTMLElement>("#retry")?.focus();
-    else if (focusSource)
-      root.querySelector<HTMLElement>(`details[data-source="${focusSource}"] summary`)?.focus();
+    if (active === "speed") speed.update(state.series?.points ?? [], session);
+    else if (active === "token") token.update(session);
+    else timing.update(session);
   }
-  return { render };
+  return {
+    render,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      speed.dispose();
+      token.dispose();
+      timing.dispose();
+      tabs.dispose();
+      retryButton.dispose();
+      banner.dispose();
+      empty.dispose();
+      quality.dispose();
+      root.replaceChildren();
+    },
+  };
 }

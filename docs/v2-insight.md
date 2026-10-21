@@ -137,6 +137,8 @@ Keys are namespaced by directory, workspace, and session ID. Dirty snapshots are
 
 The speed chart uses one-second buckets and five-second rolling rates. It follows the most recent ten minutes while a request is running, then freezes at the session's final speed window. Short sessions grow into that window. Pointer hover, touch, and keyboard navigation expose point details directly on the chart, without a separate timeline control. Token composition uses a donut and compact percentage legends; reported usage stays separate from source estimates.
 
+The OpenChamber panel uses SDK controls and applies the host theme before mounting, including subsequent light/dark or custom-theme changes. Chart categories use host syntax colors with theme-derived fallbacks; status colors remain reserved for status. Polling updates retained chart and detail nodes instead of replacing the panel, preserving keyboard focus, an open scope picker, expanded source details, and the inspected speed sample. Selecting another session resets session-specific inspection and input scope.
+
 The calculations distinguish:
 
 - **Current captured context:** the most recent outgoing request's source estimates. This is not a live reconstruction of unobserved model state.
