@@ -189,8 +189,40 @@ describe("panel controller", () => {
     await vi.advanceTimersByTimeAsync(0);
     const renders = h.states.length;
     await vi.advanceTimersByTimeAsync(3000);
-    expect(h.serviceRequest).toHaveBeenCalledTimes(8);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(5);
+    expect(
+      h.serviceRequest.mock.calls.filter(([request]) => request.path === "/session"),
+    ).toHaveLength(1);
     expect(h.states).toHaveLength(renders);
+    h.controller.dispose();
+  });
+
+  test("fetches a changed snapshot and retries failed snapshots even after the chart advances", async () => {
+    let revision = 1;
+    let failSnapshot = false;
+    const h = harness(async (request) => {
+      const body = JSON.parse(request.body!);
+      if (request.path === "/session") {
+        if (failSnapshot) return json({ error: "Snapshot offline" }, 503);
+        return json({ ...session(), revision });
+      }
+      return json({ revision, unchanged: body.after === revision, points: [] });
+    });
+    h.select();
+    await vi.advanceTimersByTimeAsync(0);
+    revision = 2;
+    failSnapshot = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h.states.at(-1)?.session?.revision).toBe(1);
+    expect(h.states.at(-1)?.series?.revision).toBe(2);
+    expect(h.states.at(-1)?.error).toContain("Snapshot offline");
+    failSnapshot = false;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h.states.at(-1)?.session?.revision).toBe(2);
+    expect(h.states.at(-1)?.error).toBeUndefined();
+    expect(
+      h.serviceRequest.mock.calls.filter(([request]) => request.path === "/session"),
+    ).toHaveLength(3);
     h.controller.dispose();
   });
 
@@ -219,7 +251,7 @@ describe("panel controller", () => {
     expect(h.serviceRequest).toHaveBeenCalledTimes(2);
     intersection(true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(h.serviceRequest).toHaveBeenCalledTimes(4);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(3);
     h.controller.dispose();
     expect(disconnect).toHaveBeenCalledOnce();
   });

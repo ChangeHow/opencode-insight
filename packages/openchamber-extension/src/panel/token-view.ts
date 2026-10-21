@@ -108,6 +108,8 @@ export function createTokenView(root: HTMLElement) {
       }
     },
     dispose() {
+      input.dispose();
+      usage.dispose();
       scope.dispose();
       quality.dispose();
       empty.dispose();

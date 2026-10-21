@@ -11,6 +11,7 @@ import { captureEvent, ensureTool, toolMetadata } from "./events";
 import { Insight } from "./rpc";
 import { trackToolScopes } from "./tool-scope";
 import { seedHistory } from "./history";
+import { snapshot } from "./snapshot";
 
 export { Insight } from "./rpc";
 
@@ -126,9 +127,7 @@ export default Plugin.define({
               throw new Error("Telemetry capture is incomplete", { cause: captureError });
             if (streamError)
               throw new Error("Telemetry event capture interrupted", { cause: streamError });
-            return sessionSchema.parse(
-              JSON.parse(JSON.stringify(await querySession(input.sessionID))),
-            );
+            return snapshot(sessionSchema, await querySession(input.sessionID));
           }),
         series: (input) =>
           collector.serialize(async () => {
@@ -137,9 +136,7 @@ export default Plugin.define({
               throw new Error("Telemetry capture is incomplete", { cause: captureError });
             if (streamError)
               throw new Error("Telemetry event capture interrupted", { cause: streamError });
-            return seriesSchema.parse(
-              JSON.parse(JSON.stringify(buildSeries(await querySession(input.sessionID), input))),
-            );
+            return snapshot(seriesSchema, buildSeries(await querySession(input.sessionID), input));
           }),
       }),
     );

@@ -232,7 +232,20 @@ describe("panel view", () => {
       sessionID: "one",
       directory: "/local",
       loading: false,
-      session,
+      session: {
+        ...session,
+        requests: [
+          {
+            ...session.requests[0],
+            endedAt: 17000,
+            streamedAt: 17000,
+            buckets: [
+              { at: 1000, output: 150, reasoning: 0, summary: 0 },
+              { at: 16000, output: 300, reasoning: 0, summary: 0 },
+            ],
+          },
+        ],
+      },
       series: {
         revision: 1,
         unchanged: false,
@@ -265,8 +278,12 @@ describe("panel view", () => {
         requests: [
           {
             ...session.requests[0],
-            endedAt: 3000,
-            streamedAt: 3000,
+            endedAt: 17000,
+            streamedAt: 17000,
+            buckets: state.session.requests[0].buckets.map((bucket) => ({
+              ...bucket,
+              output: 300,
+            })),
             context: [{ ...session.requests[0].context[0], tokens: 60 }],
           },
         ],
@@ -292,7 +309,7 @@ describe("panel view", () => {
     svg.focus();
     svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     span.click();
-    expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBe("0");
+    expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBe("7500");
     const inspector = root.querySelector<HTMLElement>("#insight-time .trace-inspector")!;
     expect(inspector.dataset.open).toBe("true");
     view.render({ ...state, sessionID: "two", session: { ...session, sessionID: "two" } });

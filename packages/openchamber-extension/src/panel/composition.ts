@@ -21,6 +21,29 @@ export function createComposition(root: HTMLElement, label: string) {
   composition.append(donut, legend);
   root.append(composition);
   const rows = new Map<string, ReturnType<typeof createRow>>();
+  let disposed = false;
+  function fitTotal() {
+    if (disposed) return;
+    total.style.removeProperty("font-size");
+    // Keep 12px of breathing room on each side of the actual inner circle.
+    const available = center.clientWidth - 24;
+    if (available <= 0 || !total.textContent) return;
+    let fontSize = parseFloat(getComputedStyle(total).fontSize);
+    const range = document.createRange();
+    range.selectNodeContents(total);
+    // Variable fonts can change glyph proportions as they shrink; remeasure the fit.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const width = Math.ceil(range.getBoundingClientRect().width);
+      if (width <= available) break;
+      fontSize *= available / width;
+      total.style.fontSize = `${fontSize}px`;
+    }
+  }
+  const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(fitTotal);
+  observer?.observe(center);
+  const fonts = document.fonts;
+  void fonts?.ready.then(fitTotal);
+  fonts?.addEventListener("loadingdone", fitTotal);
   function createRow() {
     const node = element("div", "legend-row");
     const dot = element("span", "dot");
@@ -33,8 +56,10 @@ export function createComposition(root: HTMLElement, label: string) {
   }
   return {
     update(slices: Slice[]) {
+      if (disposed) return;
       const tokens = slices.reduce((sum, slice) => sum + slice.tokens, 0);
       setText(total, number(tokens));
+      fitTotal();
       donut.setAttribute("aria-label", `${label}: ${number(tokens)} tokens`);
       let offset = 0;
       const arcs = slices
@@ -62,6 +87,11 @@ export function createComposition(root: HTMLElement, label: string) {
           return row.node;
         }),
       );
+    },
+    dispose() {
+      disposed = true;
+      observer?.disconnect();
+      fonts?.removeEventListener("loadingdone", fitTotal);
     },
   };
 }

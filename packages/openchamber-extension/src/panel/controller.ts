@@ -49,25 +49,33 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
       emit();
     }
     const body = { sessionID, directory };
-    const results = await Promise.allSettled([
+    const previousSession = state.session;
+    const readSession = () =>
       host
         .serviceRequest({ method: "POST", path: "/session", body: JSON.stringify(body) })
         .then(parseResponse)
-        .then((data) => sessionSchema.parse(data)),
-      host
-        .serviceRequest({
-          method: "POST",
-          path: "/series",
-          body: JSON.stringify({
-            ...body,
-            bucketMs: 1000,
-            windowMs: 5000,
-            after: state.series?.revision,
-          }),
-        })
-        .then(parseResponse)
-        .then((data) => seriesSchema.parse(data)),
-    ]);
+        .then((data) => sessionSchema.parse(data));
+    const readSeries = host
+      .serviceRequest({
+        method: "POST",
+        path: "/series",
+        body: JSON.stringify({
+          ...body,
+          bucketMs: 1000,
+          windowMs: 5000,
+          after: state.series?.revision,
+        }),
+      })
+      .then(parseResponse)
+      .then((data) => seriesSchema.parse(data));
+    const readSnapshot = previousSession
+      ? readSeries.then(
+          (series) =>
+            series.revision === previousSession.revision ? previousSession : readSession(),
+          () => readSession(),
+        )
+      : readSession();
+    const results = await Promise.allSettled([readSnapshot, readSeries]);
     busy = false;
     if (!visible()) return;
     if (version !== generation) {

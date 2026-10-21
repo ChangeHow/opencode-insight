@@ -75,7 +75,7 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
       target = key;
       token.reset();
       timing.reset();
-      speed.update([]);
+      speed.update();
     }
     errorSlot.hidden = !state.error;
     const error = state.error
@@ -117,7 +117,7 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
     ];
     metricsNext.forEach((value, index) => setText(values[index], value));
     qualitySlot.hidden = !summary.capturePartial;
-    speed.update(state.series?.points ?? [], session);
+    speed.update(session);
     token.update(session);
     timing.update(session);
   }

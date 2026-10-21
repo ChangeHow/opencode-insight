@@ -123,6 +123,28 @@ describe("native V2 plugin", () => {
     expect(saved.requests[0].capture).toBe("partial");
   });
 
+  test("returns detached snapshots without changing captured state when a caller edits them", async () => {
+    const h = harness([native("/a", "own-request")]);
+    const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
+    await vi.waitFor(async () => {
+      const snapshot = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+      expect(snapshot.requests).toHaveLength(1);
+    });
+    const snapshot = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+    snapshot.requests[0].status = "error";
+    snapshot.requests[0].context.push({
+      kind: "user",
+      id: "caller-only",
+      label: "caller-only",
+      tokens: 10,
+      quality: "estimated",
+    });
+    const next = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+    expect(next.requests[0].status).toBe("running");
+    expect(next.requests[0].context).toEqual([]);
+    await cleanup!();
+  });
+
   test("records tool hooks without retaining tool arguments", async () => {
     const h = harness();
     const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
