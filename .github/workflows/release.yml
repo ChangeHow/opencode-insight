@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        type: choice
+        options: [stable, beta]
+        default: stable
+      beta_version:
+        description: Explicit beta version, for example 1.1.0-beta.0
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -12,6 +22,7 @@ permissions:
 
 jobs:
   release:
+    if: github.event_name == 'push' || (github.ref == 'refs/heads/main' && inputs.channel == 'stable')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,3 +70,57 @@ jobs:
           done
           echo "Timed out waiting for release PR #$RELEASE_PR to merge."
           exit 1
+
+  beta:
+    if: github.event_name == 'workflow_dispatch' && inputs.channel == 'beta'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: npm-beta-release
+      cancel-in-progress: false
+    env:
+      BETA_VERSION: ${{ inputs.beta_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - name: Validate beta version and preserve stable tag
+        id: version
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const version = process.env.BETA_VERSION ?? '';
+          if (!/^\d+\.\d+\.\d+-beta\.\d+$/.test(version)) throw new Error('Expected an explicit x.y.z-beta.n version');
+          const current = JSON.parse(fs.readFileSync('package.json', 'utf8')).version.split('.').map(Number);
+          const next = version.split('-')[0].split('.').map(Number);
+          const difference = next.map((part, index) => part - current[index]).find(value => value !== 0) ?? 0;
+          if (difference <= 0) throw new Error('Beta base version must be greater than the current stable version');
+          NODE
+          if npm view "@changehow/oc-insight@$BETA_VERSION" version --json >/dev/null 2>&1; then
+            echo "Version already exists: $BETA_VERSION"
+            exit 1
+          fi
+          echo "latest=$(npm view @changehow/oc-insight dist-tags.latest --prefer-online)" >> "$GITHUB_OUTPUT"
+          npm version "$BETA_VERSION" --no-git-tag-version --ignore-scripts
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+      - name: Publish beta through npm Trusted Publishing
+        run: npm publish --ignore-scripts --access public --tag beta
+      - name: Verify release tags
+        env:
+          PREVIOUS_LATEST: ${{ steps.version.outputs.latest }}
+        run: |
+          test "$(npm view @changehow/oc-insight dist-tags.beta --prefer-online)" = "$BETA_VERSION"
+          test "$(npm view @changehow/oc-insight dist-tags.latest --prefer-online)" = "$PREVIOUS_LATEST"

@@ -8,6 +8,8 @@
 
 Local-first token usage dashboard for OpenCode sessions.
 
+The optional [V2 telemetry plugin and OpenChamber panel](docs/v2-insight.md) add live output curves, context-source estimates, and foreground timing without running the dashboard daemon or modifying OpenChamber.
+
 ## Requirements
 
 | Dependency  | Minimum | Notes                                                               |
