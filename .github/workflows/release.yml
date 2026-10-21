@@ -122,5 +122,20 @@ jobs:
         env:
           PREVIOUS_LATEST: ${{ steps.version.outputs.latest }}
         run: |
-          test "$(npm view @changehow/oc-insight dist-tags.beta --prefer-online)" = "$BETA_VERSION"
-          test "$(npm view @changehow/oc-insight dist-tags.latest --prefer-online)" = "$PREVIOUS_LATEST"
+          for attempt in {1..30}; do
+            tags=$(npm view @changehow/oc-insight dist-tags --json --prefer-online)
+            latest=$(node -p 'JSON.parse(process.argv[1]).latest' "$tags")
+            beta=$(node -p 'JSON.parse(process.argv[1]).beta ?? ""' "$tags")
+            if [ "$latest" != "$PREVIOUS_LATEST" ]; then
+              echo "Stable tag changed unexpectedly: $latest"
+              exit 1
+            fi
+            if [ "$beta" = "$BETA_VERSION" ]; then
+              echo "Verified beta=$beta and latest=$latest"
+              exit 0
+            fi
+            echo "Waiting for npm to finish processing $BETA_VERSION ($attempt/30)."
+            sleep 10
+          done
+          echo "Timed out waiting for npm to expose the beta tag."
+          exit 1
