@@ -32,20 +32,25 @@ export function parseResponse(response: GuestRequestResult): unknown {
 
 type PanelHost = Pick<HostClient, "onSession" | "onDirectory" | "serviceRequest">;
 
-export function createPanelController(host: PanelHost, change: (state: PanelState) => void) {
+export function createPanelController(
+  host: PanelHost,
+  change: (state: PanelState) => void,
+  surface: "panel" | "status" = "panel",
+) {
   let state: PanelState = { sessionID: null, directory: null, loading: false };
   let generation = 0;
   let disposed = false;
   let busy = false;
   let force = false;
   let speedRequested = true;
-  let intersecting = true;
+  let intersecting = typeof IntersectionObserver === "undefined";
   let timer: ReturnType<typeof setTimeout> | undefined;
   const visible = () => !document.hidden && intersecting && !disposed;
   const emit = () => change({ ...state });
   const stopTimer = () => clearTimeout(timer);
 
   async function read(path: string, body: object) {
+    if (!visible()) throw new Error("Insight view is hidden.");
     return parseResponse(
       await host.serviceRequest({ method: "POST", path, body: JSON.stringify(body) }),
     );
@@ -65,7 +70,7 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
     busy = true;
     const version = generation;
     const { sessionID, directory } = state;
-    if (!state.overview) {
+    if (!state.overview && !state.speed) {
       state = { ...state, loading: true };
       emit();
     }
@@ -78,26 +83,29 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
     let speed = previousSpeed;
     const forced = force;
     force = false;
-    try {
-      const result = overviewSchema.parse(
-        await read("/overview", {
-          ...body,
-          after: forced ? undefined : previousOverview?.revision,
-        }),
-      );
-      assertLocation(result, sessionID, directory);
-      if (!result.unchanged) {
-        if (!result.data) throw new Error("The local service returned an incomplete overview.");
-        overview = result;
-      } else if (!previousOverview?.data)
-        throw new Error("The local service returned an incomplete overview.");
-    } catch (cause) {
-      errors.push(cause instanceof Error ? cause.message : "Session unavailable.");
+    if (surface === "panel") {
+      try {
+        const result = overviewSchema.parse(
+          await read("/overview", {
+            ...body,
+            after: forced ? undefined : previousOverview?.revision,
+          }),
+        );
+        assertLocation(result, sessionID, directory);
+        if (!result.unchanged) {
+          if (!result.data) throw new Error("The local service returned an incomplete overview.");
+          overview = result;
+        } else if (!previousOverview?.data)
+          throw new Error("The local service returned an incomplete overview.");
+      } catch (cause) {
+        errors.push(cause instanceof Error ? cause.message : "Session unavailable.");
+      }
     }
     const current = () => visible() && version === generation;
     if (
       current() &&
-      (speedRequested ||
+      (surface === "status" ||
+        speedRequested ||
         forced ||
         overview !== previousOverview ||
         !speed ||
@@ -180,7 +188,7 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
       const result = toolPageSchema.parse(
         await read("/tool-page", { ...input, sessionID, directory }),
       );
-      if (disposed || version !== generation) throw new Error("Session location changed.");
+      if (!visible() || version !== generation) throw new Error("Session location changed.");
       assertLocation(result, sessionID, directory);
       if (
         result.group !== input.group ||

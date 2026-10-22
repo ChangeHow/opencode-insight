@@ -145,6 +145,24 @@
         color: var(--oc-fg, CanvasText);
         font-variant-numeric: tabular-nums;
       }
+      main.speed-status {
+        padding: 0;
+      }
+      .speed-status .chart svg {
+        height: 200px;
+      }
+      .speed-status .speed-summary {
+        flex-wrap: nowrap;
+        gap: 8px;
+      }
+      .speed-summary strong {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .speed-status .tooltip {
+        flex-wrap: wrap;
+        gap: 0 8px;
+      }
       [hidden] {
         display: none !important;
       }

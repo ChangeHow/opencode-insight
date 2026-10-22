@@ -35,7 +35,10 @@ function response(request: GuestRequest, raw = session()) {
   if (request.path === "/tool-page") return buildToolPage(raw, body);
   throw new Error(`Unexpected legacy path: ${request.path}`);
 }
-function harness(request?: (request: GuestRequest) => Promise<GuestRequestResult>) {
+function harness(
+  request?: (request: GuestRequest) => Promise<GuestRequestResult>,
+  surface: "panel" | "status" = "panel",
+) {
   let onSession: (session: SessionSnapshot | null) => void = () => {};
   let onDirectory: (directory: string | null) => void = () => {};
   const states: PanelState[] = [];
@@ -61,6 +64,7 @@ function harness(request?: (request: GuestRequest) => Promise<GuestRequestResult
       serviceRequest,
     },
     (state) => states.push(state),
+    surface,
   );
   return {
     controller,
@@ -112,6 +116,20 @@ describe("panel controller", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(h.states.at(-1)?.error).toBeUndefined();
     expect(h.states.at(-1)?.speed?.revision).toBe(1);
+    h.controller.dispose();
+  });
+
+  test("fetches only speed for the expanded Resources section", async () => {
+    const h = harness(undefined, "status");
+    h.select();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(2);
+    expect(h.serviceRequest.mock.calls.map(([request]) => request.path)).toEqual([
+      "/speed-window",
+      "/speed-window",
+    ]);
+    expect(h.states.at(-1)?.speed?.sessionID).toBe("one");
+    expect(h.states.at(-1)?.overview).toBeUndefined();
     h.controller.dispose();
   });
 
@@ -309,7 +327,7 @@ describe("panel controller", () => {
     h.controller.dispose();
   });
 
-  test("pauses when the host hides its iframe without a document visibility event", async () => {
+  test("loads only after expansion, pauses on collapse and refreshes on reopening", async () => {
     let intersection: (value: boolean) => void = () => {};
     const disconnect = vi.fn();
     vi.stubGlobal(
@@ -328,13 +346,24 @@ describe("panel controller", () => {
     );
     const h = harness();
     h.select();
+    await vi.advanceTimersByTimeAsync(4000);
+    h.controller.retry();
+    h.controller.requestSpeed();
+    await expect(h.controller.loadTools({ group: "bash" })).rejects.toThrow("hidden");
     await vi.advanceTimersByTimeAsync(0);
+    expect(h.serviceRequest).not.toHaveBeenCalled();
+    intersection(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(2);
     intersection(false);
+    h.select("two", "/other");
     await vi.advanceTimersByTimeAsync(4000);
     expect(h.serviceRequest).toHaveBeenCalledTimes(2);
     intersection(true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(h.serviceRequest).toHaveBeenCalledTimes(3);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(4);
+    expect(h.states.at(-1)?.overview?.sessionID).toBe("two");
+    expect(h.states.at(-1)?.speed?.sessionID).toBe("two");
     h.controller.dispose();
     expect(disconnect).toHaveBeenCalledOnce();
   });

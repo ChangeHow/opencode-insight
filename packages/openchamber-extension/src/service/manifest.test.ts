@@ -11,6 +11,13 @@ describe("OpenChamber extension manifest", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("Invalid extension manifest.");
     expect(result.manifest.contributes.panel.entry).toBe("dist/panel/index.html");
+    expect(result.manifest.contributes.statusSection).toEqual({
+      entry: "dist/panel/index.html",
+      title: "Speed",
+      height: 300,
+      defaultExpanded: false,
+      requiresProject: true,
+    });
     expect(result.manifest.contributes.service).toEqual({
       entry: "dist/service/main.js",
       runtime: "host",

@@ -26,6 +26,10 @@ await writeFile(
         contributes: {
           ...extension.openchamber.contributes,
           panel: { ...extension.openchamber.contributes.panel, entry: "panel/index.html" },
+          statusSection: {
+            ...extension.openchamber.contributes.statusSection,
+            entry: "panel/index.html",
+          },
           service: { ...extension.openchamber.contributes.service, entry: "service/main.js" },
         },
       },

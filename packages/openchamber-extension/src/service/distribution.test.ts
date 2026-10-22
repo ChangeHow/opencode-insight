@@ -17,6 +17,7 @@ describe("single-package platform distribution", () => {
     expect(metadata.exports["./openchamber"]).toBe("./openchamber/index.js");
     expect(panel.version).toBe(metadata.version);
     expect(parseManifest(panel).ok).toBe(true);
+    expect(panel.openchamber.contributes.statusSection.entry).toBe("panel/index.html");
     await expect(
       readFile(path.join(root, "openchamber/panel/index.html"), "utf8"),
     ).resolves.toContain("main.js");

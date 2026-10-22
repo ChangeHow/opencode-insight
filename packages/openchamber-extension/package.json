@@ -32,6 +32,13 @@
         "icon": "bar-chart-box",
         "entry": "dist/panel/index.html"
       },
+      "statusSection": {
+        "entry": "dist/panel/index.html",
+        "title": "Speed",
+        "height": 300,
+        "defaultExpanded": false,
+        "requiresProject": true
+      },
       "service": {
         "entry": "dist/service/main.js",
         "runtime": "host"
