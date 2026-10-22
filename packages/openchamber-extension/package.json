@@ -32,7 +32,6 @@
         "icon": "bar-chart-box",
         "entry": "dist/panel/index.html"
       },
-      "page": true,
       "service": {
         "entry": "dist/service/main.js",
         "runtime": "host"

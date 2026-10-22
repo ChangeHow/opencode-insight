@@ -43,7 +43,7 @@ Print the OpenChamber installable directory:
 node scripts/opendash.mjs extension-path openchamber
 ```
 
-In OpenChamber 2.5.0 or later, open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve its local-process capability, then open **Insight** on the rail. Its full-page view is also available from Extension pages. Retain the built panel and service assets. OpenChamber does not compile TypeScript at runtime.
+In OpenChamber 2.5.0 or later, open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve its local-process capability, then open **Insight** on the rail. Retain the built panel and service assets. OpenChamber does not compile TypeScript at runtime.
 
 After this change is released through the existing npm release workflow, install or upgrade the same package:
 

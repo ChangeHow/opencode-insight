@@ -15,7 +15,7 @@ describe("OpenChamber extension manifest", () => {
       entry: "dist/service/main.js",
       runtime: "host",
     });
-    expect(result.manifest.contributes.page).toBe(true);
+    expect(result.manifest.contributes.page).toBeUndefined();
     expect(result.manifest.contributes.origins).toBeUndefined();
     expect(result.manifest.contributes.integration).toBeUndefined();
   });
