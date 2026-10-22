@@ -7,6 +7,25 @@ import {
   type InsightSeries,
   type SessionInsight,
 } from "@opencode-insight/telemetry/schema";
+import {
+  overviewInputSchema,
+  overviewSchema,
+  speedWindowInputSchema,
+  speedWindowSchema,
+  toolPageInputSchema,
+  toolPageSchema,
+  type OverviewResponse,
+  type SpeedWindow,
+  type ToolPage,
+} from "@opencode-insight/telemetry/queries";
+import {
+  seriesWindowInputSchema,
+  seriesWindowSchema,
+  sourcePageInputSchema,
+  sourcePageSchema,
+  type SeriesWindow,
+  type SourcePage,
+} from "@opencode-insight/telemetry/details";
 import { z } from "zod";
 import { BridgeError, loadConnection, type Connection } from "./connection";
 
@@ -33,19 +52,78 @@ const timedFetch: typeof fetch = (input, init) =>
   });
 
 type Connect = () => Promise<Connection>;
-type QueryTarget = z.input<typeof seriesInputSchema> & { directory?: string };
+interface QueryOutput {
+  session: SessionInsight;
+  series: InsightSeries;
+  overview: OverviewResponse;
+  speedWindow: SpeedWindow;
+  toolPage: ToolPage;
+  seriesWindow: SeriesWindow;
+  sourcePage: SourcePage;
+}
+export type QueryMethod = keyof QueryOutput;
+const inputSchemas = {
+  session: targetSchema,
+  series: querySchema,
+  overview: overviewInputSchema.safeExtend({
+    sessionID: sessionIDSchema,
+    directory: targetSchema.shape.directory,
+  }),
+  speedWindow: speedWindowInputSchema.safeExtend({
+    sessionID: sessionIDSchema,
+    directory: targetSchema.shape.directory,
+  }),
+  toolPage: toolPageInputSchema.safeExtend({
+    sessionID: sessionIDSchema,
+    directory: targetSchema.shape.directory,
+  }),
+  seriesWindow: seriesWindowInputSchema.safeExtend({
+    sessionID: sessionIDSchema,
+    directory: targetSchema.shape.directory,
+  }),
+  sourcePage: sourcePageInputSchema.safeExtend({
+    sessionID: sessionIDSchema,
+    directory: targetSchema.shape.directory,
+  }),
+};
+const outputSchemas = {
+  session: sessionSchema,
+  series: seriesSchema,
+  overview: overviewSchema,
+  speedWindow: speedWindowSchema,
+  toolPage: toolPageSchema,
+  seriesWindow: seriesWindowSchema,
+  sourcePage: sourcePageSchema,
+};
+const readSchemas = {
+  overview: overviewInputSchema,
+  speedWindow: speedWindowInputSchema,
+  toolPage: toolPageInputSchema,
+  seriesWindow: seriesWindowInputSchema,
+  sourcePage: sourcePageInputSchema,
+};
+export type InsightQueryMethod = keyof typeof readSchemas;
+type QueryTarget = {
+  sessionID: string;
+  directory?: string;
+  after?: number;
+  bucketMs?: number;
+  windowMs?: number;
+  from?: number;
+  to?: number;
+  group?: string;
+  toolID?: string;
+  cursor?: string;
+  limit?: number;
+  scope?: "current" | "cumulative";
+  kind?: "system" | "definitions" | "user" | "skill" | "assistant" | "tool" | "injected";
+};
 
-async function query(
-  method: "session",
+async function query<M extends QueryMethod>(
+  method: M,
   target: QueryTarget,
   connect: Connect,
-): Promise<SessionInsight>;
-async function query(
-  method: "series",
-  target: QueryTarget,
-  connect: Connect,
-): Promise<InsightSeries>;
-async function query(method: "session" | "series", target: QueryTarget, connect: Connect) {
+): Promise<QueryOutput[M]> {
   try {
     const endpoint = await connect();
     const client = OpenCode.make({ ...endpoint, fetch: timedFetch });
@@ -64,12 +142,12 @@ async function query(method: "session" | "series", target: QueryTarget, connect:
       location: { directory },
       input,
     });
-    if (method === "series") return seriesSchema.parse(response.output);
-    const snapshot = sessionSchema.parse(response.output);
-    if (snapshot.sessionID !== target.sessionID || snapshot.directory !== directory) {
-      throw new BridgeError(409, "Insight returned a different session scope.");
+    const output = outputSchemas[method].parse(response.output);
+    if ("sessionID" in output) {
+      if (output.sessionID !== target.sessionID || output.directory !== directory)
+        throw new BridgeError(409, "Insight returned a different session scope.");
     }
-    return snapshot;
+    return output as QueryOutput[M];
   } catch (error) {
     if (error instanceof BridgeError) throw error;
     // Upstream errors may include request headers or response bodies. Never forward them.
@@ -81,13 +159,13 @@ async function query(method: "session" | "series", target: QueryTarget, connect:
 }
 
 export function createBridge(connect: Connect = loadConnection) {
-  return async (method: "session" | "series", body: unknown) => {
-    const parsed = (method === "session" ? targetSchema : querySchema).safeParse(body);
+  return async (method: QueryMethod, body: unknown) => {
+    if (!Object.hasOwn(inputSchemas, method))
+      throw new BridgeError(400, "Unknown Insight operation.");
+    const parsed = inputSchemas[method].safeParse(body);
     if (!parsed.success)
       throw new BridgeError(400, "A session ID and its project directory are required.");
-    return method === "series"
-      ? query("series", parsed.data, connect)
-      : query("session", parsed.data, connect);
+    return query(method, parsed.data, connect);
   };
 }
 
@@ -96,5 +174,22 @@ export function createInsightReader(connect: Connect = loadConnection) {
     const parsed = sessionIDSchema.safeParse(sessionID);
     if (!parsed.success) throw new BridgeError(400, "A valid OpenCode session ID is required.");
     return query("session", { sessionID: parsed.data }, connect);
+  };
+}
+
+/** ID-only dashboard reads resolve authority before selecting a compact projection. */
+export function createInsightQueryReader(connect: Connect = loadConnection) {
+  return async <M extends InsightQueryMethod>(
+    method: M,
+    sessionID: unknown,
+    options: Record<string, unknown> = {},
+  ): Promise<QueryOutput[M]> => {
+    const id = sessionIDSchema.safeParse(sessionID);
+    if (!id.success) throw new BridgeError(400, "A valid OpenCode session ID is required.");
+    if (!Object.hasOwn(readSchemas, method))
+      throw new BridgeError(400, "Unknown Insight operation.");
+    const parsed = readSchemas[method].safeParse({ ...options, sessionID: id.data });
+    if (!parsed.success) throw new BridgeError(400, "Invalid Insight query parameters.");
+    return query(method, parsed.data, connect);
   };
 }

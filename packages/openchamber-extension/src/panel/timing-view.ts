@@ -1,11 +1,11 @@
 import { mountBadge } from "@openchamber/sdk/ui";
-import type { SessionInsight } from "@opencode-insight/telemetry/schema";
-import { phaseBreakdown } from "@opencode-insight/telemetry/summary";
+import type { OverviewResponse } from "@opencode-insight/telemetry/queries";
 import { element, setText } from "./dom";
 import { duration, number } from "./format";
 import { createTraceView } from "./trace-view";
+import type { ToolPageReader } from "./trace-data";
 
-export function createTimingView(root: HTMLElement) {
+export function createTimingView(root: HTMLElement, readTools: ToolPageReader) {
   const metadata = element("div", "timing-meta");
   const background = element("span");
   background.title =
@@ -16,25 +16,23 @@ export function createTimingView(root: HTMLElement) {
   metadata.append(background, unknownSlot);
   const traceSlot = element("div");
   root.append(metadata, traceSlot);
-  const trace = createTraceView(traceSlot);
+  const trace = createTraceView(traceSlot, readTools);
   const unknown = mountBadge(unknownSlot, { label: "Duration unavailable", tone: "neutral" });
-  let latest: SessionInsight | undefined;
+  let latest: OverviewResponse | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
-  function render(session: SessionInsight) {
+  function render(overview: OverviewResponse) {
     const now = Date.now();
-    const result = phaseBreakdown(session, now);
+    const result = overview.data!.phases;
     setText(background, `Background ${duration(result.backgroundMs)}`);
     unknownSlot.hidden = !result.unknownCount;
     unknown.update({ label: `Duration unavailable · ${number(result.unknownCount)}` });
-    trace.update(session, now);
+    trace.update(overview, now);
   }
   return {
-    update(session: SessionInsight) {
-      latest = session;
-      render(session);
-      const running =
-        session.requests.some((request) => request.status === "running") ||
-        session.tools.some((tool) => tool.status === "running");
+    update(overview: OverviewResponse) {
+      latest = overview;
+      render(overview);
+      const running = overview.data!.running;
       if (running && !timer)
         timer = setInterval(() => {
           if (latest && !document.hidden) render(latest);

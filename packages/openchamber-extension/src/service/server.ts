@@ -1,9 +1,18 @@
 import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
-import { BridgeError, createBridge } from "@opencode-insight/client";
+import { BridgeError, createBridge, type QueryMethod } from "@opencode-insight/client";
 
 const BODY_LIMIT = 16384;
 const OUTPUT_LIMIT = 7_000_000;
+const operations = new Map<string, QueryMethod>([
+  ["/session", "session"],
+  ["/series", "series"],
+  ["/overview", "overview"],
+  ["/speed-window", "speedWindow"],
+  ["/tool-page", "toolPage"],
+  ["/series-window", "seriesWindow"],
+  ["/source-page", "sourcePage"],
+]);
 
 function authorized(actual: string | undefined, token: string): boolean {
   const expected = Buffer.from(`Bearer ${token}`);
@@ -50,12 +59,13 @@ export function createInsightServer(token: string, query = createBridge()): http
       respond(200, { ok: true });
       return;
     }
-    if (req.method !== "POST" || (path !== "/session" && path !== "/series")) {
+    const operation = operations.get(path ?? "");
+    if (req.method !== "POST" || !operation) {
       respond(404, { error: "Unknown Insight operation." });
       return;
     }
     try {
-      respond(200, await query(path === "/session" ? "session" : "series", await readBody(req)));
+      respond(200, await query(operation, await readBody(req)));
     } catch (error) {
       if (error instanceof BridgeError) respond(error.status, { error: error.message });
       else respond(500, { error: "Insight bridge failed." });

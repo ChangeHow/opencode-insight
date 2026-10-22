@@ -1,7 +1,7 @@
 import { mountBadge, mountButton } from "@openchamber/sdk/ui";
 import { summarizeReportedCalls } from "@opencode-insight/telemetry/summary";
 import type { ToolInsight } from "@opencode-insight/telemetry/schema";
-import type { TraceModel } from "./trace-model";
+import type { TraceOverview as TraceModel } from "@opencode-insight/telemetry/queries";
 import { describeItem } from "./trace-presentation";
 import type { TraceItem } from "./trace-presentation";
 import { element, setText, syncChildren } from "./dom";

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
+import { buildOverview, buildToolPage } from "@opencode-insight/telemetry/queries";
 import { createTimingView } from "./timing-view";
 import { stubPopover } from "./popover.test-helper";
 
@@ -19,7 +20,9 @@ describe("live timing refresh", () => {
     const interval = vi.spyOn(globalThis, "setInterval");
     const clear = vi.spyOn(globalThis, "clearInterval");
     const root = document.createElement("main");
-    const view = createTimingView(root);
+    const view = createTimingView(root, async (query) =>
+      buildToolPage(input, { ...query, sessionID: input.sessionID }),
+    );
     const input: SessionInsight = {
       version: 1,
       sessionID: "session",
@@ -42,8 +45,8 @@ describe("live timing refresh", () => {
       ],
     };
     try {
-      view.update(input);
-      view.update(input);
+      view.update(buildOverview(input));
+      view.update(buildOverview(input));
       expect(interval).toHaveBeenCalledTimes(1);
       vi.advanceTimersByTime(1000);
       expect(root.querySelector(".trace-value")?.textContent).toBe("2 s");
@@ -53,18 +56,20 @@ describe("live timing refresh", () => {
       hidden.mockReturnValue(false);
       vi.advanceTimersByTime(1000);
       expect(root.querySelector(".trace-value")?.textContent).toBe("4 s");
-      view.update({
-        ...input,
-        revision: 2,
-        requests: [{ ...input.requests[0], status: "completed", endedAt: 3500 }],
-      });
+      view.update(
+        buildOverview({
+          ...input,
+          revision: 2,
+          requests: [{ ...input.requests[0], status: "completed", endedAt: 3500 }],
+        }),
+      );
       expect(clear).toHaveBeenCalledTimes(1);
       vi.advanceTimersByTime(1000);
       expect(root.querySelector(".trace-value")?.textContent).toBe("3.5 s");
-      view.update(input);
+      view.update(buildOverview(input));
       view.reset();
       expect(clear).toHaveBeenCalledTimes(2);
-      view.update(input);
+      view.update(buildOverview(input));
     } finally {
       view.dispose();
     }

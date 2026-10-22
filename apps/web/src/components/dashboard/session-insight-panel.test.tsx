@@ -1,8 +1,148 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, fireEvent, render, screen, within, cleanup } from "@testing-library/react";
-import type { InsightSeries, SessionInsight } from "@opencode-dashboard/shared";
-import { SessionInsightPanel } from "./session-insight-panel";
+import {
+  summarizeSession,
+  tokenBreakdown,
+  phaseBreakdown,
+  type SessionInsightQueryPayload,
+  type InsightSeries,
+  type SessionInsight,
+} from "@opencode-dashboard/shared";
+import { SessionInsightPanel as CompactPanel } from "./session-insight-panel";
+import { fetchSessionInsightSources, fetchSessionInsightTools } from "@/lib/api";
+
+vi.mock("@/lib/api", () => ({
+  fetchSessionInsightSources: vi.fn(),
+  fetchSessionInsightTools: vi.fn(),
+}));
+
+// The UI receives only bounded query responses, never this legacy fixture's arrays.
+function compact(data: {
+  session: SessionInsight;
+  series: InsightSeries;
+}): SessionInsightQueryPayload {
+  const { session, series } = data;
+  const { currentContext, cumulativeContext, ...summary } = summarizeSession(session);
+  const composition = (sources: typeof currentContext) => ({
+    total: sources.reduce((sum, source) => sum + source.tokens, 0),
+    reported: sources.every((source) => source.quality === "reported"),
+    groups: tokenBreakdown(sources).map(({ kind, label, tokens, share }) => ({
+      kind,
+      label,
+      tokens,
+      share,
+    })),
+  });
+  const running = session.requests.some((request) => request.status === "running");
+  const end = running
+    ? Date.now()
+    : Math.max(
+        ...session.requests.map((request) => request.endedAt ?? request.startedAt),
+        ...series.points.map((point) => point.at),
+      );
+  const start = Math.max(
+    end - 600000,
+    Math.min(...session.requests.map((request) => request.startedAt), end - 1000),
+  );
+  const identity = {
+    sessionID: session.sessionID,
+    directory: session.directory,
+    revision: session.revision,
+  };
+  return {
+    overview: {
+      ...identity,
+      unchanged: false,
+      data: {
+        updatedAt: session.updatedAt,
+        measuredAt: Date.now(),
+        hasActivity: true,
+        running,
+        summary: {
+          ...summary,
+          hasUsage: session.requests.some((request) => request.usage !== undefined),
+          hasCost: session.requests.some((request) => request.cost !== undefined),
+        },
+        tokens: {
+          current: composition(currentContext),
+          cumulative: composition(cumulativeContext),
+        },
+        phases: phaseBreakdown(session),
+        trace: {
+          start,
+          end,
+          measuredAt: Date.now(),
+          running,
+          summary: {
+            requestCount: session.requests.length,
+            toolCount: session.tools.length,
+            errorCount: 0,
+            unknownCount: 0,
+            partialUsage: false,
+            partialCost: false,
+          },
+          groups: [],
+        },
+      },
+    },
+    series: {
+      ...identity,
+      start,
+      end,
+      running,
+      points: series.points.filter((point) => point.at >= start && point.at <= end),
+      requests: session.requests.map(({ context: _context, buckets, ...request }) => ({
+        ...request,
+        captured: buckets.length > 0,
+      })),
+      channels: {
+        reasoning: session.requests.some((request) =>
+          request.buckets.some((bucket) => bucket.reasoning > 0),
+        ),
+        summary: session.requests.some((request) =>
+          request.buckets.some((bucket) => bucket.summary > 0),
+        ),
+      },
+    },
+  };
+}
+
+function SessionInsightPanel({
+  data,
+  ...props
+}: Omit<React.ComponentProps<typeof CompactPanel>, "data"> & {
+  data?: ReturnType<typeof makeData>;
+}) {
+  if (data) {
+    const identity = {
+      sessionID: data.session.sessionID,
+      directory: data.session.directory,
+      revision: data.session.revision,
+    };
+    vi.mocked(fetchSessionInsightSources).mockImplementation(async (_id, scope, options) => {
+      const summary = summarizeSession(data.session);
+      const sources = scope === "current" ? summary.currentContext : summary.cumulativeContext;
+      const entries = options?.kind
+        ? sources.filter((source) => source.kind === options.kind)
+        : sources;
+      return {
+        ...identity,
+        scope,
+        entries: entries.slice(0, 50),
+        total: entries.length,
+        reset: false,
+      };
+    });
+    vi.mocked(fetchSessionInsightTools).mockResolvedValue({
+      ...identity,
+      total: data.session.tools.length,
+      entries: data.session.tools.slice(0, 20),
+      reset: false,
+    });
+  }
+  return <CompactPanel {...props} data={data ? compact(data) : undefined} />;
+}
 
 const makeData = (): { session: SessionInsight; series: InsightSeries } => ({
   session: {
@@ -98,6 +238,8 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.mocked(fetchSessionInsightSources).mockReset();
+  vi.mocked(fetchSessionInsightTools).mockReset();
 });
 
 describe("SessionInsightPanel", () => {
@@ -132,7 +274,7 @@ describe("SessionInsightPanel", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  test("separates reported usage from estimates and collapses source IDs", () => {
+  test("separates reported usage from estimates and collapses source IDs", async () => {
     const data = makeData();
     data.session.requests.unshift({
       ...data.session.requests[0],
@@ -154,10 +296,12 @@ describe("SessionInsightPanel", () => {
       within(sources).getByRole("img", { name: "Reported usage: 154 tokens" }),
     ).toBeInTheDocument();
     expect(within(sources).getByText("70.0%")).toBeInTheDocument();
+    expect(fetchSessionInsightSources).not.toHaveBeenCalled();
     const details = within(sources).getByText("Source details").parentElement!;
     expect(details).not.toHaveAttribute("open");
     fireEvent.click(within(sources).getByText("Source details"));
     expect(details).toHaveAttribute("open");
+    await within(details).findByText("shell");
     expect(details).toHaveTextContent("skill-a");
     expect(within(details).getByText("shell")).toBeInTheDocument();
     fireEvent.click(within(sources).getByRole("button", { name: "Cumulative" }));
@@ -234,7 +378,7 @@ describe("SessionInsightPanel", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  test("keeps repeated tool sources distinct without duplicate keys", () => {
+  test("keeps repeated tool sources distinct without duplicate keys", async () => {
     const data = makeData();
     data.session.requests[0].context.push({
       kind: "tool",
@@ -248,7 +392,7 @@ describe("SessionInsightPanel", () => {
     openTab("Token");
     const details = screen.getByText("Source details").parentElement!;
     fireEvent.click(screen.getByText("Source details"));
-    expect(within(details).getAllByText("shell")).toHaveLength(2);
+    expect(await within(details).findAllByText("shell")).toHaveLength(2);
     expect(
       errors.mock.calls.filter(([message]) => String(message).includes("same key")),
     ).toHaveLength(0);
@@ -364,7 +508,121 @@ describe("SessionInsightPanel", () => {
     expect(screen.getByText("No captured speed in this window.")).toBeInTheDocument();
   });
 
-  test("shows Code Mode child counts in optional details without child durations", () => {
+  test("refreshes expanded sources on a new overview without resetting their page", async () => {
+    const data = compact(makeData());
+    const identity = {
+      sessionID: "session-1",
+      directory: "/project",
+      revision: 1,
+      scope: "current" as const,
+      total: 100,
+      reset: false,
+    };
+    const source = {
+      kind: "skill" as const,
+      id: "later-source",
+      label: "Later source",
+      tokens: 7,
+      quality: "estimated" as const,
+    };
+    vi.mocked(fetchSessionInsightSources)
+      .mockResolvedValueOnce({
+        ...identity,
+        entries: [{ ...source, id: "first-source", label: "First source" }],
+        nextCursor: "source-page-2",
+      })
+      .mockResolvedValueOnce({ ...identity, entries: [source], previousCursor: "source-page-1" })
+      .mockResolvedValue({
+        ...identity,
+        revision: 2,
+        entries: [{ ...source, label: "Updated source" }],
+        previousCursor: "source-page-1",
+      });
+    const { rerender } = render(<CompactPanel {...props} data={data} />);
+    openTab("Token");
+    fireEvent.click(screen.getByText("Source details"));
+    await screen.findByText("First source");
+    fireEvent.click(screen.getByRole("button", { name: "Next sources" }));
+    await screen.findByText("Later source");
+    const next = { ...data, overview: { ...data.overview, revision: 2 } };
+    rerender(<CompactPanel {...props} data={next} />);
+    await screen.findByText("Updated source");
+    expect(fetchSessionInsightSources).toHaveBeenLastCalledWith("session-1", "current", {
+      kind: undefined,
+      cursor: "source-page-2",
+    });
+    expect(screen.getByText("Source details").parentElement).toHaveTextContent("later-source");
+    rerender(<CompactPanel {...props} data={{ ...next, overview: { ...next.overview } }} />);
+    await act(async () => {});
+    expect(fetchSessionInsightSources).toHaveBeenCalledTimes(3);
+  });
+
+  test("pages tool disclosures without recalculating complete timing totals", async () => {
+    const data = compact(makeData());
+    const first = {
+      id: "first",
+      name: "execute",
+      startedAt: 3000,
+      endedAt: 6000,
+      status: "completed" as const,
+      background: false,
+      reportedCalls: [{ name: "files.read", status: "completed" as const }],
+    };
+    const second = {
+      ...first,
+      id: "second",
+      reportedCalls: [{ name: "files.write", status: "completed" as const }],
+    };
+    const identity = { sessionID: "session-1", directory: "/project", revision: 1 };
+    vi.mocked(fetchSessionInsightTools)
+      .mockResolvedValueOnce({
+        ...identity,
+        total: 100000,
+        entries: [first],
+        nextCursor: "next",
+        reset: false,
+      })
+      .mockResolvedValueOnce({
+        ...identity,
+        total: 100000,
+        entries: [second],
+        cursor: "anchor-second",
+        previousCursor: "previous",
+        reset: false,
+      });
+    const { rerender } = render(<CompactPanel {...props} data={data} />);
+    openTab("Time");
+    expect(fetchSessionInsightTools).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText(/per-call timing unavailable/));
+    await screen.findByText("files.read ×1 · completed");
+    expect(screen.getByText("5.00 s")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next tools" }));
+    await screen.findByText("files.write ×1 · completed");
+    expect(screen.queryByText("files.read ×1 · completed")).not.toBeInTheDocument();
+    expect(screen.getByText("5.00 s")).toBeInTheDocument();
+    expect(fetchSessionInsightTools).toHaveBeenLastCalledWith("session-1", { cursor: "next" });
+    expect(screen.getByRole("button", { name: "Previous tools" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next tools" })).toBeDisabled();
+    vi.mocked(fetchSessionInsightTools).mockResolvedValue({
+      ...identity,
+      revision: 2,
+      total: 100001,
+      entries: [{ ...second, name: "Updated execute" }],
+      cursor: "anchor-second",
+      previousCursor: "previous",
+      reset: false,
+    });
+    rerender(
+      <CompactPanel {...props} data={{ ...data, overview: { ...data.overview, revision: 2 } }} />,
+    );
+    await screen.findByText("Updated execute");
+    expect(fetchSessionInsightTools).toHaveBeenLastCalledWith("session-1", {
+      cursor: "anchor-second",
+    });
+    expect(screen.getByText("5.00 s")).toBeInTheDocument();
+  });
+
+  test("shows Code Mode child counts in optional details without child durations", async () => {
     const data = makeData();
     data.session.tools[0].name = "execute";
     data.session.tools[0].reportedCalls = Array.from({ length: 3 }, () => ({
@@ -373,11 +631,14 @@ describe("SessionInsightPanel", () => {
     }));
     render(<SessionInsightPanel {...props} data={data} />);
     openTab("Time");
+    expect(fetchSessionInsightTools).not.toHaveBeenCalled();
     const details = screen.getByText(/per-call timing unavailable/).parentElement!;
     expect(details).not.toHaveAttribute("open");
     fireEvent.click(screen.getByText(/per-call timing unavailable/));
     expect(details).toHaveAttribute("open");
-    expect(within(details).getByText("files.read_text_file ×3 · completed")).toBeInTheDocument();
+    expect(
+      await within(details).findByText("files.read_text_file ×3 · completed"),
+    ).toBeInTheDocument();
     expect(details).not.toHaveTextContent(/\d+\.\d+ s/);
   });
 });

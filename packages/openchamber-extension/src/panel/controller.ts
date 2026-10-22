@@ -1,12 +1,17 @@
 import type { HostClient, GuestRequestResult } from "@openchamber/sdk";
-import { sessionSchema, seriesSchema } from "@opencode-insight/telemetry/schema";
-import type { SessionInsight, InsightSeries } from "@opencode-insight/telemetry/schema";
+import {
+  overviewSchema,
+  speedWindowSchema,
+  toolPageSchema,
+} from "@opencode-insight/telemetry/queries";
+import type { OverviewResponse, SpeedWindow } from "@opencode-insight/telemetry/queries";
+import type { ToolPageReader } from "./trace-data";
 
 export interface PanelState {
   sessionID: string | null;
   directory: string | null;
-  session?: SessionInsight;
-  series?: InsightSeries;
+  overview?: OverviewResponse;
+  speed?: SpeedWindow;
   loading: boolean;
   error?: string;
 }
@@ -32,11 +37,27 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
   let generation = 0;
   let disposed = false;
   let busy = false;
+  let force = false;
+  let speedRequested = true;
   let intersecting = true;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const visible = () => !document.hidden && intersecting && !disposed;
   const emit = () => change({ ...state });
   const stopTimer = () => clearTimeout(timer);
+
+  async function read(path: string, body: object) {
+    return parseResponse(
+      await host.serviceRequest({ method: "POST", path, body: JSON.stringify(body) }),
+    );
+  }
+  function assertLocation(
+    value: { sessionID: string; directory: string },
+    sessionID: string,
+    directory: string,
+  ) {
+    if (value.sessionID !== sessionID || value.directory !== directory)
+      throw new Error("The local service returned a different session location.");
+  }
 
   async function refresh() {
     stopTimer();
@@ -44,70 +65,73 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
     busy = true;
     const version = generation;
     const { sessionID, directory } = state;
-    if (!state.session) {
+    if (!state.overview) {
       state = { ...state, loading: true };
       emit();
     }
     const body = { sessionID, directory };
-    const previousSession = state.session;
-    const readSession = () =>
-      host
-        .serviceRequest({ method: "POST", path: "/session", body: JSON.stringify(body) })
-        .then(parseResponse)
-        .then((data) => sessionSchema.parse(data));
-    const readSeries = host
-      .serviceRequest({
-        method: "POST",
-        path: "/series",
-        body: JSON.stringify({
+    const previousOverview = state.overview;
+    const previousSpeed = state.speed;
+    const previousError = state.error;
+    const errors: string[] = [];
+    let overview = previousOverview;
+    let speed = previousSpeed;
+    const forced = force;
+    force = false;
+    try {
+      const result = overviewSchema.parse(
+        await read("/overview", {
           ...body,
-          bucketMs: 1000,
-          windowMs: 5000,
-          after: state.series?.revision,
+          after: forced ? undefined : previousOverview?.revision,
         }),
-      })
-      .then(parseResponse)
-      .then((data) => seriesSchema.parse(data));
-    const readSnapshot = previousSession
-      ? readSeries.then(
-          (series) =>
-            series.revision === previousSession.revision ? previousSession : readSession(),
-          () => readSession(),
-        )
-      : readSession();
-    const results = await Promise.allSettled([readSnapshot, readSeries]);
+      );
+      assertLocation(result, sessionID, directory);
+      if (!result.unchanged) {
+        if (!result.data) throw new Error("The local service returned an incomplete overview.");
+        overview = result;
+      } else if (!previousOverview?.data)
+        throw new Error("The local service returned an incomplete overview.");
+    } catch (cause) {
+      errors.push(cause instanceof Error ? cause.message : "Session unavailable.");
+    }
+    const current = () => visible() && version === generation;
+    if (
+      current() &&
+      (speedRequested ||
+        forced ||
+        overview !== previousOverview ||
+        !speed ||
+        (speed.nextAt !== undefined && speed.nextAt <= Date.now()))
+    ) {
+      speedRequested = false;
+      try {
+        const result = speedWindowSchema.parse(await read("/speed-window", body));
+        assertLocation(result, sessionID, directory);
+        speed = result;
+      } catch (cause) {
+        speedRequested = true;
+        errors.push(cause instanceof Error ? cause.message : "Speed capture unavailable.");
+      }
+    }
     busy = false;
     if (!visible()) return;
     if (version !== generation) {
       void refresh();
       return;
     }
-    const [session, series] = results;
-    const previousRevision = state.session?.revision;
-    const previousError = state.error;
-    const errors: string[] = [];
-    if (session.status === "fulfilled") {
-      if (session.value.sessionID === sessionID && session.value.directory === directory) {
-        state.session = session.value;
-      } else errors.push("The local service returned a different session location.");
-    } else
-      errors.push(
-        session.reason instanceof Error ? session.reason.message : "Session unavailable.",
-      );
-    if (series.status === "fulfilled") {
-      if (!series.value.unchanged || !state.series) state.series = series.value;
-    } else
-      errors.push(
-        series.reason instanceof Error ? series.reason.message : "Speed capture unavailable.",
-      );
-    state = { ...state, loading: false, error: errors.length ? errors.join(" ") : undefined };
-    if (
-      previousRevision !== state.session?.revision ||
-      previousError !== state.error ||
-      series.status !== "fulfilled" ||
-      !series.value.unchanged
-    )
+    state = {
+      ...state,
+      overview,
+      speed,
+      loading: false,
+      error: errors.length ? errors.join(" ") : undefined,
+    };
+    if (overview !== previousOverview || speed !== previousSpeed || previousError !== state.error)
       emit();
+    if (force || (speedRequested && !errors.length)) {
+      void refresh();
+      return;
+    }
     timer = setTimeout(() => void refresh(), 1000);
   }
 
@@ -115,6 +139,7 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
     if (sessionID === state.sessionID && directory === state.directory) return;
     generation++;
     stopTimer();
+    speedRequested = true;
     state = { sessionID, directory, loading: Boolean(sessionID && directory) };
     emit();
     void refresh();
@@ -140,7 +165,30 @@ export function createPanelController(host: PanelHost, change: (state: PanelStat
   observer?.observe(document.documentElement);
   emit();
   return {
-    retry: () => void refresh(),
+    retry() {
+      force = true;
+      void refresh();
+    },
+    requestSpeed() {
+      speedRequested = true;
+      void refresh();
+    },
+    loadTools: (async (input) => {
+      const { sessionID, directory } = state;
+      const version = generation;
+      if (!sessionID || !directory || disposed) throw new Error("Session location unavailable.");
+      const result = toolPageSchema.parse(
+        await read("/tool-page", { ...input, sessionID, directory }),
+      );
+      if (disposed || version !== generation) throw new Error("Session location changed.");
+      assertLocation(result, sessionID, directory);
+      if (
+        result.group !== input.group ||
+        (input.toolID && result.entries.some((tool) => tool.id !== input.toolID))
+      )
+        throw new Error("The local service returned different tool details.");
+      return result;
+    }) satisfies ToolPageReader,
     dispose() {
       disposed = true;
       generation++;

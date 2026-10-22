@@ -1,8 +1,4 @@
-import {
-  summarizeSession,
-  type InsightSeries,
-  type SessionInsight,
-} from "@opencode-dashboard/shared";
+import type { SessionInsightQueryPayload } from "@opencode-dashboard/shared";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +8,7 @@ import { SessionInsightTiming } from "./session-insight-timing";
 
 export interface SessionInsightPanelProps {
   sessionId: string;
-  data?: { session: SessionInsight; series: InsightSeries };
+  data?: SessionInsightQueryPayload;
   loading: boolean;
   error?: string;
   onRetry: () => void;
@@ -25,8 +21,8 @@ export function SessionInsightPanel({
   error,
   onRetry,
 }: SessionInsightPanelProps) {
-  const summary = data ? summarizeSession(data.session) : undefined;
-  const hasUsage = data?.session.requests.some((request) => request.usage !== undefined);
+  const summary = data?.overview.data.summary;
+  const hasUsage = summary?.hasUsage;
   return (
     <Card className="min-w-0 w-full" aria-label="Context & speed insight" aria-busy={loading}>
       <CardContent className="min-w-0 space-y-5 p-4 sm:p-6">
@@ -73,10 +69,8 @@ export function SessionInsightPanel({
               {[
                 [
                   "Estimated context",
-                  summary.currentContext.length
-                    ? summary.currentContext
-                        .reduce((sum, source) => sum + source.tokens, 0)
-                        .toLocaleString()
+                  data.overview.data.tokens.current.groups.length
+                    ? data.overview.data.tokens.current.total.toLocaleString()
                     : "Unavailable",
                 ],
                 ["Reported input", hasUsage ? summary.usage.input.toLocaleString() : "Unavailable"],
@@ -108,17 +102,23 @@ export function SessionInsightPanel({
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="speed">
-                <SessionInsightChart requests={data.session.requests} series={data.series} />
+                <SessionInsightChart series={data.series} />
               </TabsContent>
               <TabsContent value="token">
                 <SessionInsightContext
-                  current={summary.currentContext}
-                  cumulative={summary.cumulativeContext}
+                  sessionId={sessionId}
+                  revision={data.overview.revision}
+                  current={data.overview.data.tokens.current}
+                  cumulative={data.overview.data.tokens.cumulative}
                   usage={hasUsage ? summary.usage : undefined}
                 />
               </TabsContent>
               <TabsContent value="time">
-                <SessionInsightTiming session={data.session} />
+                <SessionInsightTiming
+                  sessionId={sessionId}
+                  revision={data.overview.revision}
+                  overview={data.overview.data}
+                />
               </TabsContent>
             </Tabs>
           </>

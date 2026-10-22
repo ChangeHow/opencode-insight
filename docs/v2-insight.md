@@ -117,7 +117,7 @@ Keep credential files out of the repository and restrict their permissions:
 chmod 600 ~/.config/opencode-insight/connection.json
 ```
 
-The bridge rejects credential files readable by other users on Unix. Credentials stay in the bridge and never reach the iframe. It forwards only the Insight session and series queries, validates the session directory against OpenCode, and sanitizes upstream failures. A wrong connection produces an error rather than an empty chart. A configured endpoint is instance-wide for this extension; switching OpenChamber to another server requires a matching bridge configuration on that server.
+The bridge rejects credential files readable by other users on Unix. Credentials stay in the bridge and never reach the iframe. It forwards only allowlisted Insight queries, validates the session directory against OpenCode, and sanitizes upstream failures. A wrong connection produces an error rather than an empty chart. A configured endpoint is instance-wide for this extension; switching OpenChamber to another server requires a matching bridge configuration on that server.
 
 # Web dashboard
 
@@ -125,7 +125,7 @@ Start the existing dashboard with `opendash server` after building or upgrading.
 
 The BFF uses the same discovery and optional `connection.json` as the OpenChamber bridge. OpenCode must already be running with the capture plugin loaded. Neither the dashboard nor the extension starts or restarts OpenCode. OpenChamber is not required for the web dashboard, and the dashboard is not required for the OpenChamber panel.
 
-The browser requests `GET /api/session/<sessionID>/insight?after=<revision>` from the BFF. This returns `{ session, series }`; the BFF resolves the directory from OpenCode and derives speed from the same snapshot. The browser cannot choose an upstream URL and never receives OpenCode credentials. Visible pages refresh every second without overlapping requests; hidden pages pause. Switching sessions discards stale responses, and transient errors retain the last captured data with a warning.
+The browser requests `GET /api/session/<sessionID>/insight/overview?after=<revision>` and `/insight/series-window` from the BFF. Sources and reported tool details use `/insight/sources` and `/insight/tools` only when expanded. Aggregation and pagination run inside the OpenCode plugin, not after transferring a full snapshot to the BFF. The legacy `/insight?after=<revision>` endpoint still returns its original `{ session, series }` payload for existing clients. The browser cannot choose an upstream URL and never receives OpenCode credentials. Visible pages refresh every second without overlapping requests; hidden pages pause. Switching sessions discards stale responses, and transient errors retain the last captured data with a warning.
 
 # Persistence
 
@@ -135,7 +135,7 @@ Keys are namespaced by directory, workspace, and session ID. Dirty snapshots are
 
 # Charts and measurement
 
-The speed chart uses one-second buckets and five-second rolling rates. It follows the most recent ten minutes while a request is running, then freezes at the session's final speed window. Short sessions grow into that window. Pointer hover, touch, and keyboard navigation expose point details directly on the chart, without a separate timeline control. Token composition uses a donut and compact percentage legends; reported usage stays separate from source estimates.
+The dashboard speed chart uses one-second buckets and five-second rolling rates. The OpenChamber chart uses completed 15-second output buckets, distinguishing output, tools, waiting, and unobserved activity without fabricating zero-rate samples. Both show the most recent ten minutes while a request is running, then freeze at the final activity window. Short sessions grow into that window. Pointer hover, touch, and keyboard navigation expose point details directly on the chart, without a separate timeline control. Token composition uses a donut and compact percentage legends; reported usage stays separate from source estimates.
 
 The OpenChamber panel shows Speed, Tokens, and Times together in a single scrolling view. Token source composition and reported usage sit side by side when the panel is wide enough and stack in that order when it narrows; each donut and legend also wraps within its own section. It uses SDK controls and applies the host theme before mounting, including subsequent light/dark or custom-theme changes. Chart categories use host syntax colors with theme-derived fallbacks; status colors remain reserved for status. Polling updates retained chart and detail nodes instead of replacing the panel, preserving keyboard focus, an open scope picker, expanded source details, and the inspected speed sample. Selecting another session resets session-specific inspection and input scope.
 
@@ -155,9 +155,9 @@ Native Code Mode `metadata.toolCalls` is captured as reported child-call names a
 
 The web dashboard's Time view partitions foreground interval unions into a stacked phase bar: waiting before the first observable delta, observed streaming, unsplit model activity, mixed parallel model phases, and tool execution outside model intervals. Hover or focus a phase for its duration, percentage, count, and definition. Missing first-delta observations stay unsplit rather than being labeled model thinking. Overlapping model/tool time belongs to the model phase, so the bar adds up to foreground duration without double-counting. Background tool invocation intervals are separate. Detached process lifetimes after a background tool returns are not tracked. A parent request's explicit wait still belongs to its foreground activity. Child sessions remain independently queryable instead of silently merging their usage into the parent's total.
 
-The OpenChamber panel's Times section uses a collapsible session → request → tool waterfall instead of a separate phase chart, using captured relationships only. Unmatched tools remain under **Unassociated tools**. Repeated tool names form expandable groups showing their execution union (U), with wall span and summed invocation time (Σ) in the selected-span inspector. These overlapping measurements are not additive session phases. Hover and focus only highlight rows; clicking a span or pressing Enter opens a bounded, non-modal detail popover anchored next to its chart row, flipping or shifting to fit the panel viewport without entering document flow. Escape, the close button, an outside press, or scrolling/resizing the owner dismisses it. Detail changes and Code Mode summaries scroll inside the popover without shifting the chart. The inspector shows recorded status, model, reported usage/cost, and estimated result tokens where available; missing endpoints remain unavailable. Short calls use markers and can be inspected with **Zoom selected**. Code Mode retains only parent timing and optional reported name/status summaries, never fabricated inner spans or stored scripts.
+The OpenChamber panel's Times section uses a collapsible session → tool-group → invocation waterfall instead of a separate phase chart. Repeated tool names form expandable groups showing their execution union (U), with wall span and summed invocation time (Σ) in the selected-span inspector. These overlapping measurements are not additive session phases. Hover and focus only highlight rows; clicking a span or pressing Enter opens a bounded, non-modal detail popover anchored next to its chart row, flipping or shifting to fit the panel viewport without entering document flow. Escape, the close button, an outside press, or scrolling/resizing the owner dismisses it. Detail changes and Code Mode summaries scroll inside the popover without shifting the chart. The inspector shows recorded status, explicit request and parent IDs, reported usage/cost, and estimated result tokens where available; missing endpoints remain unavailable. Short calls use markers and can be inspected with **Zoom selected**. Code Mode retains only parent timing and optional reported name/status summaries, never fabricated inner spans or stored scripts.
 
-Requests, tool groups, individual calls, and reported summaries are paged in batches of 20. Only one request and one repeated-tool group are expanded at a time, keeping at most 61 time-axis rows mounted even for large captures. Polling retains expanded rows, paging, selection, zoom, keyboard focus, and scroll. Running spans refresh once per second while visible, reusing closed aggregates. This waterfall is currently specific to the OpenChamber panel; the web dashboard retains its phase chart.
+Tool groups, individual calls, and reported summaries are paged in batches of 20. Only one repeated-tool group is expanded at a time, keeping at most 41 time-axis rows mounted even for large captures. Opening a group fetches its latest call page; older pages use stable capture-order cursors, not mutable timestamps. Polling retains the current page even as new calls arrive; **Latest tools** explicitly returns to the newest page. Polling retains expanded rows, selection, zoom, keyboard focus, and scroll. Running spans refresh once per second while visible, reusing closed aggregates. This waterfall is currently specific to the OpenChamber panel; the web dashboard retains its full-session phase chart.
 
 Live collection begins when the plugin loads. The panel cannot recover token-arrival history that OpenCode did not retain before installation. The collector persists statistics and source identifiers, not full prompts, reasoning text, or tool result bodies. Treat source labels and paths as potentially sensitive metadata.
 
@@ -165,7 +165,7 @@ Capture is bounded to the latest 512 requests and 2,048 tool calls per session, 
 
 # Query through OpenCode
 
-The native plugin RPC ID is `opencode-insight`. Its methods are `session` and `series`. They run on the configured OpenCode instance, scoped to the requested location. The generic HTTP interface is:
+The native plugin RPC ID is `opencode-insight`. The existing `session` and `series` methods retain their original structures and content. They run on the configured OpenCode instance, scoped to the requested location. The generic HTTP interface is:
 
 ```text
 POST /api/rpc/opencode-insight/session?location[directory]=/project
@@ -183,6 +183,18 @@ Use the target OpenCode server's normal authentication. For example, a session q
 ```
 
 A series query accepts `bucketMs`, `windowMs`, and an optional `after` revision. An unchanged revision returns `unchanged: true`; a changed revision returns a replacement series so corrections to recent buckets cannot be lost. Persisted snapshots provide recovery after panel disconnection; live notifications are not a replay log.
+
+## Purpose-specific queries
+
+Official panels avoid the full `session` response and use these additive RPC methods:
+
+- `overview`: complete retained-session usage, costs, current and cumulative input composition, foreground phases, and tool-group timing aggregates. An optional `after` revision returns a compact `unchanged: true` response when quiescent. Repeated context still counts on every captured request; no window is applied to Token totals.
+- `speedWindow`: at most ten minutes of chart-ready, completed 15-second output buckets. No request context or tool bodies are returned.
+- `seriesWindow`: the dashboard's existing five-second rolling estimator, limited to a ten-minute window, with request headers but no raw buckets or context sources.
+- `toolPage`: bounded call details, optionally filtered by `group`, or one exact `toolID`. Pages default to 20 entries, allow at most 50, and also enforce a 256 KB encoded budget. Use `cursor` to refresh the same page and `nextCursor`/`previousCursor` to navigate. Cursors bind the session, directory, group, page size, and original capture prefix; newly appended calls cannot shift an existing page. Retention invalidation returns `reset: true`.
+- `sourcePage`: current or cumulative context-source details, optionally filtered by `kind`, defaulting to 50 entries and capped at 100 plus an encoded byte budget. Cursors are scoped to the captured input identity; a replacement input returns `reset: true` rather than mixing snapshots.
+
+All accept `sessionID`; optional speed bounds require both `from` and `to`, with a positive span of at most ten minutes. Every method verifies the native session location before reading telemetry, including unchanged responses. The bridge's existing 7,000,000-byte response guard is unchanged. A single oversized detail entry fails explicitly rather than being silently truncated. No persistent full-snapshot query cache is added: idle collector eviction and unchanged polling remain independent of panel visibility.
 
 # Verification
 

@@ -1,4 +1,6 @@
 import type { InsightSeries, SessionInsight } from "@opencode-insight/telemetry";
+import type { OverviewResponse, SpeedWindow, ToolPage } from "@opencode-insight/telemetry/queries";
+import type { SeriesWindow, SourcePage } from "@opencode-insight/telemetry/details";
 
 type Value = string | number | boolean | null | undefined | Value[] | { [key: string]: Value };
 
@@ -17,6 +19,15 @@ function copy(value: Value): Value {
 }
 
 /** Detach inside the collector queue; the native RPC host validates the unchanged schema. */
-export function snapshot<T extends SessionInsight | InsightSeries>(value: T): T {
+export function snapshot<
+  T extends
+    | SessionInsight
+    | InsightSeries
+    | OverviewResponse
+    | SpeedWindow
+    | ToolPage
+    | SeriesWindow
+    | SourcePage,
+>(value: T): T {
   return copy(value) as T;
 }

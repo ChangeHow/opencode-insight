@@ -1,9 +1,8 @@
-import { useState } from "react";
-import {
-  tokenBreakdown,
-  type ContextSource,
-  type SessionInsight,
-} from "@opencode-dashboard/shared";
+import { useCallback, useState } from "react";
+import { type TokenComposition, type SessionInsight } from "@opencode-dashboard/shared";
+import { fetchSessionInsightSources } from "@/lib/api";
+import { useInsightPage } from "@/lib/use-insight-page";
+import { Button } from "@/components/ui/button";
 import { SessionInsightDonut } from "./session-insight-donut";
 
 type Usage = NonNullable<SessionInsight["requests"][number]["usage"]>;
@@ -15,17 +14,43 @@ const usageFields = [
   ["cacheWrite", "Cache write", "var(--muted-foreground)"],
 ] as const;
 
+const sourceColors = {
+  system: "#8b5cf6",
+  definitions: "#f59e0b",
+  user: "#22c55e",
+  skill: "#f97316",
+  assistant: "#3b82f6",
+  tool: "#14b8a6",
+  injected: "#d946ef",
+};
+
 export function SessionInsightContext({
+  sessionId,
+  revision,
   current,
   cumulative,
   usage,
 }: {
-  current: ContextSource[];
-  cumulative: ContextSource[];
+  sessionId: string;
+  revision: number;
+  current: TokenComposition;
+  cumulative: TokenComposition;
   usage?: Usage;
 }) {
   const [scope, setScope] = useState<"current" | "cumulative">("current");
-  const entries = tokenBreakdown(scope === "current" ? current : cumulative);
+  const [expanded, setExpanded] = useState(false);
+  const [kind, setKind] = useState<string>("");
+  const composition = scope === "current" ? current : cumulative;
+  const entries = composition.groups.map((group) => ({
+    ...group,
+    color: sourceColors[group.kind],
+  }));
+  const load = useCallback(
+    (cursor?: string) =>
+      fetchSessionInsightSources(sessionId, scope, { kind: kind || undefined, cursor }),
+    [sessionId, scope, kind],
+  );
+  const details = useInsightPage(`${sessionId}:${scope}:${kind}`, expanded, load, revision);
   const reportedTotal = usage ? usageFields.reduce((sum, [key]) => sum + usage[key], 0) : 0;
   return (
     <section aria-label="Context sources" className="min-w-0 space-y-5">
@@ -41,7 +66,10 @@ export function SessionInsightContext({
               key={value}
               type="button"
               aria-pressed={scope === value}
-              onClick={() => setScope(value)}
+              onClick={() => {
+                setScope(value);
+                setKind("");
+              }}
               title={
                 value === "current"
                   ? "Latest request snapshot"
@@ -60,28 +88,88 @@ export function SessionInsightContext({
         <p className="text-sm text-[var(--muted-foreground)]">No captured context sources.</p>
       )}
       {entries.length > 0 && (
-        <details className="text-xs">
+        <details className="text-xs" onToggle={(event) => setExpanded(event.currentTarget.open)}>
           <summary className="cursor-pointer text-[var(--muted-foreground)]">
             Source details
           </summary>
           <div className="mt-3 space-y-3">
-            {entries.map((entry) => (
-              <div key={entry.kind}>
-                <h4 className="mb-1 font-semibold">
-                  {entry.label} · {entry.tokens.toLocaleString()} tokens
-                </h4>
-                <ul className="space-y-1 [overflow-wrap:anywhere]">
-                  {entry.items.map((source, index) => (
-                    <li key={`${source.id}:${index}`}>
-                      <span>{source.label}</span> · {source.id}{" "}
-                      <span className="text-[var(--muted-foreground)]">
-                        · {source.tokens.toLocaleString()} tokens · {source.quality}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            <label className="flex items-center gap-2">
+              Source kind
+              <select
+                aria-label="Source kind"
+                value={kind}
+                onChange={(event) => setKind(event.target.value)}
+                className="rounded bg-[var(--panel-strong)] p-1"
+              >
+                <option value="">All sources</option>
+                {entries.map((entry) => (
+                  <option key={entry.kind} value={entry.kind}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {details.loading && <p role="status">Loading source details…</p>}
+            {details.error && (
+              <p role="alert">
+                {details.error}{" "}
+                <Button size="sm" variant="outline" onClick={details.retry}>
+                  Retry details
+                </Button>
+              </p>
+            )}
+            {details.page && (
+              <>
+                <p className="text-[var(--muted-foreground)]">
+                  {details.page.total.toLocaleString()} sources · current page
+                </p>
+                {[...new Set(details.page.entries.map((source) => source.kind))].map(
+                  (sourceKind) => {
+                    const group = entries.find((entry) => entry.kind === sourceKind);
+                    return (
+                      <div key={sourceKind}>
+                        <h4 className="mb-1 font-semibold">
+                          {group
+                            ? `${group.label} · ${group.tokens.toLocaleString()} tokens`
+                            : sourceKind}
+                        </h4>
+                        <ul className="space-y-1 [overflow-wrap:anywhere]">
+                          {details
+                            .page!.entries.filter((source) => source.kind === sourceKind)
+                            .map((source, index) => (
+                              <li key={`${source.id}:${index}`}>
+                                <span>{source.label}</span> · {source.id}{" "}
+                                <span className="text-[var(--muted-foreground)]">
+                                  · {source.tokens.toLocaleString()} tokens · {source.quality}
+                                </span>
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    );
+                  },
+                )}
+                {!details.page.entries.length && <p>No captured context sources on this page.</p>}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={details.loading || !details.page.previousCursor}
+                    onClick={details.previous}
+                  >
+                    Previous sources
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={details.loading || !details.page.nextCursor}
+                    onClick={details.next}
+                  >
+                    Next sources
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </details>
       )}

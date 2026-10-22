@@ -1,19 +1,23 @@
-import type { SessionInsight } from "@opencode-insight/telemetry/schema";
+import {
+  SPEED_BUCKET_MS,
+  type SpeedState,
+  type SpeedWindow,
+} from "@opencode-insight/telemetry/queries";
 import { number, time } from "./format";
-import { SPEED_BUCKET_MS, speedModel, type SpeedState } from "./speed-model";
 
 const WIDTH = 640;
 const HEIGHT = 230;
 const LEFT = 48;
 const TOP = 18;
 const BOTTOM = 194;
-export function chartGeometry(session?: SessionInsight, width = WIDTH, now = Date.now()) {
-  const model = speedModel(session, now);
-  const { start, buckets: points } = model;
-  const end = Math.max(start + SPEED_BUCKET_MS, model.end);
+export function chartGeometry(window?: SpeedWindow, width = WIDTH) {
+  const start = window?.start ?? 0;
+  const points = window?.buckets ?? [];
+  const end = window?.end ?? SPEED_BUCKET_MS;
   const max = Math.max(1, ...points.map((point) => point.tps ?? 0));
   const right = width - 20;
-  const x = (at: number) => LEFT + ((at - start) / (end - start)) * (right - LEFT);
+  const x = (at: number) =>
+    LEFT + ((at - start) / Math.max(SPEED_BUCKET_MS, end - start)) * (right - LEFT);
   const y = (value: number) => BOTTOM - (value / max) * (BOTTOM - TOP);
   const shades: Array<{ start: number; end: number; state: SpeedState }> = [];
   for (const point of points) {
@@ -33,7 +37,7 @@ export function chartGeometry(session?: SessionInsight, width = WIDTH, now = Dat
       return `C${middle},${y(previous.tps).toFixed(2)} ${middle},${y(point.tps).toFixed(2)} ${position}`;
     })
     .join(" ");
-  return { points, shades, start, end, max, x, y, path, width, right, nextAt: model.nextAt };
+  return { points, shades, start, end, max, x, y, path, width, right, nextAt: window?.nextAt };
 }
 
 const labels: Record<SpeedState, string> = {
@@ -43,8 +47,11 @@ const labels: Record<SpeedState, string> = {
   unobserved: "Unobserved",
 };
 
-export function createSpeedChart(container: HTMLElement): {
-  update(session?: SessionInsight): void;
+export function createSpeedChart(
+  container: HTMLElement,
+  refresh: () => void = () => {},
+): {
+  update(window?: SpeedWindow): void;
   dispose(): void;
 } {
   container.innerHTML = `<p class="muted chart-empty" title="Historical totals cannot reconstruct per-second output.">No speed samples in this window.</p>
@@ -70,7 +77,8 @@ export function createSpeedChart(container: HTMLElement): {
   const path = svg.querySelector("path.speed")!;
   const shades = svg.querySelector(".speed-shades")!;
   const markers = svg.querySelector(".speed-points")!;
-  let session: SessionInsight | undefined;
+  let window: SpeedWindow | undefined;
+  let refreshedAt: number | undefined;
   let g = chartGeometry();
   let selected: number | undefined;
   let inspecting = false;
@@ -101,13 +109,23 @@ export function createSpeedChart(container: HTMLElement): {
     clearTimeout(timer);
     if (disposed) return;
     if (document.hidden) return;
-    g = chartGeometry(session, Math.max(280, container.clientWidth || WIDTH));
-    if (g.nextAt !== undefined) timer = setTimeout(render, Math.max(0, g.nextAt - Date.now()));
+    g = chartGeometry(window, Math.max(280, container.clientWidth || WIDTH));
+    const nextAt = g.nextAt;
+    if (nextAt !== undefined && nextAt !== refreshedAt) {
+      timer = setTimeout(
+        () => {
+          if (disposed || document.hidden) return;
+          refreshedAt = nextAt;
+          refresh();
+        },
+        Math.max(0, nextAt - Date.now()),
+      );
+    }
     const populated = g.points.length > 0;
     empty.hidden = populated;
     heading.hidden = !populated;
     box.hidden = !populated;
-    empty.textContent = session
+    empty.textContent = window
       ? "Waiting for a completed 15 s bucket."
       : "No speed samples in this window.";
     attrs(svg, { viewBox: `0 0 ${g.width} ${HEIGHT}` });
@@ -178,7 +196,7 @@ export function createSpeedChart(container: HTMLElement): {
     );
     const index = selectedIndex();
     if (inspecting && index >= 0) show(index);
-    else if (inspecting) {
+    else if (index < 0) {
       hide();
       selected = undefined;
     }
@@ -220,9 +238,9 @@ export function createSpeedChart(container: HTMLElement): {
   observer?.observe(container);
   render();
   return {
-    update(nextSession) {
+    update(nextWindow) {
       if (disposed) return;
-      session = nextSession;
+      window = nextWindow;
       render();
     },
     dispose() {

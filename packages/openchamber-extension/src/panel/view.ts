@@ -1,13 +1,18 @@
 import { mountBadge, mountBanner, mountButton, mountEmpty } from "@openchamber/sdk/ui";
-import { summarizeSession } from "@opencode-insight/telemetry/summary";
 import type { PanelState } from "./controller";
 import { createSpeedChart } from "./chart";
 import { element, setText } from "./dom";
 import { duration, number } from "./format";
 import { createTokenView } from "./token-view";
 import { createTimingView } from "./timing-view";
+import type { ToolPageReader } from "./trace-data";
 
-export function createPanelView(root: HTMLElement, retry: () => void) {
+export function createPanelView(
+  root: HTMLElement,
+  retry: () => void,
+  readTools: ToolPageReader,
+  refreshSpeed: () => void,
+) {
   let target = "";
   let disposed = false;
   let lastError = "";
@@ -56,9 +61,9 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
     metrics.append(metric);
     return value;
   });
-  const speed = createSpeedChart(panels.speed);
+  const speed = createSpeedChart(panels.speed, refreshSpeed);
   const token = createTokenView(panels.token);
-  const timing = createTimingView(panels.time);
+  const timing = createTimingView(panels.time, readTools);
   for (const [id, label] of [
     ["speed", "Speed"],
     ["token", "Tokens"],
@@ -79,7 +84,7 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
     }
     errorSlot.hidden = !state.error;
     const error = state.error
-      ? `${state.error}${state.session ? " Previous captured data is retained; it may be stale." : ""}`
+      ? `${state.error}${state.overview?.data ? " Previous captured data is retained; it may be stale." : ""}`
       : "";
     if (error !== lastError) {
       banner.update({ title: error });
@@ -89,11 +94,11 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
     if (!state.sessionID) message = "Select an active OpenCode session to inspect local telemetry.";
     else if (!state.directory)
       message = "Session location unavailable. Select a local project directory.";
-    else if (!state.session)
+    else if (!state.overview?.data)
       message = state.loading
         ? "Loading local session telemetry…"
         : "Telemetry unavailable. The local service must verify this session location.";
-    else if (!state.session.requests.length && !state.session.tools.length)
+    else if (!state.overview.data.hasActivity)
       message =
         "No telemetry captured for this session yet. Start a model request with the capture plugin enabled.";
     emptySlot.hidden = !message;
@@ -102,14 +107,12 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
       empty.update({ title: message });
       lastEmpty = message;
     }
-    if (message || !state.session) return;
-    const session = state.session;
-    const summary = summarizeSession(session);
+    if (message || !state.overview?.data) return;
+    const data = state.overview.data;
+    const summary = data.summary;
     const metricsNext = [
-      summary.currentContext.length
-        ? number(summary.currentContext.reduce((sum, source) => sum + source.tokens, 0))
-        : "Unavailable",
-      session.requests.some((request) => request.usage)
+      data.tokens.current.groups.length ? number(data.tokens.current.total) : "Unavailable",
+      summary.hasUsage
         ? number(Object.values(summary.usage).reduce((sum, value) => sum + value, 0))
         : "Unavailable",
       summary.tps === undefined ? "Unavailable" : `${number(summary.tps)} tokens/s`,
@@ -117,9 +120,9 @@ export function createPanelView(root: HTMLElement, retry: () => void) {
     ];
     metricsNext.forEach((value, index) => setText(values[index], value));
     qualitySlot.hidden = !summary.capturePartial;
-    speed.update(session);
-    token.update(session);
-    timing.update(session);
+    speed.update(state.speed);
+    token.update(data);
+    timing.update(state.overview);
   }
   return {
     render,

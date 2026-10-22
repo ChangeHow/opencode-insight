@@ -10,7 +10,12 @@ let controller: ReturnType<typeof createPanelController> | undefined;
 const unsubscribeTheme = host.onReady((ready) => {
   applyPanelTheme(ready);
   if (view) return;
-  view = createPanelView(root, () => controller?.retry());
+  view = createPanelView(
+    root,
+    () => controller?.retry(),
+    (input) => controller!.loadTools(input),
+    () => controller?.requestSpeed(),
+  );
   controller = createPanelController(host, (state) => view!.render(state));
 });
 window.addEventListener(

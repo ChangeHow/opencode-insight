@@ -1,5 +1,11 @@
 import { Plugin } from "@opencode/plugin";
 import { buildSeries, estimateTokens } from "@opencode-insight/telemetry";
+import {
+  buildOverview,
+  buildSpeedWindow,
+  buildToolPage,
+} from "@opencode-insight/telemetry/queries";
+import { buildSeriesWindow, buildSourcePage } from "@opencode-insight/telemetry/details";
 import { Collector } from "./collector";
 import { captureContext } from "./context";
 import { Provenance } from "./provenance";
@@ -50,6 +56,12 @@ export default Plugin.define({
         collector.touch(session, Date.now());
       }
       return session;
+    };
+    const assertCapture = () => {
+      collector.assertHealthy();
+      if (captureError) throw new Error("Telemetry capture is incomplete", { cause: captureError });
+      if (streamError)
+        throw new Error("Telemetry event capture interrupted", { cause: streamError });
     };
     registrations.push(
       await trackToolScopes(ctx, collector, (error) => {
@@ -111,25 +123,58 @@ export default Plugin.define({
       await ctx.rpc.register(Insight, {
         session: (input) =>
           collector.serialize(async () => {
-            collector.assertHealthy();
-            if (captureError)
-              throw new Error("Telemetry capture is incomplete", { cause: captureError });
-            if (streamError)
-              throw new Error("Telemetry event capture interrupted", { cause: streamError });
+            assertCapture();
             return snapshot(await querySession(input.sessionID));
           }),
         series: (input) =>
           collector.serialize(async () => {
-            collector.assertHealthy();
-            if (captureError)
-              throw new Error("Telemetry capture is incomplete", { cause: captureError });
-            if (streamError)
-              throw new Error("Telemetry event capture interrupted", { cause: streamError });
+            assertCapture();
             const info = await verifiedInfo(input.sessionID);
             const unchanged = collector.unchanged(input.sessionID, input.after);
             return snapshot(
               unchanged ?? buildSeries(await querySession(input.sessionID, info), input),
             );
+          }),
+        overview: (input) =>
+          collector.serialize(async () => {
+            assertCapture();
+            const info = await verifiedInfo(input.sessionID);
+            const idle = collector.unchanged(input.sessionID, input.after);
+            const unchanged = (revision: number) => ({
+              sessionID: input.sessionID,
+              directory: ctx.location.directory,
+              revision,
+              unchanged: true,
+            });
+            if (idle) return unchanged(idle.revision);
+            const session = await querySession(input.sessionID, info);
+            if (
+              input.after === session.revision &&
+              !session.requests.some((request) => request.status === "running") &&
+              !session.tools.some((tool) => tool.status === "running")
+            )
+              return unchanged(session.revision);
+            return snapshot(buildOverview(session));
+          }),
+        speedWindow: (input) =>
+          collector.serialize(async () => {
+            assertCapture();
+            return snapshot(buildSpeedWindow(await querySession(input.sessionID), input));
+          }),
+        toolPage: (input) =>
+          collector.serialize(async () => {
+            assertCapture();
+            return snapshot(buildToolPage(await querySession(input.sessionID), input));
+          }),
+        seriesWindow: (input) =>
+          collector.serialize(async () => {
+            assertCapture();
+            return snapshot(buildSeriesWindow(await querySession(input.sessionID), input));
+          }),
+        sourcePage: (input) =>
+          collector.serialize(async () => {
+            assertCapture();
+            return snapshot(buildSourcePage(await querySession(input.sessionID), input));
           }),
       }),
     );

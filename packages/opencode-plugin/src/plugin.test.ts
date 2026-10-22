@@ -5,6 +5,8 @@ import plugin from "./index";
 import { Insight, getSessionInputSchema } from "./rpc";
 import type { NativeEvent } from "./events";
 import { Collector } from "./collector";
+import type { OverviewResponse, SpeedWindow, ToolPage } from "@opencode-insight/telemetry/queries";
+import type { SeriesWindow, SourcePage } from "@opencode-insight/telemetry/details";
 import { trackToolScopes } from "./tool-scope";
 import { Host } from "@opencode/plugin/host";
 import { fileURLToPath } from "node:url";
@@ -156,6 +158,10 @@ describe("native V2 plugin", () => {
     const next = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
     expect(next.requests[0].status).toBe("running");
     expect(next.requests[0].context).toEqual([]);
+    expect(await h.handlers.overview({ sessionID: "s1", after: next.revision })).toMatchObject({
+      unchanged: false,
+      data: { running: true },
+    });
     await cleanup!();
   });
 
@@ -182,6 +188,12 @@ describe("native V2 plugin", () => {
         expect(value.requests[0]?.status).toBe("completed");
       });
       const before = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+      expect(await h.handlers.overview({ sessionID: "s1", after: before.revision })).toEqual({
+        sessionID: "s1",
+        directory: "/a",
+        revision: before.revision,
+        unchanged: true,
+      });
       await vi.advanceTimersByTimeAsync(20000);
       const reads = h.context.storage.get.mock.calls.length;
       expect(await h.handlers.series({ sessionID: "s1", after: before.revision })).toEqual({
@@ -189,7 +201,24 @@ describe("native V2 plugin", () => {
         unchanged: true,
         points: [],
       });
+      expect(await h.handlers.overview({ sessionID: "s1", after: before.revision })).toEqual({
+        sessionID: "s1",
+        directory: "/a",
+        revision: before.revision,
+        unchanged: true,
+      });
       expect(h.context.storage.get).toHaveBeenCalledTimes(reads);
+      const historyReads = h.context.session.context.mock.calls.length;
+      h.context.session.get.mockResolvedValueOnce({ location: { directory: "/b" } });
+      await expect(
+        h.handlers.overview({ sessionID: "s1", after: before.revision }),
+      ).rejects.toThrow("another location");
+      h.context.session.get.mockRejectedValueOnce(new Error("Session not found"));
+      await expect(
+        h.handlers.overview({ sessionID: "s1", after: before.revision }),
+      ).rejects.toThrow("Session not found");
+      expect(h.context.storage.get).toHaveBeenCalledTimes(reads);
+      expect(h.context.session.context).toHaveBeenCalledTimes(historyReads);
       h.context.session.get.mockResolvedValueOnce({ location: { directory: "/b" } });
       await expect(h.handlers.series({ sessionID: "s1", after: before.revision })).rejects.toThrow(
         "another location",
@@ -199,6 +228,81 @@ describe("native V2 plugin", () => {
         "Session not found",
       );
       expect(await h.handlers.session({ sessionID: "s1" })).toEqual(before);
+      expect(h.context.storage.get).toHaveBeenCalledTimes(reads + 1);
+    } finally {
+      await cleanup!();
+      vi.useRealTimers();
+    }
+  });
+
+  test("returns detached purpose-specific projections without mutating stored telemetry", async () => {
+    vi.useFakeTimers({ now: 60000 });
+    const h = harness();
+    const stored: SessionInsight = {
+      version: 1,
+      sessionID: "s1",
+      directory: "/a",
+      updatedAt: 30000,
+      revision: 4,
+      interruptedCapture: false,
+      requests: [
+        {
+          id: "r1",
+          model: "fixture/model",
+          startedAt: 0,
+          endedAt: 30000,
+          status: "completed",
+          capture: "live",
+          reasoningMode: "unknown",
+          context: [{ kind: "user", id: "u1", label: "User", tokens: 12, quality: "reported" }],
+          buckets: [{ at: 1000, output: 4, reasoning: 1, summary: 0 }],
+          usage: { input: 12, output: 4, reasoning: 1, cacheRead: 0, cacheWrite: 0 },
+        },
+      ],
+      tools: [
+        {
+          id: "t1",
+          requestID: "r1",
+          name: "shell",
+          startedAt: 2000,
+          endedAt: 3000,
+          status: "completed",
+          background: false,
+          reportedCalls: [{ name: "child", status: "completed" }],
+        },
+      ],
+    };
+    h.context.storage.get.mockResolvedValueOnce(stored);
+    const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
+    try {
+      const overview = (await h.handlers.overview({ sessionID: "s1" })) as OverviewResponse;
+      const speed = (await h.handlers.speedWindow({ sessionID: "s1" })) as SpeedWindow;
+      const tools = (await h.handlers.toolPage({ sessionID: "s1" })) as ToolPage;
+      const series = (await h.handlers.seriesWindow({ sessionID: "s1" })) as SeriesWindow;
+      const sources = (await h.handlers.sourcePage({ sessionID: "s1" })) as SourcePage;
+      const expected = structuredClone({ overview, speed, tools, series, sources });
+      expect(overview.data?.trace.groups[0].singleTool?.id).toBe("t1");
+      expect(speed.buckets.length).toBeGreaterThan(0);
+      expect(series.requests[0].id).toBe("r1");
+      expect(series.requests[0]).not.toHaveProperty("context");
+      expect(series.requests[0]).not.toHaveProperty("buckets");
+      overview.data!.trace.groups[0].singleTool!.name = "caller-only";
+      overview.data!.summary.usage.input = 999;
+      speed.buckets[0].state = "unobserved";
+      tools.entries[0].reportedCalls![0].name = "caller-only";
+      series.requests[0].usage!.input = 999;
+      series.points[0].outputTps = 999;
+      sources.entries[0].tokens = 999;
+      expect(await h.handlers.overview({ sessionID: "s1" })).toEqual(expected.overview);
+      expect(await h.handlers.speedWindow({ sessionID: "s1" })).toEqual(expected.speed);
+      expect(await h.handlers.toolPage({ sessionID: "s1" })).toEqual(expected.tools);
+      expect(await h.handlers.seriesWindow({ sessionID: "s1" })).toEqual(expected.series);
+      expect(await h.handlers.sourcePage({ sessionID: "s1" })).toEqual(expected.sources);
+      expect(await h.handlers.session({ sessionID: "s1" })).toEqual(stored);
+      for (const method of ["speedWindow", "toolPage", "seriesWindow", "sourcePage"]) {
+        h.context.session.get.mockResolvedValueOnce({ location: { directory: "/b" } });
+        await expect(h.handlers[method]({ sessionID: "s1" })).rejects.toThrow("another location");
+      }
     } finally {
       await cleanup!();
       vi.useRealTimers();

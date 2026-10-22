@@ -162,6 +162,17 @@ try {
   if (!response.ok) throw new Error(`Built bridge returned ${response.status}.`);
   const bridged = await response.json();
   if (bridged.sessionID !== session.id) throw new Error("Built bridge returned another session.");
+  for (const route of ["overview", "speed-window", "tool-page", "series-window", "source-page"]) {
+    const response = await fetch(`${bridgeBase}/${route}`, {
+      method: "POST",
+      headers: bridgeHeaders,
+      body: JSON.stringify({ sessionID: session.id, directory: project }),
+    });
+    if (!response.ok) throw new Error(`Built bridge ${route} returned ${response.status}.`);
+    const value = await response.json();
+    if (value.sessionID !== session.id || value.directory !== project)
+      throw new Error(`Built bridge ${route} returned a different scope.`);
+  }
   const dashboardPort = await freePort();
   dashboard = spawn(process.execPath, [path.join(root, "apps/bff/dist/index.js")], {
     cwd: temporary,
@@ -189,6 +200,15 @@ try {
     throw new Error("Dashboard Insight returned a different session scope.");
   if (JSON.stringify(insight).includes(password))
     throw new Error("Dashboard exposed upstream authentication.");
+  for (const route of ["overview", "speed-window", "series-window", "tools", "sources"]) {
+    const response = await fetch(`${dashboardBase}/api/session/${session.id}/insight/${route}`);
+    if (!response.ok) throw new Error(`Dashboard ${route} returned ${response.status}.`);
+    const value = await response.json();
+    if (value.sessionID !== session.id || value.directory !== project)
+      throw new Error(`Dashboard ${route} returned a different scope.`);
+    if (JSON.stringify(value).includes(password))
+      throw new Error("Dashboard exposed authentication.");
+  }
   const unchanged = await fetch(
     `${dashboardBase}/api/session/${session.id}/insight?after=${insight.session.revision}`,
   );

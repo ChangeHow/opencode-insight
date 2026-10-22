@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
+import {
+  buildOverview,
+  buildSpeedWindow,
+  buildToolPage,
+} from "@opencode-insight/telemetry/queries";
+import type { PanelState } from "./controller";
 import { createPanelView } from "./view";
 import { stubPopover } from "./popover.test-helper";
 
@@ -42,13 +48,32 @@ const session: SessionInsight = {
   ],
 };
 
-const mounted: Array<{ root: HTMLElement; view: ReturnType<typeof createPanelView> }> = [];
+const mounted: Array<{ root: HTMLElement; view: { dispose(): void } }> = [];
 const scrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
 
 function mount(retry = () => {}) {
   const root = document.createElement("main");
   document.body.append(root);
-  const view = createPanelView(root, retry);
+  let raw = session;
+  const panel = createPanelView(
+    root,
+    retry,
+    async (input) => buildToolPage(raw, { ...input, sessionID: raw.sessionID }),
+    () => {},
+  );
+  const view = {
+    ...panel,
+    async render(state: Omit<PanelState, "overview" | "speed"> & { session?: SessionInsight }) {
+      if (state.session) raw = state.session;
+      panel.render({
+        ...state,
+        overview: state.session ? buildOverview(state.session, 30000) : undefined,
+        speed: state.session ? buildSpeedWindow(state.session, undefined, 30000) : undefined,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    },
+  };
   mounted.push({ root, view });
   return { root, view };
 }
@@ -79,14 +104,14 @@ describe("panel view", () => {
     else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
     vi.restoreAllMocks();
   });
-  test("distinguishes no selection, loading, empty, unavailable and safe service errors", () => {
+  test("distinguishes no selection, loading, empty, unavailable and safe service errors", async () => {
     const retry = vi.fn();
     const { root, view } = mount(retry);
-    view.render({ sessionID: null, directory: null, loading: false });
+    await view.render({ sessionID: null, directory: null, loading: false });
     expect(root.textContent).toContain("Select an active OpenCode session");
-    view.render({ sessionID: "one", directory: "/local", loading: true });
+    await view.render({ sessionID: "one", directory: "/local", loading: true });
     expect(root.textContent).toContain("Loading local session");
-    view.render({
+    await view.render({
       sessionID: "one",
       directory: "/local",
       loading: false,
@@ -97,7 +122,7 @@ describe("panel view", () => {
     expect(root.querySelector("script")).toBeNull();
     root.querySelector<HTMLButtonElement>("#retry")!.click();
     expect(retry).toHaveBeenCalledOnce();
-    view.render({
+    await view.render({
       sessionID: "one",
       directory: "/local",
       loading: false,
@@ -107,9 +132,9 @@ describe("panel view", () => {
     expect(root.querySelector("table")).toBeNull();
   });
 
-  test("renders compact normalized totals and simultaneous ordered sections without request tables", () => {
+  test("renders compact normalized totals and simultaneous ordered sections without request tables", async () => {
     const { root, view } = mount();
-    view.render({
+    await view.render({
       sessionID: "one",
       directory: "/local",
       loading: false,
@@ -164,10 +189,10 @@ describe("panel view", () => {
     expect(root.querySelector("table")).toBeNull();
   });
 
-  test("groups token controls and empty states in two ordered labelled blocks", () => {
+  test("groups token controls and empty states in two ordered labelled blocks", async () => {
     const { root, view } = mount();
     const state = { sessionID: "one", directory: "/local", loading: false, session };
-    view.render({
+    await view.render({
       ...state,
       session: { ...session, requests: [{ ...session.requests[0], cost: 0.25 }] },
     });
@@ -201,7 +226,7 @@ describe("panel view", () => {
     expect(usage.querySelector(".scope-slot, .quality-slot, details")).toBeNull();
     expect(input.contains(cost)).toBe(false);
 
-    view.render({
+    await view.render({
       ...state,
       session: {
         ...session,
@@ -214,7 +239,7 @@ describe("panel view", () => {
     expect(quality.hidden).toBe(true);
     expect(cost.hidden).toBe(true);
     for (const composition of compositions) expect(composition.parentElement?.hidden).toBe(true);
-    view.render({ ...state, session: { ...session, revision: 3 } });
+    await view.render({ ...state, session: { ...session, revision: 3 } });
     expect(root.querySelector(".token-grid")).toBe(grid);
     blocks.forEach((block, index) => expect(grid.children[index]).toBe(block));
     expect(input.querySelector('[aria-haspopup="listbox"]')).toBe(scope);
@@ -226,7 +251,7 @@ describe("panel view", () => {
     });
   });
 
-  test("refreshes Speed, Tokens and Times together without replacing their nodes", () => {
+  test("refreshes Speed, Tokens and Times together without replacing their nodes", async () => {
     const { root, view } = mount();
     const state = {
       sessionID: "one",
@@ -246,21 +271,8 @@ describe("panel view", () => {
           },
         ],
       },
-      series: {
-        revision: 1,
-        unchanged: false,
-        points: [0, 1000].map((at) => ({
-          at,
-          requestID: "request",
-          model: "model",
-          outputTps: 10,
-          reasoningTps: 0,
-          summaryTps: 0,
-          quality: "partial" as const,
-        })),
-      },
     };
-    view.render(state);
+    await view.render(state);
     const path = root.querySelector("#insight-speed path.speed")!;
     const previousPath = path.getAttribute("d");
     const total = root.querySelector("#insight-token .donut strong")!;
@@ -269,7 +281,7 @@ describe("panel view", () => {
     )!;
     expect(total.textContent).toBe("40");
     expect(span.getAttribute("aria-label")).toContain("2 s");
-    view.render({
+    await view.render({
       ...state,
       session: {
         ...session,
@@ -288,14 +300,6 @@ describe("panel view", () => {
           },
         ],
       },
-      series: {
-        ...state.series,
-        revision: 2,
-        points: state.series.points.map((point, index) => ({
-          ...point,
-          outputTps: index ? 20 : 5,
-        })),
-      },
     });
     expect(root.querySelector("#insight-speed path.speed")).toBe(path);
     expect(path.getAttribute("d")).not.toBe(previousPath);
@@ -312,15 +316,15 @@ describe("panel view", () => {
     expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBe("7500");
     const inspector = root.querySelector<HTMLElement>("#insight-time .trace-inspector")!;
     expect(inspector.dataset.open).toBe("true");
-    view.render({ ...state, sessionID: "two", session: { ...session, sessionID: "two" } });
+    await view.render({ ...state, sessionID: "two", session: { ...session, sessionID: "two" } });
     expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBeUndefined();
     expect(root.querySelector<HTMLElement>("#insight-speed .tooltip")!.hidden).toBe(true);
     expect(inspector.dataset.open).toBe("false");
   });
 
-  test("does not turn interrupted activity without an end into ongoing elapsed time", () => {
+  test("does not turn interrupted activity without an end into ongoing elapsed time", async () => {
     const { root, view } = mount();
-    view.render({
+    await view.render({
       sessionID: "one",
       directory: "/local",
       loading: false,
@@ -348,9 +352,9 @@ describe("panel view", () => {
     expect(span.querySelector(".trace-line-unknown")?.getAttribute("d")).toContain(" L");
   });
 
-  test("shows reported Code Mode calls directly without invented child timing", () => {
+  test("shows reported Code Mode calls directly without invented child timing", async () => {
     const { root, view } = mount();
-    view.render({
+    await view.render({
       sessionID: "one",
       directory: "/local",
       loading: false,
@@ -370,15 +374,16 @@ describe("panel view", () => {
       },
     });
     root.querySelector<HTMLButtonElement>('[aria-label="Inspect Code Mode"]')!.click();
+    await Promise.resolve();
     expect(root.textContent).toContain("files.read_text_file ×3 · completed");
     expect(root.querySelector<HTMLElement>('[data-source="reported-calls"]')?.hidden).toBe(false);
     expect(root.querySelector(".trace-inspector details")).toBeNull();
     expect(root.querySelectorAll(".lane-track")).toHaveLength(0);
   });
 
-  test("span details require activation instead of hover or focus and close on Escape", () => {
+  test("span details require activation instead of hover or focus and close on Escape", async () => {
     const { root, view } = mount();
-    view.render({ sessionID: "one", directory: "/local", loading: false, session });
+    await view.render({ sessionID: "one", directory: "/local", loading: false, session });
     const span = root.querySelector<HTMLButtonElement>(
       '[data-trace-key="tool:child-tool"] .trace-plot',
     )!;
@@ -393,17 +398,17 @@ describe("panel view", () => {
     expect(document.activeElement).toBe(span);
   });
 
-  test("keeps span inspection and keyboard focus intact across polling renders", () => {
+  test("keeps span inspection and keyboard focus intact across polling renders", async () => {
     const { root, view } = mount();
     const state = { sessionID: "one", directory: "/local", loading: false, session };
-    view.render(state);
+    await view.render(state);
     const span = root.querySelector<HTMLButtonElement>(
       '[data-trace-key="tool:child-tool"] .trace-plot',
     )!;
     span.click();
     const close = root.querySelector<HTMLButtonElement>('[aria-label="Close span details"]')!;
     expect(document.activeElement).toBe(close);
-    view.render({
+    await view.render({
       ...state,
       session: {
         ...session,
@@ -417,10 +422,10 @@ describe("panel view", () => {
     expect(root.querySelector<HTMLElement>(".trace-inspector")?.dataset.open).toBe("true");
   });
 
-  test("keeps the SDK scope popup and keyboard selection intact across polling", () => {
+  test("keeps the SDK scope popup and keyboard selection intact across polling", async () => {
     const { root, view } = mount();
     const state = { sessionID: "one", directory: "/local", loading: false, session };
-    view.render(state);
+    await view.render(state);
     const trigger = root.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
     trigger.click();
     const popup = root.querySelector<HTMLElement>('[role="listbox"]')!;
@@ -428,7 +433,7 @@ describe("panel view", () => {
     const active = popup.getAttribute("aria-activedescendant");
     const option = popup.querySelector('[data-active="true"]');
     expect(option?.textContent).toBe("Cumulative inputs");
-    view.render({ ...state, session: { ...session, revision: 2 } });
+    await view.render({ ...state, session: { ...session, revision: 2 } });
     expect(root.querySelector('[aria-haspopup="listbox"]')).toBe(trigger);
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
     expect(root.querySelector('[role="listbox"]')).toBe(popup);
@@ -442,7 +447,7 @@ describe("panel view", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  test("retains cumulative scope across polling but resets for a new session", () => {
+  test("retains cumulative scope across polling but resets for a new session", async () => {
     const { root, view } = mount();
     const captured = {
       ...session,
@@ -458,14 +463,14 @@ describe("panel view", () => {
       ],
     };
     const state = { sessionID: "one", directory: "/local", loading: false, session: captured };
-    view.render(state);
+    await view.render(state);
     expect(root.querySelector(".donut strong")?.textContent).toBe("60");
     selectScope(root, "Cumulative inputs");
     expect(root.querySelector(".donut strong")?.textContent).toBe("100");
     const blocks = [...root.querySelectorAll(".token-block")];
     const trigger = blocks[0].querySelector('[aria-haspopup="listbox"]')!;
     const donut = blocks[0].querySelector(".donut")!;
-    view.render({ ...state, session: { ...captured, revision: 2 } });
+    await view.render({ ...state, session: { ...captured, revision: 2 } });
     blocks.forEach((block, index) => {
       expect(root.querySelectorAll(".token-block")[index]).toBe(block);
     });
@@ -473,16 +478,16 @@ describe("panel view", () => {
     expect(blocks[0].querySelector(".donut")).toBe(donut);
     expect(root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe("Cumulative inputs");
     expect(root.querySelector(".donut strong")?.textContent).toBe("100");
-    view.render({ ...state, sessionID: "two", session: { ...captured, sessionID: "two" } });
+    await view.render({ ...state, sessionID: "two", session: { ...captured, sessionID: "two" } });
     expect(root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe("Current context");
     expect(root.querySelector(".donut strong")?.textContent).toBe("60");
   });
 
-  test("disposal closes SDK popups, removes listeners and ignores later renders", () => {
+  test("disposal closes SDK popups, removes listeners and ignores later renders", async () => {
     const retry = vi.fn();
     const { root, view } = mount(retry);
     const state = { sessionID: "one", directory: "/local", loading: false, session };
-    view.render(state);
+    await view.render(state);
     const svg = root.querySelector<SVGSVGElement>("#insight-speed svg")!;
     const speed = root.querySelector<HTMLElement>("#insight-speed")!;
     const retryButton = root.querySelector<HTMLButtonElement>("#retry")!;
@@ -499,7 +504,7 @@ describe("panel view", () => {
     expect(retry).not.toHaveBeenCalled();
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(speed.dataset.inspectedAt).toBeUndefined();
-    view.render({ ...state, error: "late update" });
+    await view.render({ ...state, error: "late update" });
     expect(root.childNodes).toHaveLength(0);
     expect(() => view.dispose()).not.toThrow();
   });

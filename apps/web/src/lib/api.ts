@@ -15,6 +15,10 @@ import type {
   RemoteUsagePayload,
   SessionDetailBreakdown,
   SessionInsightPayload,
+  OverviewResponse,
+  SeriesWindow,
+  SourcePage,
+  ToolPage,
   TimeRange,
   TrendPoint,
 } from "@opencode-dashboard/shared";
@@ -110,6 +114,43 @@ export function fetchSessionInsight(sessionId: string, after?: number) {
   return getJson<SessionInsightPayload>(
     `/api/session/${encodeURIComponent(sessionId)}/insight${query}`,
   );
+}
+
+export function fetchSessionInsightOverview(sessionId: string, after?: number) {
+  const query = after === undefined ? "" : `?${new URLSearchParams({ after: String(after) })}`;
+  return getJson<OverviewResponse>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight/overview${query}`,
+  );
+}
+
+export function fetchSessionInsightSeriesWindow(sessionId: string) {
+  return getJson<SeriesWindow>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight/series-window`,
+  );
+}
+
+export function fetchSessionInsightSources(
+  sessionId: string,
+  scope: "current" | "cumulative",
+  options: { kind?: string; cursor?: string } = {},
+) {
+  const params = new URLSearchParams({ scope, limit: "50" });
+  if (options.kind !== undefined) params.set("kind", options.kind);
+  if (options.cursor !== undefined) params.set("cursor", options.cursor);
+  return getJson<SourcePage>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight/sources?${params}`,
+  );
+}
+
+export function fetchSessionInsightTools(
+  sessionId: string,
+  options: { group?: string; toolID?: string; cursor?: string } = {},
+) {
+  const params = new URLSearchParams({ limit: "20" });
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) params.set(key, value);
+  }
+  return getJson<ToolPage>(`/api/session/${encodeURIComponent(sessionId)}/insight/tools?${params}`);
 }
 
 export function fetchSeries(

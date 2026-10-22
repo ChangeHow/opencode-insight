@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
-    "./summary": "./src/summary.ts"
+    "./summary": "./src/summary.ts",
+    "./queries": "./src/queries.ts",
+    "./details": "./src/query-details.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

@@ -1,6 +1,10 @@
 import type { ToolInsight } from "@opencode-insight/telemetry/schema";
 import { toolInterval } from "./trace-model";
-import type { TraceGroup, TraceInterval, TraceModel } from "./trace-model";
+import type {
+  TraceGroupOverview as TraceGroup,
+  TraceOverview as TraceModel,
+} from "@opencode-insight/telemetry/queries";
+import type { TraceInterval } from "./trace-model";
 import { duration, money, number } from "./format";
 
 export type TraceItem =
@@ -15,7 +19,7 @@ export const axisOffset = (ms: number, windowMs: number) =>
 export function itemLabel(item: TraceItem): string {
   if (item.kind === "session") return "Session";
   if (item.kind === "tool") return toolName(item.entry.name);
-  return `${toolName(item.entry.name)} ×${number(item.entry.tools.length)}`;
+  return `${toolName(item.entry.name)} ×${number(item.entry.count)}`;
 }
 
 export function itemRange(item: TraceItem, now: number): TraceInterval | undefined {
@@ -24,17 +28,12 @@ export function itemRange(item: TraceItem, now: number): TraceInterval | undefin
       ? undefined
       : { start: item.model.start, end: item.model.end };
   if (item.kind === "tool") return toolInterval(item.entry, now);
-  const intervals = item.entry.tools.flatMap((tool) => toolInterval(tool, now) ?? []);
-  if (!intervals.length) return undefined;
-  return {
-    start: Math.min(...intervals.map((interval) => interval.start)),
-    end: Math.max(...intervals.map((interval) => interval.end)),
-  };
+  return item.entry.range;
 }
 
 export function itemValue(item: TraceItem, now: number) {
   if (item.kind === "group")
-    return item.entry.unknownCount === item.entry.tools.length
+    return item.entry.unknownCount === item.entry.count
       ? "Unavailable"
       : `U ${duration(item.entry.unionMs)}`;
   const range = itemRange(item, now);
@@ -66,20 +65,18 @@ export function describeItem(item: TraceItem, model: TraceModel, now: number) {
     );
   } else if (item.kind === "group") {
     fields.push(
-      ["Invocations", number(item.entry.tools.length)],
+      ["Invocations", number(item.entry.count)],
       [
         "First-to-last span",
         item.entry.spanMs === undefined ? "Unavailable" : duration(item.entry.spanMs),
       ],
       [
         "Execution union U",
-        item.entry.unknownCount === item.entry.tools.length
-          ? "Unavailable"
-          : duration(item.entry.unionMs),
+        item.entry.unknownCount === item.entry.count ? "Unavailable" : duration(item.entry.unionMs),
       ],
       [
         "Accumulated Σ",
-        item.entry.unknownCount === item.entry.tools.length
+        item.entry.unknownCount === item.entry.count
           ? "Unavailable"
           : duration(item.entry.accumulatedMs),
       ],

@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  speedWindow,
-  requestTps,
-  type InsightSeries,
-  type RequestInsight,
-  type SeriesPoint,
-} from "@opencode-dashboard/shared";
+import { type SeriesWindow, type SeriesPoint } from "@opencode-dashboard/shared";
 import { useInsightClock } from "./session-insight-clock";
 
 const tracks = [
@@ -36,26 +30,19 @@ function segments(points: SeriesPoint[]) {
   return groups;
 }
 
-export function SessionInsightChart({
-  requests,
-  series,
-}: {
-  requests: RequestInsight[];
-  series: InsightSeries;
-}) {
-  const running = requests.some((request) => request.status === "running");
+export function SessionInsightChart({ series }: { series: SeriesWindow }) {
+  const { requests, running } = series;
   const now = useInsightClock(running);
   const [selected, setSelected] = useState<Pick<SeriesPoint, "requestID" | "at">>();
   const byId = new Map(requests.map((request) => [request.id, request]));
   const captured = new Set(
-    requests.filter((request) => request.buckets.length).map((request) => request.id),
+    requests.filter((request) => request.captured).map((request) => request.id),
   );
-  const window = speedWindow(
-    series.points.filter((point) => captured.has(point.requestID)),
-    requests,
-    now,
+  const end = running ? Math.max(series.end, now) : series.end;
+  const start = running ? Math.max(series.start, end - 600000) : series.start;
+  const points = series.points.filter(
+    (point) => captured.has(point.requestID) && point.at >= start && point.at <= end,
   );
-  const { points, start, end } = window;
   if (!points.length)
     return (
       <section
@@ -68,14 +55,9 @@ export function SessionInsightChart({
   const visibleTracks = tracks.filter(
     (track) =>
       (track.key !== "reasoningTps" && track.key !== "summaryTps") ||
-      requests.some((request) =>
-        request.buckets.some((bucket) =>
-          track.key === "reasoningTps" ? bucket.reasoning > 0 : bucket.summary > 0,
-        ),
-      ),
+      (track.key === "reasoningTps" ? series.channels.reasoning : series.channels.summary),
   );
-  const value = (point: SeriesPoint, track: Track) =>
-    track.key === "requestTps" ? requestTps(byId.get(point.requestID)!) : point[track.key];
+  const value = (point: SeriesPoint, track: Track) => point[track.key];
   const max = Math.max(
     1,
     ...points.flatMap((point) => visibleTracks.map((track) => value(point, track) ?? 0)),

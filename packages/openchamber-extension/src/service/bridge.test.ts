@@ -2,6 +2,7 @@ import http from "node:http";
 import { once } from "node:events";
 import { afterEach, describe, expect, test } from "vitest";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
+import { buildOverview } from "@opencode-insight/telemetry/queries";
 import { BridgeError } from "@opencode-insight/client";
 import { createInsightServer } from "./server";
 
@@ -37,6 +38,52 @@ afterEach(async () => {
 });
 
 describe("Insight extension bridge", () => {
+  test("serves complete Token aggregates for a session larger than the unchanged response limit", async () => {
+    const context = Array.from({ length: 800 }, (_, index) => ({
+      kind: "tool" as const,
+      id: `captured-tool-result-${index}`,
+      label: "Observed tool result",
+      tokens: 1,
+      quality: "estimated" as const,
+    }));
+    const large: SessionInsight = {
+      ...snapshot,
+      requests: Array.from({ length: 160 }, (_, index) => ({
+        id: `request-${index}`,
+        model: "fixture/model",
+        startedAt: index * 1000,
+        streamedAt: index * 1000 + 100,
+        endedAt: index * 1000 + 100,
+        status: "completed" as const,
+        reasoningMode: "unknown" as const,
+        capture: "live" as const,
+        usage: { input: 1000, output: 10, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+        context,
+        buckets: [],
+      })),
+    };
+    expect(Buffer.byteLength(JSON.stringify(large))).toBeGreaterThan(7_000_000);
+    const url = await listen(
+      createInsightServer("host-private", async (method) =>
+        method === "session" ? large : buildOverview(large, 200000),
+      ),
+    );
+    const request = {
+      method: "POST",
+      headers: { authorization: "Bearer host-private", "content-type": "application/json" },
+      body: JSON.stringify({ sessionID: "ses_test", directory: "/project" }),
+    };
+    expect((await fetch(`${url}/session`, request)).status).toBe(413);
+    const response = await fetch(`${url}/overview`, request);
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(Buffer.byteLength(text)).toBeLessThan(64000);
+    const data = JSON.parse(text).data;
+    expect(data.summary.usage.input).toBe(160000);
+    expect(data.tokens.current.total).toBe(800);
+    expect(data.tokens.cumulative.total).toBe(128000);
+  });
+
   test("protects health and RPC routes with the host service token", async () => {
     const calls: unknown[] = [];
     const url = await listen(

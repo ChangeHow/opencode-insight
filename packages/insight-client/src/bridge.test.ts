@@ -3,9 +3,21 @@ import { once } from "node:events";
 import { mkdtemp, writeFile, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
-import { createBridge, createInsightReader } from "./index";
+import {
+  createBridge,
+  createInsightReader,
+  createInsightQueryReader,
+  type InsightQueryMethod,
+  type QueryMethod,
+} from "./index";
+import {
+  buildOverview,
+  buildSpeedWindow,
+  buildToolPage,
+} from "@opencode-insight/telemetry/queries";
+import { buildSeriesWindow, buildSourcePage } from "@opencode-insight/telemetry/details";
 import { loadConnection, validateEndpoint } from "./connection";
 
 const resources: Array<() => Promise<void>> = [];
@@ -243,10 +255,144 @@ describe("Insight client", () => {
     expect(connections).toBe(0);
   });
 
-  test("sanitizes unexpected discovery errors for both shared entrypoints", async () => {
+  test.each([
+    ["overview", { after: 1 }],
+    ["speedWindow", { from: 0, to: 15000 }],
+    ["toolPage", { group: "shell", limit: 2 }],
+    ["seriesWindow", { from: 0, to: 15000 }],
+    ["sourcePage", { scope: "cumulative", kind: "user", limit: 2 }],
+  ] as const)(
+    "resolves authority and forwards only validated %s input",
+    async (method, options) => {
+      const outputs = {
+        overview: buildOverview(snapshot, 1000),
+        speedWindow: buildSpeedWindow(snapshot, undefined, 1000),
+        toolPage: buildToolPage(snapshot, { sessionID: "ses_test" }),
+        seriesWindow: buildSeriesWindow(snapshot, undefined, 1000),
+        sourcePage: buildSourcePage(snapshot, { sessionID: "ses_test" }),
+      };
+      const requests: string[] = [];
+      const url = await listen(
+        http.createServer(async (req, res) => {
+          requests.push(req.url ?? "");
+          expect(req.headers.authorization).toBe("Bearer host-only");
+          res.setHeader("Content-Type", "application/json");
+          if (req.url === "/api/session/ses_test") {
+            res.end(
+              JSON.stringify({ data: { id: "ses_test", location: { directory: "/project" } } }),
+            );
+            return;
+          }
+          let body = "";
+          for await (const chunk of req) body += chunk;
+          expect(JSON.parse(body)).toEqual({ input: { sessionID: "ses_test", ...options } });
+          expect(decodeURIComponent(req.url ?? "")).toContain("/project");
+          expect(req.url).toContain(`/api/rpc/opencode-insight/${method}`);
+          res.end(JSON.stringify({ output: outputs[method] }));
+        }),
+      );
+      const connect = async () => ({
+        baseUrl: url,
+        headers: { authorization: "Bearer host-only" },
+      });
+      const overrides = {
+        url: "https://attacker.example",
+        baseUrl: "https://attacker.example",
+        auth: "private",
+        headers: { authorization: "Bearer caller" },
+        directory: "/attacker",
+      };
+      expect(
+        await createInsightQueryReader(connect)(method, "ses_test", {
+          ...options,
+          ...overrides,
+          sessionID: "ses_other",
+        }),
+      ).toEqual(outputs[method]);
+      expect(
+        await createBridge(connect)(method, {
+          ...options,
+          ...overrides,
+          sessionID: "ses_test",
+          directory: "/project",
+        }),
+      ).toEqual(outputs[method]);
+      expect(requests).toHaveLength(4);
+    },
+  );
+
+  test("rejects invalid purpose-specific queries and unknown methods before connecting", async () => {
+    const connect = vi.fn(async () => ({ baseUrl: "http://127.0.0.1:4096", headers: {} }));
+    const read = createInsightQueryReader(connect);
+    const bridge = createBridge(connect);
+    const invalid: [InsightQueryMethod, Record<string, unknown>][] = [
+      ["overview", { after: -1 }],
+      ["speedWindow", { from: 1 }],
+      ["seriesWindow", { from: 0, to: 600001 }],
+      ["toolPage", { toolID: "t1", group: "shell" }],
+      ["sourcePage", { scope: "foreign" }],
+      ["sourcePage", { limit: 101 }],
+    ];
+    for (const [method, options] of invalid) {
+      await expect(read(method, "ses_test", options)).rejects.toMatchObject({ status: 400 });
+      await expect(
+        bridge(method, { sessionID: "ses_test", directory: "/project", ...options }),
+      ).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(read("overview", "codex:session")).rejects.toMatchObject({ status: 400 });
+    await expect(read("toString" as InsightQueryMethod, "ses_test")).rejects.toMatchObject({
+      status: 400,
+    });
+    await expect(
+      bridge("toString" as QueryMethod, { sessionID: "ses_test", directory: "/project" }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  test("rejects compact results outside native scope and sanitizes invalid returned locations", async () => {
+    let directory: unknown = "/project";
+    let output: unknown = {
+      sessionID: "ses_other",
+      directory: "/project",
+      revision: 1,
+      unchanged: true,
+    };
+    let rpcCalls = 0;
+    const url = await listen(
+      http.createServer((req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        if (req.url === "/api/session/ses_test") {
+          res.end(JSON.stringify({ data: { id: "ses_test", location: { directory } } }));
+        } else {
+          rpcCalls++;
+          res.end(JSON.stringify({ output }));
+        }
+      }),
+    );
+    const read = createInsightQueryReader(async () => ({ baseUrl: url, headers: {} }));
+    await expect(read("overview", "ses_test")).rejects.toMatchObject({ status: 409 });
+    output = { sessionID: "ses_test", directory: "/attacker", revision: 1, unchanged: true };
+    await expect(read("overview", "ses_test")).rejects.toMatchObject({ status: 409 });
+    output = { private: "upstream-secret" };
+    await expect(read("overview", "ses_test")).rejects.toMatchObject({
+      status: 502,
+      message:
+        "Cannot query Insight on this OpenCode instance. Check the plugin, session, and connection.",
+    });
+    directory = "";
+    await expect(read("overview", "ses_test")).rejects.toMatchObject({ status: 502 });
+    expect(rpcCalls).toBe(3);
+  });
+
+  test("sanitizes unexpected discovery errors for all shared entrypoints", async () => {
     const connect = async () => {
       throw new Error("private discovery credentials");
     };
+    await expect(createInsightQueryReader(connect)("overview", "ses_test")).rejects.toMatchObject({
+      status: 502,
+      message:
+        "Cannot query Insight on this OpenCode instance. Check the plugin, session, and connection.",
+    });
     await expect(createInsightReader(connect)("ses_test")).rejects.toMatchObject({
       status: 502,
       message:

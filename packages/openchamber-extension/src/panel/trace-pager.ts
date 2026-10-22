@@ -28,14 +28,18 @@ export function createTracePager(label: string, changed: (page: number) => void)
   });
   return {
     node,
-    update(current: number, total: number) {
+    update(
+      current: number,
+      total: number,
+      navigation?: { previous: boolean; next: boolean; first?: number; last?: number },
+    ) {
       page = current;
       node.hidden = total <= TRACE_PAGE_SIZE;
-      previous.update({ disabled: page === 0 });
-      next.update({ disabled: page >= lastTracePage(total) });
+      previous.update({ disabled: navigation ? !navigation.previous : page === 0 });
+      next.update({ disabled: navigation ? !navigation.next : page >= lastTracePage(total) });
       setText(
         count,
-        `${label} ${page * TRACE_PAGE_SIZE + 1}–${Math.min(total, (page + 1) * TRACE_PAGE_SIZE)} / ${total}`,
+        `${label} ${navigation?.first ?? page * TRACE_PAGE_SIZE + 1}–${navigation?.last ?? Math.min(total, (page + 1) * TRACE_PAGE_SIZE)} / ${total}`,
       );
     },
     dispose() {

@@ -1,6 +1,5 @@
 import { mountBadge, mountEmpty, mountSelect } from "@openchamber/sdk/ui";
-import type { SessionInsight } from "@opencode-insight/telemetry/schema";
-import { summarizeSession, tokenBreakdown } from "@opencode-insight/telemetry/summary";
+import type { OverviewData } from "@opencode-insight/telemetry/queries";
 import { createComposition } from "./composition";
 import { element, setText } from "./dom";
 import { money } from "./format";
@@ -8,7 +7,7 @@ import { sourceColors, usageColors } from "./theme";
 
 export function createTokenView(root: HTMLElement) {
   let cumulative = false;
-  let latest: SessionInsight | undefined;
+  let latest: OverviewData | undefined;
   const grid = element("div", "token-grid");
   const inputBlock = element("section", "token-block");
   inputBlock.setAttribute("aria-labelledby", "insight-input-heading");
@@ -60,22 +59,20 @@ export function createTokenView(root: HTMLElement) {
     "Current: latest input snapshot. Cumulative: every captured input, including repeated context.";
   // The SDK retains its accessible label while the compact toolbar displays only the value.
   scopeSlot.querySelector(".oc-sdk-field-label")?.classList.add("sr-only");
-  function update(session: SessionInsight) {
-    latest = session;
-    const summary = summarizeSession(session);
-    const sources = cumulative ? summary.cumulativeContext : summary.currentContext;
-    const groups = tokenBreakdown(sources);
+  function update(data: OverviewData) {
+    latest = data;
+    const { summary } = data;
+    const composition = cumulative ? data.tokens.cumulative : data.tokens.current;
+    const { groups } = composition;
     inputSlot.hidden = qualitySlot.hidden = !groups.length;
     emptySlot.hidden = !!groups.length;
     input.update(
       groups.map((group) => ({ ...group, id: group.kind, color: sourceColors[group.kind] })),
     );
     quality.update({
-      label: sources.every((source) => source.quality === "reported")
-        ? "Reported"
-        : "Estimated attribution",
+      label: composition.reported ? "Reported" : "Estimated attribution",
     });
-    const hasUsage = session.requests.some((request) => request.usage);
+    const { hasUsage } = summary;
     usageSlot.hidden = !hasUsage;
     unavailableSlot.hidden = hasUsage;
     const total = Object.values(summary.usage).reduce((sum, tokens) => sum + tokens, 0);
@@ -95,7 +92,7 @@ export function createTokenView(root: HTMLElement) {
         share: total ? summary.usage[id] / total : 0,
       })),
     );
-    cost.hidden = !session.requests.some((request) => request.cost !== undefined);
+    cost.hidden = !summary.hasCost;
     setText(cost, money(summary.cost));
   }
   return {

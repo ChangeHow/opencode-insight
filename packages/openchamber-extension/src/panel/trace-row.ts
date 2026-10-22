@@ -1,5 +1,4 @@
 import { mountButton } from "@openchamber/sdk/ui";
-import { toolInterval } from "./trace-model";
 import type { TraceInterval } from "./trace-model";
 import { itemLabel, itemRange, itemValue } from "./trace-presentation";
 import type { TraceItem } from "./trace-presentation";
@@ -121,21 +120,13 @@ export function createTraceRow(
         color = "var(--insight-chart-6)";
         data[0] = path([
           ...group.intervals,
-          ...group.tools.flatMap((tool) => {
-            const interval = toolInterval(tool, now);
-            return interval && interval.start === interval.end ? [interval] : [];
-          }),
+          ...[...group.zeroStarts, ...group.runningStarts.filter((start) => start >= now)].map(
+            (start) => ({ start, end: start }),
+          ),
         ]);
-        data[1] = path(
-          group.tools.flatMap((tool) => {
-            const interval = toolInterval(tool, now);
-            return tool.status === "error" && interval ? [interval] : [];
-          }),
-        );
+        data[1] = path(group.errorIntervals);
         data[2] = path(
-          group.tools
-            .filter((tool) => !toolInterval(tool, now))
-            .map((tool) => ({ start: tool.startedAt, end: tool.startedAt })),
+          group.unknownStarts.map((start) => ({ start, end: start })),
           true,
         );
       } else if (range) {

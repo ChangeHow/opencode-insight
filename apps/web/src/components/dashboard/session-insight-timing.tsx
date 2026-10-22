@@ -1,23 +1,31 @@
-import { useState } from "react";
-import {
-  phaseBreakdown,
-  summarizeReportedCalls,
-  type SessionInsight,
-} from "@opencode-dashboard/shared";
-import { useInsightClock } from "./session-insight-clock";
+import { useCallback, useState } from "react";
+import { summarizeReportedCalls, type OverviewData } from "@opencode-dashboard/shared";
+import { fetchSessionInsightTools } from "@/lib/api";
+import { useInsightPage } from "@/lib/use-insight-page";
+import { Button } from "@/components/ui/button";
 
 const duration = (ms: number) =>
   ms > 0 && ms < 1000 ? `${ms.toLocaleString()} ms` : `${(ms / 1000).toFixed(2)} s`;
 
-export function SessionInsightTiming({ session }: { session: SessionInsight }) {
-  const now = useInsightClock(
-    session.requests.some((request) => request.status === "running") ||
-      session.tools.some((tool) => tool.status === "running"),
-  );
-  const { phases, totalMs, backgroundMs, unknownCount } = phaseBreakdown(session, now);
+export function SessionInsightTiming({
+  sessionId,
+  revision,
+  overview,
+}: {
+  sessionId: string;
+  revision: number;
+  overview: OverviewData;
+}) {
+  const { phases, totalMs, backgroundMs, unknownCount } = overview.phases;
   const [selected, setSelected] = useState<string>();
+  const [expanded, setExpanded] = useState(false);
+  const load = useCallback(
+    (cursor?: string) => fetchSessionInsightTools(sessionId, { cursor }),
+    [sessionId],
+  );
+  const details = useInsightPage(sessionId, expanded, load, revision);
   const inspected = phases.find((phase) => phase.id === selected);
-  const reported = session.tools.filter((tool) => tool.reportedCalls?.length);
+  const reported = details.page?.entries.filter((tool) => tool.reportedCalls?.length) ?? [];
   return (
     <section
       aria-label="Time accounting"
@@ -102,11 +110,26 @@ export function SessionInsightTiming({ session }: { session: SessionInsight }) {
         </span>
         {unknownCount > 0 && <span>Timing unavailable · {unknownCount} closed intervals</span>}
       </div>
-      {reported.length > 0 && (
-        <details className="text-xs">
+      {overview.trace.summary.toolCount > 0 && (
+        <details className="text-xs" onToggle={(event) => setExpanded(event.currentTarget.open)}>
           <summary className="cursor-pointer text-[var(--muted-foreground)]">
             Reported Code Mode calls · per-call timing unavailable
           </summary>
+          {details.loading && <p role="status">Loading tool details…</p>}
+          {details.error && (
+            <p role="alert">
+              {details.error}{" "}
+              <Button size="sm" variant="outline" onClick={details.retry}>
+                Retry details
+              </Button>
+            </p>
+          )}
+          {details.page && (
+            <p className="mt-2 text-[var(--muted-foreground)]">
+              {details.page.total.toLocaleString()} tools · current page
+            </p>
+          )}
+          {details.page && !reported.length && <p>No reported calls on this page.</p>}
           <ul className="mt-3 space-y-3">
             {reported.map((tool) => (
               <li key={tool.id}>
@@ -126,6 +149,26 @@ export function SessionInsightTiming({ session }: { session: SessionInsight }) {
               </li>
             ))}
           </ul>
+          {details.page && (
+            <div className="mt-3 flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={details.loading || !details.page.previousCursor}
+                onClick={details.previous}
+              >
+                Previous tools
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={details.loading || !details.page.nextCursor}
+                onClick={details.next}
+              >
+                Next tools
+              </Button>
+            </div>
+          )}
         </details>
       )}
     </section>

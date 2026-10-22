@@ -1,7 +1,7 @@
 import { mountBadge, mountButton } from "@openchamber/sdk/ui";
-import type { SessionInsight } from "@opencode-insight/telemetry/schema";
-import { advanceTraceClock, createTraceModel } from "./trace-model";
-import type { TraceModel } from "./trace-model";
+import { advanceTraceOverview } from "@opencode-insight/telemetry/queries";
+import type { OverviewResponse, TraceOverview } from "@opencode-insight/telemetry/queries";
+import { createTraceData, type ToolPageReader } from "./trace-data";
 import { createTraceInspector } from "./trace-inspector";
 import {
   createTracePager,
@@ -18,7 +18,7 @@ import { duration, money, number } from "./format";
 
 const groupKey = (name: string) => `group:${name}`;
 
-export function createTraceView(root: HTMLElement) {
+export function createTraceView(root: HTMLElement, readTools: ToolPageReader) {
   const container = element("section", "trace-view");
   container.setAttribute("aria-label", "Tool waterfall");
   const heading = element("div", "section-head");
@@ -58,24 +58,31 @@ export function createTraceView(root: HTMLElement) {
   scroll.append(axis, rowsSlot);
   const footer = element("div", "trace-footer");
   const rowCount = element("span", "muted");
-  footer.append(rowCount);
+  const pageStatus = element("span", "muted");
+  pageStatus.setAttribute("role", "status");
+  footer.append(rowCount, pageStatus);
   container.append(heading, stats, toolbar, scroll, footer);
   root.append(container);
-  let session: SessionInsight | undefined;
-  let cached: TraceModel | undefined;
+  let overview: OverviewResponse | undefined;
+  let cached: TraceOverview | undefined;
   let revision = -1;
   let now = Date.now();
-  let model: TraceModel;
+  let model: TraceOverview;
   let selected = "session";
   let zoomed: string | undefined;
   let sessionOpen = true;
   let openGroup: string | undefined;
   let groupPage = 0;
-  let callPage = 0;
   let disposed = false;
   const items = new Map<string, TraceItem>();
   const rows = new Map<string, ReturnType<typeof createTraceRow>>();
   const inspector = createTraceInspector(container);
+  const data = createTraceData(readTools, render);
+  function open(name: string | undefined) {
+    openGroup = name;
+    if (name === undefined) data.close();
+    else data.open(name);
+  }
   function button(label: string, onClick: () => void) {
     const slot = element("span");
     controls.append(slot);
@@ -87,13 +94,12 @@ export function createTraceView(root: HTMLElement) {
     if (item?.kind === "group" || item?.kind === "tool") {
       const group = model.groups.find((entry) => entry.name === item.entry.name)!;
       groupPage = Math.floor(model.groups.indexOf(group) / PAGE_SIZE);
-      openGroup = group.name;
-      callPage = item.kind === "tool" ? Math.floor(group.tools.indexOf(item.entry) / PAGE_SIZE) : 0;
+      open(group.name);
     }
     render();
   });
   const collapse = button("Collapse tools", () => {
-    openGroup = undefined;
+    open(undefined);
     render();
   });
   const zoom = button("Zoom selected", () => {
@@ -112,13 +118,10 @@ export function createTraceView(root: HTMLElement) {
   }
   const groupsPager = pager("tool groups", (page) => {
     groupPage = page;
-    openGroup = undefined;
-    callPage = 0;
+    open(undefined);
     scroll.scrollTop = 0;
   });
-  const callsPager = pager("calls", (page) => {
-    callPage = page;
-  });
+  const callsPager = pager("calls", (page) => data.move(page));
   footer.append(groupsPager.node);
   const latestSlot = element("span");
   footer.append(latestSlot);
@@ -127,49 +130,67 @@ export function createTraceView(root: HTMLElement) {
     size: "xs",
     variant: "ghost",
     onClick: () => {
-      groupPage = lastTracePage(model.groups.length);
-      openGroup = undefined;
-      callPage = 0;
+      if (openGroup !== undefined) open(openGroup);
+      else groupPage = lastTracePage(model.groups.length);
       scroll.scrollTop = 0;
       render();
     },
   });
+  const retrySlot = element("span");
+  footer.append(retrySlot);
+  const retry = mountButton(retrySlot, {
+    label: "Retry details",
+    size: "xs",
+    variant: "ghost",
+    onClick: () => data.retry(),
+  });
+  retrySlot.hidden = true;
   function select(item: TraceItem, trigger: HTMLElement) {
     selected = item.key;
+    if (item.kind === "tool") data.select(item.entry.id);
+    else data.clearSelection();
     render();
     inspector.show(trigger);
   }
   function toggle(item: TraceItem) {
     if (item.kind === "session") sessionOpen = !sessionOpen;
     else if (item.kind === "group") {
-      openGroup = openGroup === item.entry.name ? undefined : item.entry.name;
-      callPage = 0;
+      open(openGroup === item.entry.name ? undefined : item.entry.name);
     }
     render();
   }
   const pageOf = <T>(list: T[], page: number) =>
     list.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   function render() {
-    if (disposed || !cached || !session) return;
-    model = advanceTraceClock(cached, now);
+    if (disposed || !cached || !overview) return;
+    model = advanceTraceOverview(cached, now);
+    const { page, pageIndex, detail, busy, error } = data.state;
     items.clear();
     const rootItem: TraceItem = {
       key: "session",
       kind: "session",
       model,
-      sessionID: session.sessionID,
+      sessionID: overview.sessionID,
     };
     items.set(rootItem.key, rootItem);
     for (const group of model.groups) {
       const key = groupKey(group.name);
       items.set(key, { key, kind: "group", entry: group });
-      for (const tool of group.tools)
-        items.set(`tool:${tool.id}`, {
-          key: `tool:${tool.id}`,
+      if (group.singleTool)
+        items.set(`tool:${group.singleTool.id}`, {
+          key: `tool:${group.singleTool.id}`,
           kind: "tool",
-          entry: tool,
+          entry: group.singleTool,
         });
     }
+    for (const tool of page?.entries ?? [])
+      items.set(`tool:${tool.id}`, {
+        key: `tool:${tool.id}`,
+        kind: "tool",
+        entry: tool,
+      });
+    if (detail)
+      items.set(`tool:${detail.id}`, { key: `tool:${detail.id}`, kind: "tool", entry: detail });
     const active = items.get(selected) ?? rootItem;
     selected = active.key;
     inspector.update(active, model, now);
@@ -222,14 +243,20 @@ export function createTraceView(root: HTMLElement) {
     });
     groupPage = clampTracePage(groupPage, model.groups.length);
     groupsPager.update(groupPage, model.groups.length);
-    latest.update({ disabled: groupPage === lastTracePage(model.groups.length) });
+    const activeGroup = model.groups.find((group) => group.name === openGroup);
+    latest.update({
+      disabled:
+        openGroup !== undefined
+          ? !page || (pageIndex === 0 && page.total === activeGroup?.count)
+          : groupPage === lastTracePage(model.groups.length),
+    });
     const visible: Array<TraceRowState | HTMLElement> = [
       { item: rootItem, depth: 0, expandable: true, expanded: sessionOpen },
     ];
     if (sessionOpen)
       for (const group of pageOf(model.groups, groupPage)) {
-        if (group.tools.length === 1) {
-          const tool = group.tools[0];
+        if (group.count === 1 && group.singleTool) {
+          const tool = group.singleTool;
           visible.push({
             item: items.get(`tool:${tool.id}`)!,
             depth: 1,
@@ -244,9 +271,13 @@ export function createTraceView(root: HTMLElement) {
             expanded: openGroup === group.name,
           });
           if (openGroup !== group.name) continue;
-          callPage = clampTracePage(callPage, group.tools.length);
-          callsPager.update(callPage, group.tools.length);
-          for (const tool of pageOf(group.tools, callPage))
+          callsPager.update(pageIndex, page?.total ?? group.count, {
+            previous: !busy && !!page?.previousCursor,
+            next: !busy && !!page?.nextCursor,
+            first: page?.entries.length ? (page.start ?? 0) + 1 : 0,
+            last: page?.end ?? 0,
+          });
+          for (const tool of page?.entries ?? [])
             visible.push({
               item: items.get(`tool:${tool.id}`)!,
               depth: 2,
@@ -275,6 +306,8 @@ export function createTraceView(root: HTMLElement) {
       rowCount,
       `${activeKeys.size} visible rows · ${number(summary.toolCount)} native calls`,
     );
+    setText(pageStatus, error ?? (busy ? "Loading tool details…" : ""));
+    retrySlot.hidden = !error;
     container.dataset.visibleRows = String(activeKeys.size);
     container.dataset.zoomed = zoomed ?? "";
     inspector.refresh();
@@ -283,40 +316,42 @@ export function createTraceView(root: HTMLElement) {
   const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(render);
   observer?.observe(scroll);
   return {
-    update(next: SessionInsight, at = Date.now()) {
+    update(next: OverviewResponse, at = Date.now()) {
+      if (!next.data) return;
       now = at;
       if (
-        !session ||
-        session.sessionID !== next.sessionID ||
-        session.directory !== next.directory
+        overview &&
+        (overview.sessionID !== next.sessionID || overview.directory !== next.directory)
       ) {
-        cached = undefined;
-        revision = -1;
+        this.reset();
       }
-      session = next;
+      overview = next;
       if (!cached || revision !== next.revision) {
-        cached = createTraceModel(next, now);
+        cached = next.data.trace;
         revision = next.revision;
       }
+      data.update(next);
       render();
     },
     reset() {
-      session = undefined;
+      overview = undefined;
       cached = undefined;
       revision = -1;
       selected = "session";
       zoomed = openGroup = undefined;
       sessionOpen = true;
-      groupPage = callPage = 0;
+      groupPage = 0;
+      data.reset();
       inspector.reset();
     },
     dispose() {
       disposed = true;
+      data.dispose();
       observer?.disconnect();
       rows.forEach((row) => row.dispose());
       inspector.dispose();
       live.dispose();
-      [expand, collapse, zoom, resetZoom, latest].forEach((control) => control.dispose());
+      [expand, collapse, zoom, resetZoom, latest, retry].forEach((control) => control.dispose());
       [groupsPager, callsPager].forEach((control) => control.dispose());
       container.remove();
     },
