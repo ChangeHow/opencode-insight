@@ -1,12 +1,8 @@
 import { Plugin } from "@opencode/plugin";
-import {
-  buildSeries,
-  estimateTokens,
-  sessionSchema,
-  seriesSchema,
-} from "@opencode-insight/telemetry";
+import { buildSeries, estimateTokens } from "@opencode-insight/telemetry";
 import { Collector } from "./collector";
 import { captureContext } from "./context";
+import { Provenance } from "./provenance";
 import { captureEvent, ensureTool, toolMetadata } from "./events";
 import { Insight } from "./rpc";
 import { trackToolScopes } from "./tool-scope";
@@ -20,6 +16,7 @@ export default Plugin.define({
   async setup(ctx) {
     const collector = new Collector(ctx.storage, ctx.location.directory, ctx.location.workspaceID);
     const controller = new AbortController();
+    const provenance = new Provenance();
     let streamError: unknown;
     let captureError: unknown;
     const observe = async (operation: () => Promise<void>) => {
@@ -30,14 +27,22 @@ export default Plugin.define({
       }
     };
     const registrations: { dispose(): Promise<void> }[] = [];
-    const verifiedSession = async (sessionID: string) => {
+    const verifiedInfo = async (sessionID: string) => {
       const info = await ctx.session.get({ sessionID });
       if (info.location.directory !== ctx.location.directory)
         throw new Error("Session belongs to another location");
+      return info;
+    };
+    const verifiedSession = async (sessionID: string) => {
+      const info = await verifiedInfo(sessionID);
       return collector.session(sessionID, info.parentID);
     };
-    const querySession = async (sessionID: string) => {
-      const session = await verifiedSession(sessionID);
+    const querySession = async (
+      sessionID: string,
+      info?: Awaited<ReturnType<typeof verifiedInfo>>,
+    ) => {
+      const verified = info ?? (await verifiedInfo(sessionID));
+      const session = await collector.session(sessionID, verified.parentID);
       if (
         !session.requests.length &&
         seedHistory(session, await ctx.session.context({ sessionID }))
@@ -57,24 +62,8 @@ export default Plugin.define({
         await observe(() =>
           collector.serialize(async () => {
             const session = await verifiedSession(input.sessionID);
-            const messages = await ctx.session.context({ sessionID: input.sessionID });
-            const skills = new Map(
-              messages
-                .filter((m) => m.type === "skill")
-                .map((m) => [m.id, { id: m.skill, name: m.name }]),
-            );
-            // Native user messages carry authoritative attached-skill provenance; the
-            // wrapper text is matched transiently and never persisted.
-            const attachments = new Map(
-              messages.flatMap((m) => {
-                if (m.type !== "user") return [];
-                const attached = (m.skills ?? []).flatMap((skill) =>
-                  typeof skill.text === "string"
-                    ? [{ id: skill.id, name: skill.name, text: skill.text }]
-                    : [],
-                );
-                return attached.length ? ([[m.id, attached]] as const) : [];
-              }),
+            const { skills, attachments } = await provenance.context(session, input, () =>
+              ctx.session.context({ sessionID: input.sessionID }),
             );
             const { sources, partial } = captureContext(input, skills, attachments);
             collector.context(session, sources, partial);
@@ -127,7 +116,7 @@ export default Plugin.define({
               throw new Error("Telemetry capture is incomplete", { cause: captureError });
             if (streamError)
               throw new Error("Telemetry event capture interrupted", { cause: streamError });
-            return snapshot(sessionSchema, await querySession(input.sessionID));
+            return snapshot(await querySession(input.sessionID));
           }),
         series: (input) =>
           collector.serialize(async () => {
@@ -136,7 +125,11 @@ export default Plugin.define({
               throw new Error("Telemetry capture is incomplete", { cause: captureError });
             if (streamError)
               throw new Error("Telemetry event capture interrupted", { cause: streamError });
-            return snapshot(seriesSchema, buildSeries(await querySession(input.sessionID), input));
+            const info = await verifiedInfo(input.sessionID);
+            const unchanged = collector.unchanged(input.sessionID, input.after);
+            return snapshot(
+              unchanged ?? buildSeries(await querySession(input.sessionID, info), input),
+            );
           }),
       }),
     );
@@ -145,6 +138,7 @@ export default Plugin.define({
       try {
         for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
           if (event.type === "server.connected") {
+            provenance.clear();
             if (connected) await collector.close();
             connected = true;
             continue;
@@ -153,7 +147,29 @@ export default Plugin.define({
           const workspaceID =
             "workspaceID" in event.location ? event.location.workspaceID : undefined;
           if (workspaceID !== ctx.location.workspaceID) continue;
-          await collector.serialize(() => captureEvent(collector, event));
+          await collector.serialize(async () => {
+            await captureEvent(collector, event);
+            if (
+              event.type === "session.step.started" ||
+              event.type === "session.inbox.enqueued" ||
+              event.type === "session.skill.activated"
+            ) {
+              const session = await collector.session(event.data.sessionID);
+              if (event.type === "session.step.started")
+                provenance.ordinary(session, event.data.assistantMessageID);
+              else if (event.type === "session.inbox.enqueued") {
+                const item = event.data.item;
+                // Admission is durable and follows all prompt hooks and skill resolution.
+                // Draft prompt inputs and assembled roles alone are not identity proofs.
+                if (
+                  item.type === "synthetic" ||
+                  (item.type === "user" && !item.payload.skills?.length)
+                )
+                  provenance.ordinary(session, event.data.inboxID);
+                else provenance.invalidate(session);
+              } else provenance.invalidate(session);
+            }
+          });
         }
         if (!controller.signal.aborted) streamError = new Error("Telemetry event stream ended");
       } catch (error) {

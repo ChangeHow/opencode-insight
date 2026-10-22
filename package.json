@@ -56,6 +56,7 @@
     "format:check": "oxfmt --check .",
     "doctor": "react-doctor apps/web -y --score --blocking warning",
     "bench": "pnpm -r --if-present bench",
+    "bench:insight-memory": "node scripts/insight-memory/run.mjs",
     "daemon:start": "node ./scripts/daemon.mjs",
     "daemon:stop": "node ./scripts/stop-daemon.mjs",
     "daemon:restart": "node ./scripts/stop-daemon.mjs && node ./scripts/daemon.mjs",

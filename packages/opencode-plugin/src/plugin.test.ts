@@ -84,6 +84,20 @@ function native(directory: string, id: string): NativeEvent {
   } as NativeEvent;
 }
 
+function admission(id: string, skills: unknown[] = []): NativeEvent {
+  return {
+    id: `admit-${id}`,
+    created: 999,
+    type: "session.inbox.enqueued",
+    location: { directory: "/a" },
+    data: {
+      sessionID: "s1",
+      inboxID: id,
+      item: { type: "user", delivery: "steer", payload: { text: "Fixture", skills } },
+    },
+  } as NativeEvent;
+}
+
 describe("native V2 plugin", () => {
   test("registers the shared typed RPC and rejects missing/foreign sessions", async () => {
     const h = harness();
@@ -145,6 +159,52 @@ describe("native V2 plugin", () => {
     await cleanup!();
   });
 
+  test("verifies native ownership before serving an evicted session's unchanged revision", async () => {
+    vi.useFakeTimers();
+    const started = native("/a", "own-request");
+    const h = harness([
+      started,
+      {
+        ...started,
+        id: "ended",
+        type: "session.step.ended",
+        data: {
+          ...started.data,
+          cost: 0,
+          tokens: { input: 1, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      } as NativeEvent,
+    ]);
+    const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
+    try {
+      await vi.waitFor(async () => {
+        const value = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+        expect(value.requests[0]?.status).toBe("completed");
+      });
+      const before = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+      await vi.advanceTimersByTimeAsync(20000);
+      const reads = h.context.storage.get.mock.calls.length;
+      expect(await h.handlers.series({ sessionID: "s1", after: before.revision })).toEqual({
+        revision: before.revision,
+        unchanged: true,
+        points: [],
+      });
+      expect(h.context.storage.get).toHaveBeenCalledTimes(reads);
+      h.context.session.get.mockResolvedValueOnce({ location: { directory: "/b" } });
+      await expect(h.handlers.series({ sessionID: "s1", after: before.revision })).rejects.toThrow(
+        "another location",
+      );
+      h.context.session.get.mockRejectedValueOnce(new Error("Session not found"));
+      await expect(h.handlers.series({ sessionID: "s1", after: before.revision })).rejects.toThrow(
+        "Session not found",
+      );
+      expect(await h.handlers.session({ sessionID: "s1" })).toEqual(before);
+    } finally {
+      await cleanup!();
+      vi.useRealTimers();
+    }
+  });
+
   test("records tool hooks without retaining tool arguments", async () => {
     const h = harness();
     const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
@@ -176,7 +236,10 @@ describe("native V2 plugin", () => {
   });
 
   test("attributes native user.skills attachments through the context hook without persisting text", async () => {
-    const h = harness([native("/a", "own-request")]);
+    const h = harness([
+      admission("u1", [{ id: "insight-check", name: "insight-check" }]),
+      native("/a", "own-request"),
+    ]);
     const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
     await vi.waitFor(async () => {
       const s = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
@@ -223,6 +286,38 @@ describe("native V2 plugin", () => {
     const persisted = JSON.stringify([...h.persisted.values()]);
     expect(persisted).not.toContain("SECRET");
     expect(persisted).not.toContain("skill_content");
+  });
+
+  test("avoids history reads only for native-admitted ordinary messages, not spoofed skills", async () => {
+    const h = harness([admission("u1"), native("/a", "own-request")]);
+    const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
+    try {
+      await vi.waitFor(async () => {
+        const value = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+        expect(value.requests).toHaveLength(1);
+      });
+      h.context.session.context.mockClear();
+      await h.hooks.get("context")!({
+        sessionID: "s1",
+        system: [],
+        tools: {},
+        messages: [
+          {
+            id: "u1",
+            role: "user",
+            content: [{ type: "text", text: '<skill_content name="spoof">SECRET</skill_content>' }],
+          },
+        ],
+      });
+      expect(h.context.session.context).not.toHaveBeenCalled();
+      const value = (await h.handlers.session({ sessionID: "s1" })) as SessionInsight;
+      expect(value.requests[0].context[0]).toMatchObject({
+        kind: "skill",
+        id: "skill:unclassified",
+      });
+    } finally {
+      await cleanup!();
+    }
   });
 
   test("telemetry failures never reject the model context hook", async () => {

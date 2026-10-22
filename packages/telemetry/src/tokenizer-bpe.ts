@@ -1,4 +1,5 @@
 import cl100kRanks from "js-tiktoken/ranks/cl100k_base";
+import { buildTokenRanks } from "./tokenizer-ranks";
 
 /**
  * Encode-only cl100k_base BPE token counter.
@@ -6,8 +7,8 @@ import cl100kRanks from "js-tiktoken/ranks/cl100k_base";
  * Semantically equivalent to `new Tiktoken(cl100kRanks).encode(text, [], []).length`
  * from js-tiktoken@1.0.21, but built for counting only:
  * - No rank->bytes decoder table (`textMap`); decoding is never needed to count.
- * - Rank keys are the token's bytes as chars U+0000..U+00FF instead of
- *   comma-joined decimal strings (~2.7x shorter, bijective on bytes 0..255).
+ * - Ranks use a compact byte arena and an exact collision-checked hash index,
+ *   rather than retaining one JavaScript string and Map entry per token.
  * - Special tokens are never recognized. With `allowedSpecial=[]` and
  *   `disallowedSpecial=[]` the upstream special-token scan can neither emit a
  *   special token nor throw; its only observable effect is chunking the input,
@@ -27,32 +28,35 @@ function byteKey(bytes: Uint8Array, start: number, end: number): string {
   return key;
 }
 
-function buildRankMap(): Map<string, number> {
-  const map = new Map<string, number>();
-  // Line format: `<ignored> <rank-offset> <base64-token>...`, same parse as
-  // js-tiktoken (later duplicates win).
-  for (const line of cl100kRanks.bpe_ranks.split("\n")) {
-    if (!line) continue;
-    const fields = line.split(" ");
-    const offset = Number.parseInt(fields[1], 10);
-    for (let i = 2; i < fields.length; i++) {
-      map.set(atob(fields[i]), offset + (i - 2));
-    }
-  }
-  return map;
+function buildRankMap(): ReturnType<typeof buildTokenRanks> {
+  return buildTokenRanks(cl100kRanks.bpe_ranks);
 }
 
-function bytePairCount(piece: Uint8Array, ranks: Map<string, number>): number {
+let workspace:
+  | {
+      starts: Int32Array;
+      ends: Int32Array;
+      pairRank: Int32Array;
+    }
+  | undefined;
+
+function bytePairCount(piece: string, ranks: ReturnType<typeof buildTokenRanks>): number {
   const n = piece.length;
-  const starts = new Int32Array(n);
-  const ends = new Int32Array(n);
+  if (!workspace || workspace.starts.length < n) {
+    const capacity = Math.max(n, (workspace?.starts.length ?? 0) * 2);
+    workspace = {
+      starts: new Int32Array(capacity),
+      ends: new Int32Array(capacity),
+      pairRank: new Int32Array(capacity),
+    };
+  }
+  const { starts, ends, pairRank } = workspace;
   // pairRank[i] is the rank of piece[starts[i], ends[i + 1]) or -1 when absent,
   // mirroring upstream's null-rank skip. Recomputed only for pairs whose
   // neighborhood changed, which cannot affect merge selection: identical ranks,
   // minimum rank with leftmost tie-break (strict <), same as upstream.
-  const pairRank = new Int32Array(n - 1);
   const rankOf = (start: number, end: number): number => {
-    const rank = ranks.get(byteKey(piece, start, end));
+    const rank = ranks.get(piece.slice(start, end));
     return rank === undefined ? -1 : rank;
   };
   for (let i = 0; i < n; i++) {
@@ -60,6 +64,7 @@ function bytePairCount(piece: Uint8Array, ranks: Map<string, number>): number {
     ends[i] = i + 1;
   }
   for (let i = 0; i < n - 1; i++) pairRank[i] = rankOf(i, i + 2);
+  pairRank[n - 1] = -1;
   let parts = n;
   while (parts > 1) {
     let best = -1;
@@ -90,23 +95,50 @@ function bytePairCount(piece: Uint8Array, ranks: Map<string, number>): number {
   return tokens;
 }
 
-let rankMap: Map<string, number> | undefined;
+let rankMap: ReturnType<typeof buildTokenRanks> | undefined;
 let pattern: RegExp | undefined;
+let lastUsed = 0;
+let idleTimer: ReturnType<typeof setTimeout> | undefined;
 const textEncoder = new TextEncoder();
+const idleMilliseconds = 5000;
+
+function releaseIdle(): void {
+  idleTimer = undefined;
+  const remaining = idleMilliseconds - (Date.now() - lastUsed);
+  if (remaining > 0) {
+    scheduleRelease(remaining);
+    return;
+  }
+  rankMap = undefined;
+  pattern = undefined;
+  workspace = undefined;
+}
+
+function scheduleRelease(milliseconds = idleMilliseconds): void {
+  if (idleTimer) return;
+  idleTimer = setTimeout(releaseIdle, milliseconds);
+  // Browser timers are numbers; Node/Bun timers can avoid keeping a process alive.
+  (idleTimer as unknown as { unref?: () => void }).unref?.();
+}
 
 /** Count cl100k_base tokens in `text`; special-token-looking text stays ordinary. */
 export function countCl100kTokens(text: string): number {
+  lastUsed = Date.now();
+  scheduleRelease();
   rankMap ??= buildRankMap();
   pattern ??= new RegExp(cl100kRanks.pat_str, "ug");
   let count = 0;
   // matchAll clones the regex per call, so caching `pattern` is stateless.
   for (const match of text.matchAll(pattern)) {
-    const piece = textEncoder.encode(match[0]);
+    // Convert each UTF-8 piece once. Pair lookups can then slice the same byte
+    // string instead of repeatedly allocating typed-array views and spreading them.
+    const bytes = textEncoder.encode(match[0]);
+    const piece = byteKey(bytes, 0, bytes.length);
     if (piece.length === 1) {
       // Upstream returns the (always-present) single-byte rank unprefiltered;
       // every byte 0..255 is a cl100k_base token, so this is exactly one token.
       count += 1;
-    } else if (rankMap.has(byteKey(piece, 0, piece.length))) {
+    } else if (rankMap.has(piece)) {
       count += 1;
     } else {
       count += bytePairCount(piece, rankMap);

@@ -2,18 +2,26 @@ import type { Plugin } from "@opencode/plugin";
 import {
   sessionSchema,
   type ContextSource,
+  type InsightSeries,
   type RequestInsight,
   type SessionInsight,
 } from "@opencode-insight/telemetry";
 import { StreamCounter, type Channel } from "./stream";
+import { storageBorrow } from "./storage-borrow";
+
+const idleMilliseconds = 5000;
 
 export class Collector {
   private sessions = new Map<string, SessionInsight>();
   private counters = new Map<string, StreamCounter>();
   private pendingContext = new Map<string, { sources: ContextSource[]; partial: boolean }>();
   private dirty = new Set<string>();
+  private persisted = new WeakSet<SessionInsight>();
+  private activity = new WeakMap<SessionInsight, number>();
+  private idleRevisions = new Map<string, number>();
   private tail: Promise<unknown> = Promise.resolve();
   private timer?: ReturnType<typeof setTimeout>;
+  private idleTimer?: ReturnType<typeof setTimeout>;
   private writeError?: unknown;
   private prefix: string;
 
@@ -27,8 +35,56 @@ export class Collector {
 
   serialize<T>(operation: () => Promise<T>): Promise<T> {
     const next = this.tail.then(operation);
-    this.tail = next.catch(() => {});
+    // Keep ordering and failure recovery, but not the last operation's response.
+    this.tail = next.then(
+      () => undefined,
+      () => undefined,
+    );
     return next;
+  }
+
+  unchanged(sessionID: string, after: number | undefined): InsightSeries | undefined {
+    const revision = this.idleRevisions.get(sessionID);
+    if (revision !== undefined && revision === after)
+      return { revision, unchanged: true, points: [] };
+  }
+
+  private scheduleIdle(milliseconds = idleMilliseconds): void {
+    if (this.idleTimer) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = undefined;
+      void this.serialize(() => this.evictIdle()).catch((error: unknown) => {
+        this.writeError = error;
+      });
+    }, milliseconds);
+    this.idleTimer.unref?.();
+  }
+
+  private async evictIdle(): Promise<void> {
+    await this.flush();
+    let next = Infinity;
+    for (const session of this.sessions.values()) {
+      if (
+        !this.persisted.has(session) ||
+        this.pendingContext.has(session.sessionID) ||
+        session.requests.some((request) => request.status === "running") ||
+        session.tools.some((tool) => tool.status === "running")
+      )
+        continue;
+      const remaining = idleMilliseconds - (Date.now() - this.activity.get(session)!);
+      if (remaining > 0) {
+        next = Math.min(next, remaining);
+        continue;
+      }
+      this.sessions.delete(session.sessionID);
+      // Empty sessions still need history seeding on their next query.
+      if (session.requests.length) {
+        this.idleRevisions.set(session.sessionID, session.revision);
+        if (this.idleRevisions.size > 64)
+          this.idleRevisions.delete(this.idleRevisions.keys().next().value!);
+      }
+    }
+    if (Number.isFinite(next)) this.scheduleIdle(next);
   }
 
   async session(sessionID: string, parentID?: string): Promise<SessionInsight> {
@@ -90,12 +146,18 @@ export class Collector {
       this.touch(session, session.updatedAt);
     }
     this.sessions.set(sessionID, session);
+    this.idleRevisions.delete(sessionID);
+    if (parsed.success) this.persisted.add(session);
+    this.activity.set(session, Date.now());
+    this.scheduleIdle();
     return session;
   }
 
   touch(session: SessionInsight, now: number): void {
     session.updatedAt = Math.max(session.updatedAt, now);
     session.revision++;
+    this.activity.set(session, Date.now());
+    this.scheduleIdle();
     this.dirty.add(session.sessionID);
     if (!this.timer) {
       this.timer = setTimeout(() => {
@@ -108,6 +170,8 @@ export class Collector {
   }
 
   context(session: SessionInsight, sources: ContextSource[], partial = false): void {
+    this.activity.set(session, Date.now());
+    this.scheduleIdle();
     const request = session.requests.at(-1);
     if (!request || request.status !== "running" || request.context.length) {
       this.pendingContext.set(session.sessionID, {
@@ -181,8 +245,9 @@ export class Collector {
     for (const id of [...this.dirty]) {
       const session = this.sessions.get(id);
       if (!session) continue;
-      await this.storage.set(this.prefix + id, JSON.parse(JSON.stringify(session)));
+      await this.storage.set(this.prefix + id, storageBorrow(session));
       this.dirty.delete(id);
+      this.persisted.add(session);
     }
     this.writeError = undefined;
   }
@@ -194,6 +259,9 @@ export class Collector {
 
   async close(now?: number): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = undefined;
     await this.serialize(async () => {
       for (const session of this.sessions.values()) {
         const end = now ?? session.updatedAt;
@@ -217,8 +285,17 @@ export class Collector {
         }
       }
       if (this.timer) clearTimeout(this.timer);
+      this.timer = undefined;
+      if (this.idleTimer) clearTimeout(this.idleTimer);
+      this.idleTimer = undefined;
       await this.flush();
       this.counters.clear();
+      // Reconnect reuses this collector, but no idle timer remains after close.
+      // Keep only state that cannot yet be recovered exactly from storage.
+      for (const session of this.sessions.values()) {
+        if (this.persisted.has(session) && !this.pendingContext.has(session.sessionID))
+          this.sessions.delete(session.sessionID);
+      }
     });
   }
 }

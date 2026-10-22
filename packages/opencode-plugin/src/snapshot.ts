@@ -1,17 +1,22 @@
-import type { ZodType } from "zod";
+import type { InsightSeries, SessionInsight } from "@opencode-insight/telemetry";
 
-function omitUndefined(value: unknown): void {
-  if (value === null || typeof value !== "object") return;
-  const record = value as Record<string, unknown>;
-  for (const key of Object.keys(record)) {
-    if (record[key] === undefined) delete record[key];
-    else omitUndefined(record[key]);
+type Value = string | number | boolean | null | undefined | Value[] | { [key: string]: Value };
+
+// Only plain telemetry data: no toJSON hooks, class instances, or cyclic references.
+function copy(value: Value): Value {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? (value === 0 ? 0 : value) : null;
+  if (typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map(copy);
+  const result: Record<string, Value> = {};
+  for (const key of Object.keys(value)) {
+    const item = value[key];
+    if (item !== undefined) result[key] = copy(item);
   }
+  return result;
 }
 
-/** Schema parsing creates the detached copy; omit absent JSON fields without a second copy. */
-export function snapshot<T>(schema: ZodType<T>, value: unknown): T {
-  const result = schema.parse(value);
-  omitUndefined(result);
-  return result;
+/** Detach inside the collector queue; the native RPC host validates the unchanged schema. */
+export function snapshot<T extends SessionInsight | InsightSeries>(value: T): T {
+  return copy(value) as T;
 }
