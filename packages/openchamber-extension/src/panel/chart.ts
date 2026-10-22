@@ -25,7 +25,8 @@ export function chartGeometry(window?: SpeedWindow, width = WIDTH) {
       const position = `${x(point.at).toFixed(2)},${y(point.tps).toFixed(2)}`;
       if (point.breakBefore || previous?.tps === undefined) return `M${position}`;
       // This connects request averages, not invented per-second reasoning samples.
-      return `L${position}`;
+      const midpoint = ((x(previous.at) + x(point.at)) / 2).toFixed(2);
+      return `C${midpoint},${y(previous.tps).toFixed(2)} ${midpoint},${y(point.tps).toFixed(2)} ${position}`;
     })
     .join(" ");
   return { points, shades, start, end, max, x, y, path, width, right, nextAt: window?.nextAt };

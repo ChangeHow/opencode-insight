@@ -66,7 +66,7 @@ describe("speed chart", () => {
     expect(g.end).toBe(30000);
     expect(g.points.map((point) => point.at)).toEqual([5000, 20000]);
     expect(g.path.match(/M/g)).toHaveLength(1);
-    expect(g.path.match(/L/g)).toHaveLength(1);
+    expect(g.path).toBe("M143.33,106.00 C286.33,106.00 286.33,18.00 429.33,18.00");
     expect(g.shades).toEqual([]);
     const { root, controller } = mount();
     controller.update(window());
@@ -96,7 +96,7 @@ describe("speed chart", () => {
     });
     const g = chartGeometry(data);
     expect(g.path.match(/M/g)).toHaveLength(2);
-    expect(g.path).not.toContain("L");
+    expect(g.path).not.toMatch(/[CL]/);
     expect(g.points).toHaveLength(3);
     expect(g.shades.map((point) => point.requestID)).toEqual(["missing"]);
     const { root, controller } = mount();
@@ -126,7 +126,7 @@ describe("speed chart", () => {
     );
     expect(unknownDuration.points).toHaveLength(2);
     expect(unknownDuration.path.match(/M/g)).toHaveLength(2);
-    expect(unknownDuration.path).not.toContain("L");
+    expect(unknownDuration.path).not.toMatch(/[CL]/);
   });
 
   test("keyboard and touch inspection expose request rates", () => {
@@ -185,7 +185,7 @@ describe("speed chart", () => {
     expect(root.querySelector<HTMLElement>(".chart-empty")!.hidden).toBe(false);
     expect(root.querySelector<HTMLElement>(".chart")!.hidden).toBe(true);
     controller.update(window({ ...session, requests: [session.requests[0]] }));
-    expect(root.querySelector("path.speed")!.getAttribute("d")).not.toContain("L");
+    expect(root.querySelector("path.speed")!.getAttribute("d")).not.toMatch(/[CL]/);
     controller.update(
       window({
         ...session,
