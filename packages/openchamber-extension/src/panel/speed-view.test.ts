@@ -51,6 +51,7 @@ describe("speed status section", () => {
     const mean = root.querySelector(".speed-summary strong")!;
     const svg = root.querySelector("svg")!;
     expect(mean.textContent).toBe("10 tokens/s");
+    expect(root.querySelector("button")?.closest("[hidden]")).not.toBeNull();
     expect(root.querySelector(".token-grid, .trace-view, h1")).toBeNull();
     svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     expect(root.querySelector(".tooltip strong")?.textContent).toBe(mean.textContent);
@@ -94,6 +95,7 @@ describe("speed status section", () => {
       ...state,
       speed: buildSpeedWindow({ ...session, requests: [] }, undefined, 30000),
     });
+    expect(button.closest("[hidden]")).not.toBeNull();
     expect(root.querySelector(".speed-summary strong")?.textContent).toBe("Unavailable");
     expect(root.querySelector<HTMLElement>(".chart")?.hidden).toBe(true);
     expect(root.textContent).toContain("no measured model request duration");

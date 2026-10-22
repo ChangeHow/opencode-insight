@@ -10,11 +10,10 @@ export function createSpeedView(root: HTMLElement, retry: () => void, refresh: (
   root.setAttribute("aria-label", "Session speed");
   const summary = element("div", "section-head speed-summary");
   const mean = element("div");
-  mean.title =
-    "Shown requests: reported output + reasoning / total request-to-stream-end time. Includes in-request latency and stalls; excludes inter-request tools and idle time.";
   const value = element("strong");
-  mean.append(element("span", "muted", "Generation mean "), value);
+  mean.append(value);
   const retrySlot = element("div");
+  retrySlot.hidden = true;
   summary.append(mean, retrySlot);
   const errorSlot = element("div");
   const emptySlot = element("div");
@@ -37,6 +36,7 @@ export function createSpeedView(root: HTMLElement, retry: () => void, refresh: (
         chart.update();
       }
       errorSlot.hidden = !state.error;
+      retrySlot.hidden = !state.error;
       if (state.error)
         banner.update({
           title: `${state.error}${state.speed ? " Previous captured data is retained; it may be stale." : ""}`,
