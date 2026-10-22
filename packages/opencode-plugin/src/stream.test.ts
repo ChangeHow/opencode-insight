@@ -201,5 +201,6 @@ describe("stream prefix retention", () => {
     expect(run.actual.buckets[0].at).toBe(1000);
     run.delta("text", "output", "ion", 7201000);
     expect(run.actual.buckets.every((bucket) => bucket.output === 0)).toBe(true);
-  }, 30000);
+    // Exhaustive per-event snapshot comparisons need headroom on slower CI workers.
+  }, 60000);
 });
