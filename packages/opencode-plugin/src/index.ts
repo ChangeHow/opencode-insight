@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin";
+import { randomUUID } from "node:crypto";
 import { buildSeries, estimateTokens } from "@opencode-insight/telemetry";
 import {
   buildOverview,
@@ -21,6 +22,8 @@ export default Plugin.define({
   id: "opencode-insight",
   async setup(ctx) {
     const collector = new Collector(ctx.storage, ctx.location.directory, ctx.location.workspaceID);
+    // Owned by this location's live capture/RPC setup, never by the separate RPC bundle.
+    let speedScope = randomUUID();
     const controller = new AbortController();
     const provenance = new Provenance();
     let streamError: unknown;
@@ -156,10 +159,24 @@ export default Plugin.define({
               return unchanged(session.revision);
             return snapshot(buildOverview(session));
           }),
+        speedScope: async (input) => {
+          assertCapture();
+          await verifiedInfo(input.sessionID);
+          return {
+            sessionID: input.sessionID,
+            directory: ctx.location.directory,
+            scope: speedScope,
+          };
+        },
         speedWindow: (input) =>
           collector.serialize(async () => {
             assertCapture();
-            return snapshot(buildSpeedWindow(await querySession(input.sessionID), input));
+            const scope = speedScope;
+            const session = await querySession(input.sessionID);
+            if (scope !== speedScope)
+              throw new Error("Telemetry source changed during speed query");
+            const measuredAt = Date.now();
+            return snapshot({ ...buildSpeedWindow(session, input, measuredAt), scope });
           }),
         toolPage: (input) =>
           collector.serialize(async () => {
@@ -184,7 +201,10 @@ export default Plugin.define({
         for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
           if (event.type === "server.connected") {
             provenance.clear();
-            if (connected) await collector.close();
+            if (connected) {
+              speedScope = randomUUID();
+              await collector.close();
+            }
             connected = true;
             continue;
           }

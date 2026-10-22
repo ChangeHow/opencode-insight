@@ -51,6 +51,7 @@ export function buildSpeedWindow(
     sessionID: session.sessionID,
     directory: session.directory,
     revision: session.revision,
+    measuredAt: now,
     generation: buildGenerationWindow(session, range, now),
   };
   const buckets: SpeedBucket[] = [];

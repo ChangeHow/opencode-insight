@@ -27,7 +27,9 @@ export function createSpeedView(root: HTMLElement, retry: () => void, refresh: (
   });
   const banner = mountBanner(errorSlot, { tone: "error", title: "Telemetry unavailable" });
   const empty = mountEmpty(emptySlot, { title: "Select an active OpenCode session" });
-  const chart = createSpeedChart(chartSlot, refresh);
+  const chart = createSpeedChart(chartSlot, refresh, (left) => {
+    summary.style.paddingInlineStart = `${left}px`;
+  });
   return {
     render(state: PanelState) {
       const key = `${state.directory}\0${state.sessionID}`;
@@ -51,7 +53,15 @@ export function createSpeedView(root: HTMLElement, retry: () => void, refresh: (
       chartSlot.hidden = !!message;
       if (message) empty.update({ title: message });
       const tps = state.speed?.generation?.tps;
-      setText(value, tps === undefined ? "Unavailable" : `${number(tps)} tokens/s`);
+      setText(
+        value,
+        tps === undefined
+          ? "Unavailable"
+          : `${state.speed?.generation?.estimated ? "≈" : ""}${number(tps)} tokens/s`,
+      );
+      if (state.speedCached && state.speedReceivedAt !== undefined)
+        value.title = `Previous sample · measured ${new Date(state.speed?.measuredAt ?? state.speedReceivedAt).toLocaleString()}; awaiting live telemetry.`;
+      else value.removeAttribute("title");
       chart.update(state.speed);
     },
     dispose() {

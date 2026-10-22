@@ -1,18 +1,20 @@
 import { z } from "zod";
-import { requestSchema, type SessionInsight } from "./schema";
+import { requestSchema, type RequestInsight, type SessionInsight } from "./schema";
 import { requestTps } from "./summary";
 
 export const MAX_GENERATION_STAGES = 40;
+export const GENERATION_WINDOW_MS = 15 * 60 * 1000;
 
 export const generationStageSchema = z.object({
   requestID: z.string(),
   model: z.string(),
   start: z.number(),
   end: z.number(),
-  offsetMs: z.number().nonnegative(),
+  offsetMs: z.number(),
   durationMs: z.number().positive(),
   status: requestSchema.shape.status,
   tps: z.number().nonnegative().optional(),
+  estimated: z.literal(true).optional(),
   output: z.number().nonnegative().optional(),
   reasoning: z.number().nonnegative().optional(),
   breakBefore: z.boolean().optional(),
@@ -20,21 +22,74 @@ export const generationStageSchema = z.object({
 export type GenerationStage = z.infer<typeof generationStageSchema>;
 
 export const generationWindowSchema = z.object({
+  start: z.number().finite(),
+  end: z.number().finite(),
+  partial: z.boolean(),
   durationMs: z.number().nonnegative(),
   stages: z.array(generationStageSchema).max(MAX_GENERATION_STAGES),
   tps: z.number().nonnegative().optional(),
+  estimated: z.literal(true).optional(),
   unavailableCount: z.number().int().nonnegative(),
 });
 export type GenerationWindow = z.infer<typeof generationWindowSchema>;
 
-/** Compress gaps between requests, retaining each request's full elapsed time. */
+/** Reproject captured request averages, never infer token arrivals or extend running requests. */
+export function advanceGenerationWindow(
+  window: GenerationWindow,
+  elapsedMs: number,
+): GenerationWindow {
+  const start = window.start + elapsedMs;
+  const end = window.end + elapsedMs;
+  const stages = window.stages
+    .filter((stage) => stage.end > start && stage.start < end)
+    .map((stage) => ({ ...stage, offsetMs: stage.start - start }));
+  const measured = stages.filter((stage) => stage.tps !== undefined);
+  const measuredMs = measured.reduce((sum, stage) => sum + stage.durationMs, 0);
+  return {
+    ...window,
+    start,
+    end,
+    stages,
+    estimated: measured.some((stage) => stage.estimated) ? true : undefined,
+    tps:
+      measuredMs > 0
+        ? measured.reduce((sum, stage) => sum + stage.tps! * stage.durationMs, 0) / measuredMs
+        : undefined,
+    unavailableCount: stages.filter((stage) => stage.tps === undefined).length,
+  };
+}
+
+function liveTokens(request: RequestInsight, end: number) {
+  if (
+    request.status !== "running" ||
+    request.capture !== "live" ||
+    request.firstDeltaAt === undefined ||
+    request.firstDeltaAt > end ||
+    end <= request.startedAt
+  )
+    return;
+  // Partial capture includes evicted buckets and rejected stream text. Only a
+  // complete captured prefix can represent the whole request-to-observation mean.
+  let output = 0;
+  let reasoning = 0;
+  for (const bucket of request.buckets) {
+    output += bucket.output;
+    reasoning += bucket.reasoning;
+  }
+  // Summary text is not reasoning; summary-only and pre-first-chunk stay unknown.
+  return output + reasoning > 0 ? { output, reasoning } : undefined;
+}
+
+/** Wall-clock viewport; rates always retain the full measured request duration. */
 export function buildGenerationWindow(
   session: SessionInsight,
   input?: { from?: number; to?: number },
   now = Date.now(),
 ): GenerationWindow {
+  const end = input?.to ?? now;
+  const start = input?.from ?? end - GENERATION_WINDOW_MS;
   // Select before removing unplottable requests so unknown durations consume the bound.
-  const selected = session.requests
+  const candidates = session.requests
     .map((request) => ({
       request,
       end:
@@ -43,22 +98,23 @@ export function buildGenerationWindow(
         (request.status === "running" ? now : request.startedAt),
     }))
     .filter(({ request, end }) => {
-      if (input?.to !== undefined && request.startedAt >= input.to) return false;
-      if (input?.from === undefined) return true;
-      return end > request.startedAt ? end > input.from : request.startedAt >= input.from;
+      if (request.startedAt >= (input?.to ?? now)) return false;
+      return end > request.startedAt ? end > start : request.startedAt >= start;
     })
-    .sort((a, b) => a.request.startedAt - b.request.startedAt)
-    .slice(-MAX_GENERATION_STAGES);
+    .sort((a, b) => a.request.startedAt - b.request.startedAt);
+  const selected = candidates.slice(-MAX_GENERATION_STAGES);
 
   const stages: GenerationStage[] = [];
-  let durationMs = 0;
   let measuredMs = 0;
   let tokens = 0;
   let unavailableCount = 0;
   let breakBefore = false;
   for (const { request, end } of selected) {
     const elapsed = end - request.startedAt;
-    const tps = requestTps(request);
+    const estimate = liveTokens(request, end);
+    const tps =
+      requestTps(request) ??
+      (estimate && ((estimate.output + estimate.reasoning) * 1000) / elapsed);
     if (tps === undefined) unavailableCount++;
     if (elapsed <= 0) {
       breakBefore = true;
@@ -69,25 +125,31 @@ export function buildGenerationWindow(
       model: request.model,
       start: request.startedAt,
       end,
-      offsetMs: durationMs,
+      offsetMs: request.startedAt - start,
       durationMs: elapsed,
       status: request.status,
       tps,
-      output: request.usage?.output,
-      reasoning: request.usage?.reasoning,
+      ...(estimate ? { estimated: true as const } : {}),
+      output: estimate?.output ?? request.usage?.output,
+      reasoning: estimate?.reasoning ?? request.usage?.reasoning,
       ...(breakBefore ? { breakBefore: true } : {}),
     });
     breakBefore = false;
-    durationMs += elapsed;
     if (tps !== undefined) {
       measuredMs += elapsed;
-      tokens += request.usage!.output + request.usage!.reasoning;
+      tokens += estimate
+        ? estimate.output + estimate.reasoning
+        : request.usage!.output + request.usage!.reasoning;
     }
   }
   return {
-    durationMs,
+    start,
+    end,
+    partial: session.interruptedCapture || candidates.length > MAX_GENERATION_STAGES,
+    durationMs: end - start,
     stages,
     tps: measuredMs > 0 ? (tokens * 1000) / measuredMs : undefined,
+    ...(stages.some((stage) => stage.estimated) ? { estimated: true as const } : {}),
     unavailableCount,
   };
 }

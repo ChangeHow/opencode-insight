@@ -20,6 +20,46 @@ const session = (id = "one", directory = "/local"): SessionInsight => ({
   interruptedCapture: false,
 });
 const json = (value: unknown, status = 200) => ({ status, body: JSON.stringify(value) });
+// Paint visibility may be false for usable frames under host decorative overlays.
+function browserIntersection(initial = true, observeInitial = true) {
+  let notify: (values?: boolean[]) => void = () => {};
+  let intersecting = initial;
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(listener: IntersectionObserverCallback) {
+        notify = (values = [intersecting]) =>
+          listener(
+            values.map(
+              (value) =>
+                ({
+                  isIntersecting: value,
+                  isVisible: false,
+                }) as unknown as IntersectionObserverEntry,
+            ),
+            this as unknown as IntersectionObserver,
+          );
+        this.observe = () => {
+          if (observeInitial) notify();
+        };
+      }
+      observe: () => void;
+      disconnect = disconnect;
+    },
+  );
+  return {
+    disconnect,
+    set(value: boolean) {
+      intersecting = value;
+      notify();
+    },
+    deliver(values: boolean[]) {
+      intersecting = values.at(-1)!;
+      notify(values);
+    },
+  };
+}
 function response(request: GuestRequest, raw = session()) {
   const body = JSON.parse(request.body!);
   if (request.path === "/overview")
@@ -38,6 +78,7 @@ function response(request: GuestRequest, raw = session()) {
 function harness(
   request?: (request: GuestRequest) => Promise<GuestRequestResult>,
   surface: "panel" | "status" = "panel",
+  replay = false,
 ) {
   let onSession: (session: SessionSnapshot | null) => void = () => {};
   let onDirectory: (directory: string | null) => void = () => {};
@@ -55,10 +96,12 @@ function harness(
     {
       onSession(listener) {
         onSession = listener;
+        if (replay) listener({ id: "one", title: "one", busy: false });
         return unsubSession;
       },
       onDirectory(listener) {
         onDirectory = listener;
+        if (replay) listener("/local");
         return unsubDirectory;
       },
       serviceRequest,
@@ -86,6 +129,7 @@ describe("panel controller", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    browserIntersection();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -108,7 +152,10 @@ describe("panel controller", () => {
     expect(h.serviceRequest).toHaveBeenCalledTimes(2);
     expect(h.states.at(-1)?.overview?.sessionID).toBe("one");
     h.serviceRequest.mockRejectedValue(new Error("Capture offline"));
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(2999);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(2);
+    expect(h.states.at(-1)?.error).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
     expect(h.states.at(-1)?.error).toContain("Capture offline");
     expect(h.states.at(-1)?.overview?.sessionID).toBe("one");
     h.serviceRequest.mockImplementation(async (request) => json(response(request)));
@@ -122,7 +169,9 @@ describe("panel controller", () => {
   test("fetches only speed for the expanded Resources section", async () => {
     const h = harness(undefined, "status");
     h.select();
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(h.serviceRequest).toHaveBeenCalledTimes(2);
     expect(h.serviceRequest.mock.calls.map(([request]) => request.path)).toEqual([
       "/speed-window",
@@ -167,7 +216,8 @@ describe("panel controller", () => {
     expect(h.states.at(-1)?.overview).toBeUndefined();
   });
 
-  test("pauses hidden panels, drops pending results, resumes and disposes", async () => {
+  test("works without IntersectionObserver and pauses hidden documents, drops pending results and disposes", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
     const h = harness();
     h.select();
     Object.defineProperty(document, "hidden", { configurable: true, value: true });
@@ -196,20 +246,20 @@ describe("panel controller", () => {
     h.controller.dispose();
   });
 
-  test("does not replace the chart DOM on unchanged idle polls", async () => {
+  test("advances the idle viewport without rereading an unchanged speed projection", async () => {
     const h = harness(async (request) => json(response(request)));
     h.select();
     await vi.advanceTimersByTimeAsync(0);
     const renders = h.states.length;
     const initial = h.states.at(-1)!;
     await vi.advanceTimersByTimeAsync(3000);
-    expect(h.serviceRequest).toHaveBeenCalledTimes(5);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(3);
     expect(
       h.serviceRequest.mock.calls.filter(([request]) => request.path === "/speed-window"),
     ).toHaveLength(1);
-    expect(h.states).toHaveLength(renders);
+    expect(h.states).toHaveLength(renders + 3);
     expect(h.states.at(-1)?.overview).toBe(initial.overview);
-    expect(h.states.at(-1)?.speed).toBe(initial.speed);
+    expect(h.states.at(-1)?.speed?.generation?.end).toBe(initial.speed!.generation!.end + 3000);
     h.controller.dispose();
   });
 
@@ -227,12 +277,12 @@ describe("panel controller", () => {
     await vi.advanceTimersByTimeAsync(0);
     revision = 2;
     failSnapshot = true;
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(3000);
     expect(h.states.at(-1)?.overview?.revision).toBe(1);
     expect(h.states.at(-1)?.speed?.revision).toBe(1);
     expect(h.states.at(-1)?.error).toContain("Snapshot offline");
     failSnapshot = false;
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(3000);
     expect(h.states.at(-1)?.overview?.revision).toBe(2);
     expect(h.states.at(-1)?.error).toBeUndefined();
     expect(
@@ -327,23 +377,8 @@ describe("panel controller", () => {
     h.controller.dispose();
   });
 
-  test("loads only after expansion, pauses on collapse and refreshes on reopening", async () => {
-    let intersection: (value: boolean) => void = () => {};
-    const disconnect = vi.fn();
-    vi.stubGlobal(
-      "IntersectionObserver",
-      class {
-        constructor(listener: IntersectionObserverCallback) {
-          intersection = (value) =>
-            listener(
-              [{ isIntersecting: value } as IntersectionObserverEntry],
-              this as unknown as IntersectionObserver,
-            );
-        }
-        observe = vi.fn();
-        disconnect = disconnect;
-      },
-    );
+  test("waits for the first intersection and pauses offscreen until reopening", async () => {
+    const intersection = browserIntersection(false, false);
     const h = harness();
     h.select();
     await vi.advanceTimersByTimeAsync(4000);
@@ -352,19 +387,75 @@ describe("panel controller", () => {
     await expect(h.controller.loadTools({ group: "bash" })).rejects.toThrow("hidden");
     await vi.advanceTimersByTimeAsync(0);
     expect(h.serviceRequest).not.toHaveBeenCalled();
-    intersection(true);
+    intersection.set(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(h.serviceRequest).toHaveBeenCalledTimes(2);
-    intersection(false);
+    intersection.set(false);
     h.select("two", "/other");
     await vi.advanceTimersByTimeAsync(4000);
     expect(h.serviceRequest).toHaveBeenCalledTimes(2);
-    intersection(true);
+    intersection.set(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(h.serviceRequest).toHaveBeenCalledTimes(4);
     expect(h.states.at(-1)?.overview?.sessionID).toBe("two");
     expect(h.states.at(-1)?.speed?.sessionID).toBe("two");
     h.controller.dispose();
-    expect(disconnect).toHaveBeenCalledOnce();
+    expect(intersection.disconnect).toHaveBeenCalledOnce();
+  });
+
+  test("loads intersecting Resources despite isVisible false without duplicate refreshes", async () => {
+    const intersection = browserIntersection(false, false);
+    // Reproduce a browser with IOv2 support, not just the legacy fallback path.
+    Object.defineProperty(IntersectionObserver.prototype, "trackVisibility", { value: false });
+    const h = harness(undefined, "status", true);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(h.serviceRequest).not.toHaveBeenCalled();
+    intersection.set(true);
+    intersection.set(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.serviceRequest.mock.calls.map(([request]) => request.path)).toEqual(["/speed-window"]);
+    expect(h.states.at(-1)?.speed?.sessionID).toBe("one");
+    h.controller.dispose();
+  });
+
+  test("uses the latest queued intersection without starting reads for an offscreen frame", async () => {
+    const intersection = browserIntersection(false, false);
+    const h = harness(undefined, "panel", true);
+    intersection.deliver([true, false]);
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(h.serviceRequest).not.toHaveBeenCalled();
+    intersection.deliver([false, true]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(2);
+    h.controller.dispose();
+  });
+
+  test("coalesces speed refresh callbacks and discards speed completed after leaving the viewport", async () => {
+    const intersection = browserIntersection();
+    let finish = () => {};
+    const h = harness((request) => {
+      const result = json(response(request));
+      if (request.path !== "/speed-window") return Promise.resolve(result);
+      return new Promise((resolve) => {
+        finish = () => resolve(result);
+      });
+    });
+    h.select();
+    await vi.advanceTimersByTimeAsync(0);
+    h.controller.requestSpeed();
+    h.controller.requestSpeed();
+    intersection.set(false);
+    finish();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(2);
+    expect(h.states.at(-1)?.speed).toBeUndefined();
+    intersection.set(true);
+    await vi.advanceTimersByTimeAsync(0);
+    h.controller.requestSpeed();
+    finish();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h.serviceRequest).toHaveBeenCalledTimes(4);
+    expect(h.states.at(-1)?.speed?.sessionID).toBe("one");
+    h.controller.dispose();
   });
 });

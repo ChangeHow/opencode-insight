@@ -1,5 +1,5 @@
-import type { SpeedWindow } from "@opencode-insight/telemetry/queries";
-import { duration, number, time } from "./format";
+import { GENERATION_WINDOW_MS, type SpeedWindow } from "@opencode-insight/telemetry/queries";
+import { number, time } from "./format";
 
 const WIDTH = 640;
 const HEIGHT = 230;
@@ -7,12 +7,22 @@ const LEFT = 48;
 const TOP = 18;
 const BOTTOM = 194;
 export function chartGeometry(window?: SpeedWindow, width = WIDTH) {
-  const start = 0;
-  const points = (window?.generation?.stages ?? []).map((stage) => ({
-    ...stage,
-    at: stage.offsetMs + stage.durationMs / 2,
-  }));
-  const end = window?.generation?.durationMs ?? 0;
+  const end = window?.generation?.end ?? window?.measuredAt ?? Date.now();
+  const start = window?.generation?.start ?? end - GENERATION_WINDOW_MS;
+  const points = (window?.generation?.stages ?? [])
+    .filter((stage) => stage.end > start && stage.start < end)
+    .map((stage) => {
+      const from = Math.max(start, stage.start);
+      const to = Math.min(end, stage.end);
+      return {
+        ...stage,
+        from,
+        to,
+        // Position the full request average in its visible interval, not an invented sample.
+        at: (from + to) / 2,
+      };
+    })
+    .sort((a, b) => a.at - b.at);
   const max = Math.max(1, ...points.map((point) => point.tps ?? 0));
   const right = width - 20;
   const x = (at: number) => LEFT + ((at - start) / Math.max(1, end - start)) * (right - LEFT);
@@ -24,7 +34,7 @@ export function chartGeometry(window?: SpeedWindow, width = WIDTH) {
       const previous = points[index - 1];
       const position = `${x(point.at).toFixed(2)},${y(point.tps).toFixed(2)}`;
       if (point.breakBefore || previous?.tps === undefined) return `M${position}`;
-      // This connects request averages, not invented per-second reasoning samples.
+      // Interpolate request means over real elapsed time, not instantaneous generation speed.
       const midpoint = ((x(previous.at) + x(point.at)) / 2).toFixed(2);
       return `C${midpoint},${y(previous.tps).toFixed(2)} ${midpoint},${y(point.tps).toFixed(2)} ${position}`;
     })
@@ -35,13 +45,14 @@ export function chartGeometry(window?: SpeedWindow, width = WIDTH) {
 export function createSpeedChart(
   container: HTMLElement,
   refresh: () => void = () => {},
+  onLabelLayout?: (left: number) => void,
 ): {
   update(window?: SpeedWindow): void;
   dispose(): void;
 } {
   container.innerHTML = `<p class="muted chart-empty" title="Missing usage or timing cannot reconstruct generation speed.">No measured model requests.</p>
     <div class="section-head chart-heading"><span class="muted">Recent model requests</span><span class="muted">Output + reasoning</span></div>
-    <div class="chart"><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" role="img" tabindex="0" aria-label="Output plus reasoning request mean TPS on cumulative request time" aria-description="Each point is a reported request average, not instantaneous speed. Vertical dividers mark requests. Hover or tap to inspect; use Left, Right, Home or End; Escape dismisses.">
+    <div class="chart"><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" role="img" tabindex="0" aria-label="Output plus reasoning request mean TPS over the last fifteen wall-clock minutes" aria-description="Each point shows a request average, not instantaneous speed. The smooth curve interpolates between known request means over real elapsed time; it does not indicate observed generation during idle time. Unknown rates break the curve. Approximate rates use observed output and reasoning until reported usage arrives. Tools and idle time retain their real spacing. Vertical dividers mark request starts. Hover or tap to inspect; use Left, Right, Home or End; Escape dismisses.">
       <g class="speed-shades" aria-hidden="true"/>
       <g class="speed-boundaries" aria-hidden="true"/>
       ${[0, 0.5, 1].map(() => `<line class="grid"/><text class="value-label" text-anchor="end"/><text class="time-label" y="218"/>`).join("")}
@@ -88,7 +99,7 @@ export function createSpeedChart(
     container.dataset.inspectedAt = String(p.at);
     container.dataset.inspectedRequest = p.requestID;
     tip.hidden = false;
-    tip.innerHTML = `<time>${time(p.start)}–${time(p.end)}</time><strong>${p.tps === undefined ? (p.status === "running" ? "Pending final usage" : "Rate unavailable") : `${number(p.tps)} tokens/s`}</strong>`;
+    tip.innerHTML = `<time>${time(p.start)}–${time(p.end)}</time><strong>${p.tps === undefined ? (p.status === "running" ? "Pending final usage" : "Rate unavailable") : `${p.estimated ? "≈" : ""}${number(p.tps)} tokens/s`}</strong>`;
     cursor.removeAttribute("hidden");
     attrs(cursor, { x1: g.x(p.at), x2: g.x(p.at) });
   }
@@ -111,8 +122,15 @@ export function createSpeedChart(
     }
     const populated = g.points.length > 0;
     empty.hidden = populated;
-    heading.hidden = !populated;
-    box.hidden = !populated;
+    heading.hidden = !window;
+    box.hidden = !window;
+    const label = heading.querySelector("span")!;
+    label.textContent = window?.generation?.partial
+      ? "Recent model requests · captured history only"
+      : "Recent model requests";
+    label.title = window?.generation?.partial
+      ? "Only retained captured requests are shown (up to 40); earlier activity may be missing."
+      : "Last fifteen wall-clock minutes";
     empty.textContent = window
       ? "Generation speed unavailable: no measured model request duration."
       : "No measured model requests.";
@@ -127,8 +145,13 @@ export function createSpeedChart(
         x: g.x(at),
         "text-anchor": i === 0 ? "start" : i === 2 ? "end" : "middle",
       });
-      times[i].textContent = duration(at);
+      times[i].textContent = time(at);
     });
+    if (onLabelLayout)
+      onLabelLayout(
+        Math.min(...values.map((value) => value.getBoundingClientRect().left)) -
+          svg.getBoundingClientRect().left,
+      );
     path.setAttribute("d", g.path);
     const node = (
       tag: "rect" | "text" | "circle" | "line",
@@ -142,8 +165,8 @@ export function createSpeedChart(
     };
     shades.replaceChildren(
       ...g.shades.flatMap((shade) => {
-        const left = g.x(shade.offsetMs),
-          width = g.x(shade.offsetMs + shade.durationMs) - left;
+        const left = g.x(shade.from),
+          width = g.x(shade.to) - left;
         const rectangle = node("rect", {
           x: left,
           y: TOP,
@@ -169,15 +192,17 @@ export function createSpeedChart(
       }),
     );
     boundaries.replaceChildren(
-      ...g.points.slice(1).map((point) =>
-        node("line", {
-          x1: g.x(point.offsetMs),
-          x2: g.x(point.offsetMs),
-          y1: TOP,
-          y2: BOTTOM,
-          class: "speed-boundary",
-        }),
-      ),
+      ...g.points
+        .filter((point) => point.start >= g.start)
+        .map((point) =>
+          node("line", {
+            x1: g.x(point.start),
+            x2: g.x(point.start),
+            y1: TOP,
+            y2: BOTTOM,
+            class: "speed-boundary",
+          }),
+        ),
     );
     markers.replaceChildren(
       ...g.points.flatMap((point) =>
@@ -207,8 +232,13 @@ export function createSpeedChart(
       g.start +
       ((((event.clientX - bounds.left) / bounds.width) * g.width - LEFT) / (g.right - LEFT)) *
         (g.end - g.start);
-    const index = g.points.findIndex((point) => at < point.offsetMs + point.durationMs);
-    show(index < 0 ? g.points.length - 1 : index);
+    // Prefer a containing interval; parallel requests and idle gaps use nearest midpoint.
+    const containing = g.points.filter((point) => at >= point.from && at <= point.to);
+    const candidates = containing.length ? containing : g.points;
+    const nearest = candidates.reduce((best, point) =>
+      Math.abs(point.at - at) < Math.abs(best.at - at) ? point : best,
+    );
+    show(g.points.indexOf(nearest));
   };
   const focus = () => show(selectedIndex() < 0 ? g.points.length - 1 : selectedIndex());
   const keydown = (event: KeyboardEvent) => {

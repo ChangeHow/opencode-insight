@@ -38,6 +38,26 @@ afterEach(async () => {
 });
 
 describe("Insight extension bridge", () => {
+  test("routes the lightweight scope through the same authenticated service boundary", async () => {
+    const calls: unknown[] = [];
+    const identity = { sessionID: "ses_test", directory: "/project", scope: "source-owned" };
+    const url = await listen(
+      createInsightServer("host-private", async (method, body) => {
+        calls.push({ method, body });
+        return identity;
+      }),
+    );
+    const response = await fetch(`${url}/speed-scope`, {
+      method: "POST",
+      headers: { authorization: "Bearer host-private" },
+      body: JSON.stringify({ sessionID: "ses_test", directory: "/project" }),
+    });
+    expect(await response.json()).toEqual(identity);
+    expect(calls).toEqual([
+      { method: "speedScope", body: { sessionID: "ses_test", directory: "/project" } },
+    ]);
+  });
+
   test("serves complete Token aggregates for a session larger than the unchanged response limit", async () => {
     const context = Array.from({ length: 800 }, (_, index) => ({
       kind: "tool" as const,

@@ -9,6 +9,7 @@ const operations = new Map<string, QueryMethod>([
   ["/series", "series"],
   ["/overview", "overview"],
   ["/speed-window", "speedWindow"],
+  ["/speed-scope", "speedScope"],
   ["/tool-page", "toolPage"],
   ["/series-window", "seriesWindow"],
   ["/source-page", "sourcePage"],

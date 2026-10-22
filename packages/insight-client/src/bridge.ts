@@ -12,10 +12,12 @@ import {
   overviewSchema,
   speedWindowInputSchema,
   speedWindowSchema,
+  speedScopeSchema,
   toolPageInputSchema,
   toolPageSchema,
   type OverviewResponse,
   type SpeedWindow,
+  type SpeedScope,
   type ToolPage,
 } from "@opencode-insight/telemetry/queries";
 import {
@@ -57,6 +59,7 @@ interface QueryOutput {
   series: InsightSeries;
   overview: OverviewResponse;
   speedWindow: SpeedWindow;
+  speedScope: SpeedScope;
   toolPage: ToolPage;
   seriesWindow: SeriesWindow;
   sourcePage: SourcePage;
@@ -73,6 +76,7 @@ const inputSchemas = {
     sessionID: sessionIDSchema,
     directory: targetSchema.shape.directory,
   }),
+  speedScope: targetSchema,
   toolPage: toolPageInputSchema.safeExtend({
     sessionID: sessionIDSchema,
     directory: targetSchema.shape.directory,
@@ -91,6 +95,7 @@ const outputSchemas = {
   series: seriesSchema,
   overview: overviewSchema,
   speedWindow: speedWindowSchema,
+  speedScope: speedScopeSchema,
   toolPage: toolPageSchema,
   seriesWindow: seriesWindowSchema,
   sourcePage: sourcePageSchema,

@@ -10,6 +10,7 @@ import {
   overviewSchema,
   speedWindowInputSchema,
   speedWindowSchema,
+  speedScopeSchema,
   toolPageInputSchema,
   toolPageSchema,
 } from "@opencode-insight/telemetry/queries";
@@ -29,6 +30,7 @@ export const Insight = Rpc.define({
     series: { input: seriesInputSchema, output: seriesSchema },
     overview: { input: overviewInputSchema, output: overviewSchema },
     speedWindow: { input: speedWindowInputSchema, output: speedWindowSchema },
+    speedScope: { input: getSessionInputSchema, output: speedScopeSchema },
     toolPage: { input: toolPageInputSchema, output: toolPageSchema },
     seriesWindow: { input: seriesWindowInputSchema, output: seriesWindowSchema },
     sourcePage: { input: sourcePageInputSchema, output: sourcePageSchema },

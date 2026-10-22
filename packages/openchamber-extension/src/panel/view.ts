@@ -50,7 +50,7 @@ export function createPanelView(
   const descriptions = [
     "Latest input snapshot · estimated/reported.",
     "Reported repeated input + cache + output + reasoning.",
-    "Shown requests: reported output + reasoning / total request-to-stream-end time. Includes in-request latency and stalls; excludes inter-request tools and idle time.",
+    "Shown requests: output + reasoning / total request duration, including latency and stalls. ≈ uses observed stream estimates until reported usage arrives; excludes inter-request tools and idle time.",
     "Union of model and blocking tools; background separate.",
   ];
   const values = metricLabels.map((label, index) => {
@@ -102,10 +102,20 @@ export function createPanelView(
       message =
         "No telemetry captured for this session yet. Start a model request with the capture plugin enabled.";
     emptySlot.hidden = !message;
-    content.hidden = !!message;
+    const showEmptySpeed =
+      !!state.overview?.data && !state.overview.data.hasActivity && !!state.speed;
+    content.hidden = !!message && !showEmptySpeed;
+    metrics.hidden = showEmptySpeed;
+    panels.token.hidden = showEmptySpeed;
+    panels.time.hidden = showEmptySpeed;
     if (message !== lastEmpty) {
       empty.update({ title: message });
       lastEmpty = message;
+    }
+    if (showEmptySpeed) {
+      qualitySlot.hidden = true;
+      speed.update(state.speed);
+      return;
     }
     if (message || !state.overview?.data) return;
     const data = state.overview.data;
@@ -117,7 +127,7 @@ export function createPanelView(
         : "Unavailable",
       state.speed?.generation?.tps === undefined
         ? "Unavailable"
-        : `${number(state.speed.generation.tps)} tokens/s`,
+        : `${state.speed.generation.estimated ? "≈" : ""}${number(state.speed.generation.tps)} tokens/s`,
       duration(summary.foregroundMs),
     ];
     metricsNext.forEach((value, index) => setText(values[index], value));

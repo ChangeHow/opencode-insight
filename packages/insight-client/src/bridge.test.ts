@@ -60,6 +60,44 @@ afterEach(async () => {
 });
 
 describe("Insight client", () => {
+  test("validates and forwards the source-owned speed scope without exposing connection credentials", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("/api/session/"))
+        return Response.json({ data: { id: "ses_test", location: { directory: "/project" } } });
+      return Response.json({
+        output: { sessionID: "ses_test", directory: "/project", scope: "capture-setup-one" },
+      });
+    });
+    try {
+      const bridge = createBridge(async () => ({
+        baseUrl: "https://source.example",
+        headers: { authorization: "Bearer private" },
+      }));
+      expect(await bridge("speedScope", { sessionID: "ses_test", directory: "/project" })).toEqual({
+        sessionID: "ses_test",
+        directory: "/project",
+        scope: "capture-setup-one",
+      });
+      expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([
+        "https://source.example/api/session/ses_test",
+        expect.stringContaining("/api/rpc/opencode-insight/speedScope"),
+      ]);
+      fetch.mockImplementation(async (input) =>
+        String(input).includes("/api/session/")
+          ? Response.json({ data: { location: { directory: "/project" } } })
+          : Response.json({
+              output: { sessionID: "ses_test", directory: "/other", scope: "capture-setup-two" },
+            }),
+      );
+      await expect(
+        bridge("speedScope", { sessionID: "ses_test", directory: "/project" }),
+      ).rejects.toThrow("different session scope");
+    } finally {
+      fetch.mockRestore();
+    }
+  });
+
   test("uses managed discovery without starting or changing OpenCode", async () => {
     const file = await configFile({ registrationFile: "/private/service.json" });
     const calls: unknown[] = [];

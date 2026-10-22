@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { buildSpeedWindow } from "@opencode-insight/telemetry/queries";
 import type { SessionInsight } from "@opencode-insight/telemetry/schema";
 import { chartGeometry, createSpeedChart } from "./chart";
+import { time } from "./format";
 
 const session: SessionInsight = {
   version: 1,
@@ -52,6 +53,53 @@ function mount(refresh: () => void = () => {}) {
 const window = (input = session) => buildSpeedWindow(input, undefined, 630000);
 
 describe("speed chart", () => {
+  test("keeps a fixed wall-clock axis, real idle gaps and clipped concurrent request inspection", () => {
+    const data = buildSpeedWindow(
+      {
+        ...session,
+        requests: [
+          {
+            ...session.requests[0],
+            id: "expired-high",
+            startedAt: 0,
+            streamedAt: 1000,
+            usage: { ...session.requests[0].usage!, output: 1000000 },
+          },
+          { ...session.requests[0], id: "crossing", startedAt: 1000000, streamedAt: 1200000 },
+          { ...session.requests[1], id: "recent", startedAt: 1900000, streamedAt: 1910000 },
+          { ...session.requests[1], id: "parallel", startedAt: 1902000, streamedAt: 1912000 },
+        ],
+      },
+      undefined,
+      2000000,
+    );
+    const g = chartGeometry(data);
+    expect([g.start, g.end, g.max]).toEqual([1100000, 2000000, 40]);
+    expect(g.points.map((p) => p.requestID)).toEqual(["crossing", "recent", "parallel"]);
+    expect(g.points[0].at).toBe(1150000);
+    expect(g.points[0]).toMatchObject({
+      from: 1100000,
+      to: 1200000,
+      durationMs: 200000,
+      output: 20,
+      reasoning: 80,
+      tps: 0.5,
+    });
+    expect(g.points[1].at).toBe(1905000);
+    const { root, controller } = mount();
+    controller.update(data);
+    const svg = root.querySelector("svg")!;
+    svg.getBoundingClientRect = () => ({ left: 0, width: 640 }) as DOMRect;
+    svg.dispatchEvent(new MouseEvent("pointerdown", { clientX: g.x(1907000) }));
+    expect(root.dataset.inspectedRequest).toBe("parallel");
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
+    expect(root.dataset.inspectedRequest).toBe("crossing");
+    controller.update(buildSpeedWindow({ ...session, requests: [] }, undefined, 3000000));
+    expect(root.querySelector<HTMLElement>(".chart")!.hidden).toBe(false);
+    expect(root.querySelectorAll(".speed-points circle")).toHaveLength(0);
+    expect(root.querySelector<HTMLElement>(".tooltip")!.hidden).toBe(true);
+  });
+
   afterEach(() => {
     mounted.splice(0).forEach((chart) => chart.dispose());
     vi.useRealTimers();
@@ -60,22 +108,22 @@ describe("speed chart", () => {
     document.body.replaceChildren();
   });
 
-  test("connects reported output plus reasoning request means on compressed model time", () => {
+  test("connects real request means with a smooth trend without compressing idle time", () => {
     const g = chartGeometry(window());
     expect(g.points.map((point) => point.tps)).toEqual([10, 20]);
-    expect(g.end).toBe(30000);
-    expect(g.points.map((point) => point.at)).toEqual([5000, 20000]);
-    expect(g.path.match(/M/g)).toHaveLength(1);
-    expect(g.path).toBe("M143.33,106.00 C286.33,106.00 286.33,18.00 429.33,18.00");
+    expect([g.start, g.end]).toEqual([-270000, 630000]);
+    expect(g.points.map((point) => point.at)).toEqual([5000, 610000]);
+    expect(g.path).toBe("M222.78,106.00 C415.03,106.00 415.03,18.00 607.29,18.00");
     expect(g.shades).toEqual([]);
     const { root, controller } = mount();
     controller.update(window());
-    expect(root.querySelectorAll(".speed-boundary")).toHaveLength(1);
+    expect(root.querySelector("path.speed")!.getAttribute("d")).toBe(g.path);
+    expect(root.querySelectorAll(".speed-boundary")).toHaveLength(2);
     expect(root.querySelectorAll(".speed-points circle")).toHaveLength(2);
     expect([...root.querySelectorAll(".time-label")].map((node) => node.textContent)).toEqual([
-      "0 s",
-      "15 s",
-      "30 s",
+      time(-270000),
+      time(180000),
+      time(630000),
     ]);
   });
 

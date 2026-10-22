@@ -116,6 +116,12 @@ export const speedWindowInputSchema = z
     { message: "Provide both range bounds with a positive span of at most ten minutes" },
   );
 export type SpeedWindowInput = z.input<typeof speedWindowInputSchema>;
+export const speedScopeSchema = z.object({
+  sessionID,
+  directory: z.string(),
+  scope: z.string().min(1).max(128),
+});
+export type SpeedScope = z.infer<typeof speedScopeSchema>;
 export const speedBucketSchema = z.object({
   start: z.number(),
   end: z.number(),
@@ -127,6 +133,8 @@ export type SpeedBucket = z.infer<typeof speedBucketSchema>;
 export type SpeedState = SpeedBucket["state"];
 export const speedWindowSchema = z.object({
   ...identity,
+  scope: speedScopeSchema.shape.scope.optional(),
+  measuredAt: z.number().finite().optional(),
   start: z.number(),
   end: z.number(),
   buckets: z.array(speedBucketSchema),

@@ -129,6 +129,8 @@ describe("panel view", () => {
       session: { ...session, requests: [], tools: [] },
     });
     expect(root.textContent).toContain("No telemetry captured");
+    expect(root.querySelector("#insight-speed .chart")?.closest("[hidden]")).toBeNull();
+    expect(root.querySelectorAll("#insight-speed .speed-points circle")).toHaveLength(0);
     expect(root.querySelector("table")).toBeNull();
   });
 

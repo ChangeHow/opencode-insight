@@ -47,7 +47,14 @@ describe("bounded speed window", () => {
       const old = speedModel(session, now);
       const result = buildSpeedWindow(session, undefined, now);
       const { generation, ...legacy } = result;
-      expect(legacy).toEqual({ sessionID: "s", directory: "/project", revision: 1, ...old });
+      expect(legacy).toEqual({
+        sessionID: "s",
+        directory: "/project",
+        revision: 1,
+        measuredAt: now,
+        ...old,
+      });
+      expect(generation).toMatchObject({ start: now - 900000, end: now });
       expect(generation?.stages.map((stage) => stage.requestID)).toEqual(
         now > 20000 ? ["a", "b"] : ["a"],
       );
@@ -66,11 +73,12 @@ describe("bounded speed window", () => {
     session.requests[1] = { ...session.requests[1], status: "interrupted" };
     for (const now of [16000, 30000, 999999]) {
       const { generation, ...legacy } = buildSpeedWindow(session, undefined, now);
-      expect(generation?.stages).toHaveLength(1);
+      expect(generation?.stages).toHaveLength(now < 916000 ? 1 : 0);
       expect(legacy).toEqual({
         sessionID: "s",
         directory: "/project",
         revision: 1,
+        measuredAt: now,
         ...speedModel(session, now),
       });
     }

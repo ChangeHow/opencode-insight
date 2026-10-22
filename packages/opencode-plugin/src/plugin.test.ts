@@ -5,7 +5,12 @@ import plugin from "./index";
 import { Insight, getSessionInputSchema } from "./rpc";
 import type { NativeEvent } from "./events";
 import { Collector } from "./collector";
-import type { OverviewResponse, SpeedWindow, ToolPage } from "@opencode-insight/telemetry/queries";
+import type {
+  OverviewResponse,
+  SpeedWindow,
+  SpeedScope,
+  ToolPage,
+} from "@opencode-insight/telemetry/queries";
 import type { SeriesWindow, SourcePage } from "@opencode-insight/telemetry/details";
 import { trackToolScopes } from "./tool-scope";
 import { Host } from "@opencode/plugin/host";
@@ -101,6 +106,28 @@ function admission(id: string, skills: unknown[] = []): NativeEvent {
 }
 
 describe("native V2 plugin", () => {
+  test("owns one lightweight speed scope per setup and returns it with speed data", async () => {
+    const first = harness();
+    const second = harness();
+    const cleanup = await plugin.setup(first.context as unknown as Plugin.Context);
+    const cleanupOther = await plugin.setup(second.context as unknown as Plugin.Context);
+    try {
+      const scope = (await first.handlers.speedScope({ sessionID: "s1" })) as SpeedScope;
+      expect(scope).toMatchObject({ sessionID: "s1", directory: "/a", scope: expect.any(String) });
+      expect(first.context.session.context).not.toHaveBeenCalled();
+      expect(first.context.storage.get).not.toHaveBeenCalled();
+      expect(await first.handlers.speedScope({ sessionID: "s1" })).toEqual(scope);
+      expect(await first.handlers.speedWindow({ sessionID: "s1" })).toMatchObject(scope);
+      expect(await second.handlers.speedScope({ sessionID: "s1" })).not.toEqual(scope);
+      await expect(first.handlers.speedScope({ sessionID: "foreign" })).rejects.toThrow(
+        "another location",
+      );
+    } finally {
+      await cleanup!();
+      await cleanupOther!();
+    }
+  });
+
   test("registers the shared typed RPC and rejects missing/foreign sessions", async () => {
     const h = harness();
     const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
