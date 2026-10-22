@@ -1,4 +1,5 @@
 import type { SessionInsight } from "./schema";
+import { buildGenerationWindow } from "./query-generation";
 import {
   speedWindowInputSchema,
   type SpeedBucket,
@@ -50,6 +51,7 @@ export function buildSpeedWindow(
     sessionID: session.sessionID,
     directory: session.directory,
     revision: session.revision,
+    generation: buildGenerationWindow(session, range, now),
   };
   const buckets: SpeedBucket[] = [];
   if (start >= end) return { ...identity, start: closedEnd, end: closedEnd, buckets, nextAt };

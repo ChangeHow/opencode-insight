@@ -14,20 +14,30 @@ const session: SessionInsight = {
   tools: [],
   requests: [
     {
-      id: "request",
+      id: "first",
       model: "model",
       startedAt: 0,
-      endedAt: 31000,
-      streamedAt: 31000,
-      firstDeltaAt: 1000,
+      streamedAt: 10000,
+      endedAt: 11000,
       status: "completed",
       reasoningMode: "hidden",
-      capture: "live",
+      capture: "partial",
       context: [],
-      buckets: [
-        { at: 1000, output: 150, reasoning: 0, summary: 0 },
-        { at: 16000, output: 300, reasoning: 0, summary: 0 },
-      ],
+      buckets: [],
+      usage: { input: 0, output: 20, reasoning: 80, cacheRead: 0, cacheWrite: 0 },
+    },
+    {
+      id: "second",
+      model: "model",
+      startedAt: 600000,
+      streamedAt: 620000,
+      endedAt: 621000,
+      status: "completed",
+      reasoningMode: "hidden",
+      capture: "partial",
+      context: [],
+      buckets: [],
+      usage: { input: 0, output: 100, reasoning: 300, cacheRead: 0, cacheWrite: 0 },
     },
   ],
 };
@@ -39,6 +49,7 @@ function mount(refresh: () => void = () => {}) {
   mounted.push(controller);
   return { root, controller };
 }
+const window = (input = session) => buildSpeedWindow(input, undefined, 630000);
 
 describe("speed chart", () => {
   afterEach(() => {
@@ -49,206 +60,176 @@ describe("speed chart", () => {
     document.body.replaceChildren();
   });
 
-  test("smoothly joins output buckets but never interpolates through gray waiting intervals", () => {
-    const g = chartGeometry(
-      buildSpeedWindow(
-        {
-          ...session,
-          requests: [
-            {
-              ...session.requests[0],
-              endedAt: 61000,
-              buckets: [
-                ...session.requests[0].buckets,
-                { at: 60000, output: 450, reasoning: 0, summary: 0 },
-              ],
-            },
-          ],
-        },
-        undefined,
-        75000,
-      ),
-      640,
-    );
-    expect(g.path.match(/M/g)).toHaveLength(2);
-    expect(g.path.match(/C/g)).toHaveLength(1);
-    expect(g.path).not.toContain("L");
-    expect(g.shades).toEqual([{ start: 30000, end: 60000, state: "waiting" }]);
-    expect(chartGeometry().max).toBe(1);
+  test("connects reported output plus reasoning request means on compressed model time", () => {
+    const g = chartGeometry(window());
+    expect(g.points.map((point) => point.tps)).toEqual([10, 20]);
+    expect(g.end).toBe(30000);
+    expect(g.points.map((point) => point.at)).toEqual([5000, 20000]);
+    expect(g.path.match(/M/g)).toHaveLength(1);
+    expect(g.path.match(/L/g)).toHaveLength(1);
+    expect(g.shades).toEqual([]);
+    const { root, controller } = mount();
+    controller.update(window());
+    expect(root.querySelectorAll(".speed-boundary")).toHaveLength(1);
+    expect(root.querySelectorAll(".speed-points circle")).toHaveLength(2);
+    expect([...root.querySelectorAll(".time-label")].map((node) => node.textContent)).toEqual([
+      "0 s",
+      "15 s",
+      "30 s",
+    ]);
   });
 
-  test("refreshes the bounded window at the final bucket boundary without inventing output", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(14999);
-    const input: SessionInsight = {
+  test("does not interpolate through unknown request rates or fabricate hidden reasoning samples", () => {
+    const data = window({
       ...session,
       requests: [
+        session.requests[0],
         {
           ...session.requests[0],
-          endedAt: 1100,
-          streamedAt: 1100,
-          buckets: [session.requests[0].buckets[0]],
+          id: "missing",
+          startedAt: 20000,
+          streamedAt: 25000,
+          usage: undefined,
         },
+        session.requests[1],
       ],
-    };
-    const refresh = vi.fn();
-    const { root, controller } = mount(refresh);
-    const initial = buildSpeedWindow(input);
-    controller.update(initial);
-    expect(root.querySelector<HTMLElement>(".chart")!.hidden).toBe(true);
-    vi.advanceTimersByTime(1);
-    expect(refresh).toHaveBeenCalledOnce();
-    expect(root.querySelector<HTMLElement>(".chart")!.hidden).toBe(true);
-    controller.update(initial);
-    expect(vi.getTimerCount()).toBe(0);
-    controller.update(buildSpeedWindow(input));
-    expect(root.querySelector<HTMLElement>(".chart")!.hidden).toBe(false);
-    expect(root.querySelectorAll(".speed-points circle")).toHaveLength(1);
-    root.querySelector("svg")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
-    expect(root.querySelector(".tooltip strong")?.textContent).toBe("10 tokens/s");
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  test("defers overdue refresh while hidden and requests it only once when visible", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(45000);
-    const refresh = vi.fn();
-    const { controller } = mount(refresh);
-    const window = buildSpeedWindow({
-      ...session,
-      requests: [{ ...session.requests[0], status: "running" }],
     });
-    controller.update(window);
-    vi.spyOn(document, "hidden", "get").mockReturnValue(true);
-    document.dispatchEvent(new Event("visibilitychange"));
-    vi.advanceTimersByTime(15001);
-    expect(refresh).not.toHaveBeenCalled();
-    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
-    document.dispatchEvent(new Event("visibilitychange"));
-    vi.runOnlyPendingTimers();
-    expect(refresh).toHaveBeenCalledOnce();
-    controller.update(window);
-    document.dispatchEvent(new Event("visibilitychange"));
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  test("shows an honest empty state and no table", () => {
+    const g = chartGeometry(data);
+    expect(g.path.match(/M/g)).toHaveLength(2);
+    expect(g.path).not.toContain("L");
+    expect(g.points).toHaveLength(3);
+    expect(g.shades.map((point) => point.requestID)).toEqual(["missing"]);
     const { root, controller } = mount();
-    controller.update();
-    expect(root.textContent).toContain("No speed samples");
-    expect(root.querySelector(".chart-empty")?.getAttribute("title")).toContain(
-      "cannot reconstruct",
+    controller.update(data);
+    const svg = root.querySelector("svg")!;
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    expect(root.querySelector(".tooltip strong")?.textContent).toBe("Rate unavailable");
+    expect(root.querySelectorAll(".speed-points circle")).toHaveLength(2);
+
+    const unknownDuration = chartGeometry(
+      window({
+        ...session,
+        requests: [
+          session.requests[0],
+          {
+            ...session.requests[0],
+            id: "unknown-duration",
+            startedAt: 20000,
+            streamedAt: undefined,
+            endedAt: undefined,
+            status: "interrupted",
+          },
+          session.requests[1],
+        ],
+      }),
     );
-    expect(root.querySelector("table")).toBeNull();
+    expect(unknownDuration.points).toHaveLength(2);
+    expect(unknownDuration.path.match(/M/g)).toHaveLength(2);
+    expect(unknownDuration.path).not.toContain("L");
   });
 
-  test("keyboard inspection reports bucket TPS or waiting status, never fabricated zero speed", () => {
+  test("keyboard and touch inspection expose request rates", () => {
     const { root, controller } = mount();
-    controller.update(buildSpeedWindow(session, undefined, 75000));
+    controller.update(window());
     const svg = root.querySelector("svg")!;
-    const key = (key: string) => svg.dispatchEvent(new KeyboardEvent("keydown", { key }));
-    key("Home");
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     const tip = root.querySelector<HTMLElement>(".tooltip")!;
     expect(tip.hidden).toBe(false);
-    expect(tip.querySelector("time")?.textContent).toBeTruthy();
     expect(tip.querySelector("strong")?.textContent).toBe("10 tokens/s");
-    expect(tip.children).toHaveLength(2);
-    expect(root.querySelectorAll("path.line")).toHaveLength(1);
-    key("ArrowRight");
-    expect(root.dataset.inspectedAt).toBe("22500");
-    key("End");
-    expect(tip.querySelector("strong")?.textContent).toBe("Waiting");
-    expect(root.querySelectorAll(".speed-shade")).toHaveLength(1);
-    key("Escape");
-    expect(tip.hidden).toBe(true);
-  });
-
-  test("pointer inspection uses a separate readout without obscuring the curve", () => {
-    const { root, controller } = mount();
-    controller.update(buildSpeedWindow(session, undefined, 75000));
-    const chart = root.querySelector<HTMLElement>(".chart")!;
-    const svg = root.querySelector("svg")!;
+    expect(root.dataset.inspectedRequest).toBe("first");
     svg.getBoundingClientRect = () => ({ left: 0, width: 320 }) as DOMRect;
-    svg.dispatchEvent(new MouseEvent("pointermove", { clientX: 319 }));
-    const tip = root.querySelector<HTMLElement>(".tooltip")!;
-    expect(tip.hidden).toBe(false);
-    expect(tip.parentElement?.className).toBe("speed-inspection");
-    expect(tip.parentElement?.previousElementSibling).toBe(svg);
-    expect(tip.querySelector("strong")?.textContent).toBe("Waiting");
-    chart.dispatchEvent(new Event("pointerleave"));
-    expect(tip.hidden).toBe(true);
     svg.dispatchEvent(new MouseEvent("pointerdown", { clientX: 319 }));
+    expect(root.dataset.inspectedRequest).toBe("second");
+    expect(tip.querySelector("strong")?.textContent).toBe("20 tokens/s");
+    expect(tip.parentElement?.previousElementSibling).toBe(svg);
+    root.querySelector(".chart")!.dispatchEvent(new Event("pointerleave"));
+    expect(tip.hidden).toBe(true);
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "End" }));
     expect(tip.hidden).toBe(false);
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(tip.hidden).toBe(true);
   });
 
-  test("retains SVG, focus, readout and selected bucket across polling until it leaves the window", () => {
+  test("retains the selected request, focus and readout through polling until that request leaves", () => {
     const { root, controller } = mount();
-    controller.update(buildSpeedWindow(session, undefined, 75000));
+    controller.update(window());
     const svg = root.querySelector("svg")!;
     const tip = root.querySelector<HTMLElement>(".tooltip")!;
     svg.focus();
     svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     const before = root.querySelector("path.speed")!.getAttribute("d");
     controller.update(
-      buildSpeedWindow(
-        {
-          ...session,
-          requests: [
-            {
-              ...session.requests[0],
-              buckets: [
-                { ...session.requests[0].buckets[0], output: 300 },
-                session.requests[0].buckets[1],
-              ],
-            },
-          ],
-        },
-        undefined,
-        75000,
-      ),
+      window({
+        ...session,
+        requests: [
+          { ...session.requests[0], usage: { ...session.requests[0].usage!, output: 70 } },
+          session.requests[1],
+        ],
+      }),
     );
     expect(root.querySelector("svg")).toBe(svg);
     expect(document.activeElement).toBe(svg);
     expect(root.querySelector(".tooltip")).toBe(tip);
-    expect(tip.hidden).toBe(false);
-    expect(root.dataset.inspectedAt).toBe("7500");
-    expect(tip.querySelector("strong")?.textContent).toBe("20 tokens/s");
+    expect(root.dataset.inspectedRequest).toBe("first");
+    expect(tip.querySelector("strong")?.textContent).toBe("15 tokens/s");
     expect(root.querySelector("path.speed")!.getAttribute("d")).not.toBe(before);
-    controller.update(
-      buildSpeedWindow(
-        {
-          ...session,
-          requests: [
-            { ...session.requests[0], startedAt: 16000, buckets: [session.requests[0].buckets[1]] },
-          ],
-        },
-        undefined,
-        75000,
-      ),
-    );
+    controller.update(window({ ...session, requests: [session.requests[1]] }));
     expect(tip.hidden).toBe(true);
-    expect(root.dataset.inspectedAt).toBeUndefined();
+    expect(root.dataset.inspectedRequest).toBeUndefined();
   });
 
-  test("keeps listeners singular and cancels the bucket clock on disposal", () => {
+  test("shows pending requests, single averages and absent measurements honestly", () => {
+    const { root, controller } = mount();
+    controller.update();
+    expect(root.querySelector<HTMLElement>(".chart-empty")!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>(".chart")!.hidden).toBe(true);
+    controller.update(window({ ...session, requests: [session.requests[0]] }));
+    expect(root.querySelector("path.speed")!.getAttribute("d")).not.toContain("L");
+    controller.update(
+      window({
+        ...session,
+        requests: [
+          { ...session.requests[0], status: "running", streamedAt: undefined, endedAt: undefined },
+        ],
+      }),
+    );
+    root.querySelector("svg")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
+    expect(root.querySelector(".tooltip strong")?.textContent).toBe("Pending final usage");
+    expect(root.querySelectorAll(".speed-points circle")).toHaveLength(0);
+    expect(root.querySelector("path.speed")!.getAttribute("d")).toBe("");
+    expect(root.querySelector("table")).toBeNull();
+  });
+
+  test("refreshes at capture deadlines only while visible and cancels the clock on disposal", () => {
     vi.useFakeTimers();
     vi.setSystemTime(45000);
-    const { root, controller } = mount();
-    const input = {
+    const refresh = vi.fn();
+    const { root, controller } = mount(refresh);
+    const data = buildSpeedWindow({
       ...session,
-      requests: [{ ...session.requests[0], status: "running" as const }],
-    };
-    for (let i = 0; i < 5; i++) controller.update(buildSpeedWindow(input, undefined, Date.now()));
+      requests: [
+        { ...session.requests[0], status: "running", streamedAt: undefined, endedAt: undefined },
+      ],
+    });
+    for (let i = 0; i < 5; i++) controller.update(data);
     expect(vi.getTimerCount()).toBe(1);
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(15001);
+    expect(refresh).not.toHaveBeenCalled();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    document.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(0);
+    expect(refresh).toHaveBeenCalledOnce();
+    controller.update(data);
+    expect(vi.getTimerCount()).toBe(0);
     const svg = root.querySelector("svg")!;
-    const key = (key: string) => svg.dispatchEvent(new KeyboardEvent("keydown", { key }));
-    key("Home");
-    key("ArrowRight");
-    expect(root.dataset.inspectedAt).toBe("22500");
+    svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     controller.dispose();
     controller.dispose();
     expect(vi.getTimerCount()).toBe(0);
-    key("Home");
+    expect(root.querySelector<HTMLElement>(".tooltip")!.hidden).toBe(true);
     svg.dispatchEvent(new Event("focus"));
     expect(root.querySelector<HTMLElement>(".tooltip")!.hidden).toBe(true);
     const path = root.querySelector("path.speed")!.getAttribute("d");
@@ -256,7 +237,7 @@ describe("speed chart", () => {
     expect(root.querySelector("path.speed")!.getAttribute("d")).toBe(path);
   });
 
-  test("observes width changes including hidden to visible and disconnects", () => {
+  test("adapts to narrow panels and disconnects width observation", () => {
     let resize: () => void = () => {};
     const observe = vi.fn(),
       disconnect = vi.fn();
@@ -275,13 +256,12 @@ describe("speed chart", () => {
     Object.defineProperty(root, "clientWidth", { get: () => width });
     const controller = createSpeedChart(root);
     mounted.push(controller);
-    controller.update(buildSpeedWindow(session, undefined, 75000));
+    controller.update(window());
     const svg = root.querySelector("svg")!;
-    expect(svg.getAttribute("viewBox")).toBe("0 0 640 230");
     const before = root.querySelector("path.speed")!.getAttribute("d");
+    expect(svg.getAttribute("viewBox")).toBe("0 0 640 230");
     width = 320;
     resize();
-    expect(root.querySelector("svg")).toBe(svg);
     expect(svg.getAttribute("viewBox")).toBe("0 0 320 230");
     expect(root.querySelector("path.speed")!.getAttribute("d")).not.toBe(before);
     expect(observe).toHaveBeenCalledWith(root);

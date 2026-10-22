@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { sourceKinds, tokenUsageSchema, toolSchema, requestSchema } from "./schema";
+import { generationWindowSchema } from "./query-generation";
 
 const sessionID = z.string().min(1).max(128);
 const revision = z.number().int().nonnegative();
@@ -130,6 +131,7 @@ export const speedWindowSchema = z.object({
   end: z.number(),
   buckets: z.array(speedBucketSchema),
   nextAt: z.number().optional(),
+  generation: generationWindowSchema.optional(),
 });
 export type SpeedWindow = z.infer<typeof speedWindowSchema>;
 export const toolPageInputSchema = z

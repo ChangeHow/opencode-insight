@@ -166,6 +166,10 @@ describe("panel view", () => {
     );
     expect(metrics[0]).toBe("40");
     expect(metrics[1]).toBe("165");
+    expect(metrics[2]).toBe("20 tokens/s");
+    const speedSvg = root.querySelector("#insight-speed svg")!;
+    speedSvg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
+    expect(root.querySelector("#insight-speed .tooltip strong")?.textContent).toBe(metrics[2]);
     expect(root.querySelector(".donut")).not.toBeNull();
     expect(root.querySelector(".donut strong")?.textContent).toBe("40");
     expect(root.querySelector('[data-source="attribution"]')).toBeNull();
@@ -260,14 +264,12 @@ describe("panel view", () => {
       session: {
         ...session,
         requests: [
+          { ...session.requests[0], id: "baseline" },
           {
             ...session.requests[0],
+            startedAt: 2000,
             endedAt: 17000,
             streamedAt: 17000,
-            buckets: [
-              { at: 1000, output: 150, reasoning: 0, summary: 0 },
-              { at: 16000, output: 300, reasoning: 0, summary: 0 },
-            ],
           },
         ],
       },
@@ -288,14 +290,13 @@ describe("panel view", () => {
         revision: 2,
         tools: [{ ...session.tools[0], endedAt: 3500 }],
         requests: [
+          state.session.requests[0],
           {
             ...session.requests[0],
+            startedAt: 2000,
             endedAt: 17000,
             streamedAt: 17000,
-            buckets: state.session.requests[0].buckets.map((bucket) => ({
-              ...bucket,
-              output: 300,
-            })),
+            usage: { ...session.requests[0].usage!, output: 60 },
             context: [{ ...session.requests[0].context[0], tokens: 60 }],
           },
         ],
@@ -313,7 +314,9 @@ describe("panel view", () => {
     svg.focus();
     svg.dispatchEvent(new KeyboardEvent("keydown", { key: "Home" }));
     span.click();
-    expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedAt).toBe("7500");
+    expect(root.querySelector<HTMLElement>("#insight-speed")!.dataset.inspectedRequest).toBe(
+      "baseline",
+    );
     const inspector = root.querySelector<HTMLElement>("#insight-time .trace-inspector")!;
     expect(inspector.dataset.open).toBe("true");
     await view.render({ ...state, sessionID: "two", session: { ...session, sessionID: "two" } });

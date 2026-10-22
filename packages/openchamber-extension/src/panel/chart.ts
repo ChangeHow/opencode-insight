@@ -1,9 +1,5 @@
-import {
-  SPEED_BUCKET_MS,
-  type SpeedState,
-  type SpeedWindow,
-} from "@opencode-insight/telemetry/queries";
-import { number, time } from "./format";
+import type { SpeedWindow } from "@opencode-insight/telemetry/queries";
+import { duration, number, time } from "./format";
 
 const WIDTH = 640;
 const HEIGHT = 230;
@@ -11,41 +7,29 @@ const LEFT = 48;
 const TOP = 18;
 const BOTTOM = 194;
 export function chartGeometry(window?: SpeedWindow, width = WIDTH) {
-  const start = window?.start ?? 0;
-  const points = window?.buckets ?? [];
-  const end = window?.end ?? SPEED_BUCKET_MS;
+  const start = 0;
+  const points = (window?.generation?.stages ?? []).map((stage) => ({
+    ...stage,
+    at: stage.offsetMs + stage.durationMs / 2,
+  }));
+  const end = window?.generation?.durationMs ?? 0;
   const max = Math.max(1, ...points.map((point) => point.tps ?? 0));
   const right = width - 20;
-  const x = (at: number) =>
-    LEFT + ((at - start) / Math.max(SPEED_BUCKET_MS, end - start)) * (right - LEFT);
+  const x = (at: number) => LEFT + ((at - start) / Math.max(1, end - start)) * (right - LEFT);
   const y = (value: number) => BOTTOM - (value / max) * (BOTTOM - TOP);
-  const shades: Array<{ start: number; end: number; state: SpeedState }> = [];
-  for (const point of points) {
-    if (point.tps !== undefined) continue;
-    const previous = shades.at(-1);
-    if (previous?.state === point.state && previous.end === point.start) previous.end = point.end;
-    else shades.push({ start: point.start, end: point.end, state: point.state });
-  }
+  const shades = points.filter((point) => point.tps === undefined);
   const path = points
     .map((point, index) => {
       if (point.tps === undefined) return "";
       const previous = points[index - 1];
       const position = `${x(point.at).toFixed(2)},${y(point.tps).toFixed(2)}`;
-      if (previous?.tps === undefined) return `M${position}`;
-      const middle = ((x(previous.at) + x(point.at)) / 2).toFixed(2);
-      // Controls stay between the endpoints: smooth joins cannot invent peaks.
-      return `C${middle},${y(previous.tps).toFixed(2)} ${middle},${y(point.tps).toFixed(2)} ${position}`;
+      if (point.breakBefore || previous?.tps === undefined) return `M${position}`;
+      // This connects request averages, not invented per-second reasoning samples.
+      return `L${position}`;
     })
     .join(" ");
   return { points, shades, start, end, max, x, y, path, width, right, nextAt: window?.nextAt };
 }
-
-const labels: Record<SpeedState, string> = {
-  output: "Output",
-  waiting: "Waiting",
-  tools: "Tools",
-  unobserved: "Unobserved",
-};
 
 export function createSpeedChart(
   container: HTMLElement,
@@ -54,17 +38,17 @@ export function createSpeedChart(
   update(window?: SpeedWindow): void;
   dispose(): void;
 } {
-  container.innerHTML = `<p class="muted chart-empty" title="Historical totals cannot reconstruct per-second output.">No speed samples in this window.</p>
-    <div class="section-head chart-heading"><span class="muted">Latest 10 min</span><span class="muted">15 s buckets</span></div>
-    <div class="chart"><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" role="img" tabindex="0" aria-label="Output TPS in completed 15 second buckets" aria-description="Hover or tap to inspect. Use Left and Right arrows, Home or End to select buckets; Escape dismisses.">
+  container.innerHTML = `<p class="muted chart-empty" title="Missing usage or timing cannot reconstruct generation speed.">No measured model requests.</p>
+    <div class="section-head chart-heading"><span class="muted">Recent model requests</span><span class="muted">Output + reasoning</span></div>
+    <div class="chart"><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" role="img" tabindex="0" aria-label="Output plus reasoning request mean TPS on cumulative request time" aria-description="Each point is a reported request average, not instantaneous speed. Vertical dividers mark requests. Hover or tap to inspect; use Left, Right, Home or End; Escape dismisses.">
       <g class="speed-shades" aria-hidden="true"/>
+      <g class="speed-boundaries" aria-hidden="true"/>
       ${[0, 0.5, 1].map(() => `<line class="grid"/><text class="value-label" text-anchor="end"/><text class="time-label" y="218"/>`).join("")}
       <text x="${LEFT}" y="12">tokens/s</text>
       <path class="line speed" style="stroke:var(--insight-speed-output)"/>
       <g class="speed-points" aria-hidden="true"/>
       <line class="cursor" y1="${TOP}" y2="${BOTTOM}" hidden/>
-    </svg><div class="speed-inspection"><div class="tooltip" role="status" hidden></div></div></div>
-    <span class="sr-only">Hover or tap to inspect. Use Left and Right arrows, Home or End to select samples; Escape dismisses.</span>`;
+    </svg><div class="speed-inspection"><div class="tooltip" role="status" hidden></div></div></div>`;
   const svg = container.querySelector("svg")!;
   const box = container.querySelector<HTMLElement>(".chart")!;
   const tip = container.querySelector<HTMLElement>(".tooltip")!;
@@ -77,10 +61,11 @@ export function createSpeedChart(
   const path = svg.querySelector("path.speed")!;
   const shades = svg.querySelector(".speed-shades")!;
   const markers = svg.querySelector(".speed-points")!;
+  const boundaries = svg.querySelector(".speed-boundaries")!;
   let window: SpeedWindow | undefined;
   let refreshedAt: number | undefined;
   let g = chartGeometry();
-  let selected: number | undefined;
+  let selected: string | undefined;
   let inspecting = false;
   let disposed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -92,19 +77,21 @@ export function createSpeedChart(
     tip.hidden = true;
     cursor.setAttribute("hidden", "");
     delete container.dataset.inspectedAt;
+    delete container.dataset.inspectedRequest;
   };
   function show(index: number) {
     const p = g.points[index];
     if (!p) return;
-    selected = p.at;
+    selected = p.requestID;
     inspecting = true;
     container.dataset.inspectedAt = String(p.at);
+    container.dataset.inspectedRequest = p.requestID;
     tip.hidden = false;
-    tip.innerHTML = `<time>${time(p.start)}–${time(p.end)}</time><strong>${p.tps === undefined ? labels[p.state] : `${number(p.tps)} tokens/s`}</strong>`;
+    tip.innerHTML = `<time>${time(p.start)}–${time(p.end)}</time><strong>${p.tps === undefined ? (p.status === "running" ? "Pending final usage" : "Rate unavailable") : `${number(p.tps)} tokens/s`}</strong>`;
     cursor.removeAttribute("hidden");
     attrs(cursor, { x1: g.x(p.at), x2: g.x(p.at) });
   }
-  const selectedIndex = () => g.points.findIndex((p) => p.at === selected);
+  const selectedIndex = () => g.points.findIndex((p) => p.requestID === selected);
   function render() {
     clearTimeout(timer);
     if (disposed) return;
@@ -126,8 +113,8 @@ export function createSpeedChart(
     heading.hidden = !populated;
     box.hidden = !populated;
     empty.textContent = window
-      ? "Waiting for a completed 15 s bucket."
-      : "No speed samples in this window.";
+      ? "Generation speed unavailable: no measured model request duration."
+      : "No measured model requests.";
     attrs(svg, { viewBox: `0 0 ${g.width} ${HEIGHT}` });
     [0, 0.5, 1].forEach((ratio, i) => {
       const y = g.y(g.max * ratio);
@@ -139,11 +126,11 @@ export function createSpeedChart(
         x: g.x(at),
         "text-anchor": i === 0 ? "start" : i === 2 ? "end" : "middle",
       });
-      times[i].textContent = time(at);
+      times[i].textContent = duration(at);
     });
     path.setAttribute("d", g.path);
     const node = (
-      tag: "rect" | "text" | "circle",
+      tag: "rect" | "text" | "circle" | "line",
       attributes: Record<string, string | number>,
       text?: string,
     ) => {
@@ -154,8 +141,8 @@ export function createSpeedChart(
     };
     shades.replaceChildren(
       ...g.shades.flatMap((shade) => {
-        const left = g.x(shade.start),
-          width = g.x(shade.end) - left;
+        const left = g.x(shade.offsetMs),
+          width = g.x(shade.offsetMs + shade.durationMs) - left;
         const rectangle = node("rect", {
           x: left,
           y: TOP,
@@ -175,10 +162,21 @@ export function createSpeedChart(
                   "text-anchor": "middle",
                   class: "speed-state",
                 },
-                labels[shade.state],
+                shade.status === "running" ? "Pending" : "Unavailable",
               ),
             ];
       }),
+    );
+    boundaries.replaceChildren(
+      ...g.points.slice(1).map((point) =>
+        node("line", {
+          x1: g.x(point.offsetMs),
+          x2: g.x(point.offsetMs),
+          y1: TOP,
+          y2: BOTTOM,
+          class: "speed-boundary",
+        }),
+      ),
     );
     markers.replaceChildren(
       ...g.points.flatMap((point) =>
@@ -188,7 +186,7 @@ export function createSpeedChart(
               node("circle", {
                 cx: g.x(point.at),
                 cy: g.y(point.tps),
-                r: 2.2,
+                r: 3,
                 fill: "var(--insight-speed-output)",
               }),
             ],
@@ -208,7 +206,8 @@ export function createSpeedChart(
       g.start +
       ((((event.clientX - bounds.left) / bounds.width) * g.width - LEFT) / (g.right - LEFT)) *
         (g.end - g.start);
-    show(Math.max(0, Math.min(g.points.length - 1, Math.floor((at - g.start) / SPEED_BUCKET_MS))));
+    const index = g.points.findIndex((point) => at < point.offsetMs + point.durationMs);
+    show(index < 0 ? g.points.length - 1 : index);
   };
   const focus = () => show(selectedIndex() < 0 ? g.points.length - 1 : selectedIndex());
   const keydown = (event: KeyboardEvent) => {

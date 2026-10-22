@@ -46,11 +46,11 @@ export function createPanelView(
   const empty = mountEmpty(emptySlot, { title: "Select an active OpenCode session" });
   const quality = mountBadge(qualitySlot, { label: "Partial capture", tone: "neutral" });
   qualitySlot.title = "Totals and timing cover only observed activity.";
-  const metricLabels = ["Current context", "Cumulative tokens", "Request mean", "Foreground"];
+  const metricLabels = ["Current context", "Cumulative tokens", "Generation mean", "Foreground"];
   const descriptions = [
     "Latest input snapshot · estimated/reported.",
     "Reported repeated input + cache + output + reasoning.",
-    "Reported output + reasoning / whole request elapsed.",
+    "Shown requests: reported output + reasoning / total request-to-stream-end time. Includes in-request latency and stalls; excludes inter-request tools and idle time.",
     "Union of model and blocking tools; background separate.",
   ];
   const values = metricLabels.map((label, index) => {
@@ -115,7 +115,9 @@ export function createPanelView(
       summary.hasUsage
         ? number(Object.values(summary.usage).reduce((sum, value) => sum + value, 0))
         : "Unavailable",
-      summary.tps === undefined ? "Unavailable" : `${number(summary.tps)} tokens/s`,
+      state.speed?.generation?.tps === undefined
+        ? "Unavailable"
+        : `${number(state.speed.generation.tps)} tokens/s`,
       duration(summary.foregroundMs),
     ];
     metricsNext.forEach((value, index) => setText(values[index], value));
