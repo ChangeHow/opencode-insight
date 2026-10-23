@@ -32,7 +32,14 @@ function session(requests: RequestInsight[]): SessionInsight {
     sessionID: "s",
     directory: "/project",
     revision: 1,
-    updatedAt: 0,
+    updatedAt: Math.max(
+      0,
+      ...requests.flatMap((request) => [
+        request.startedAt,
+        request.streamedAt ?? 0,
+        request.endedAt ?? 0,
+      ]),
+    ),
     interruptedCapture: false,
     requests,
     tools: [],
@@ -40,6 +47,34 @@ function session(requests: RequestInsight[]): SessionInsight {
 }
 
 describe("bounded generation window", () => {
+  test("freezes idle activity despite background tools and resumes the latest fifteen minutes", () => {
+    const input = session([request()]);
+    input.tools = [
+      { id: "background", name: "shell", startedAt: 5000, status: "running", background: true },
+    ];
+    const frozen = buildGenerationWindow(input, undefined, 10000);
+    expect(frozen).toMatchObject({ start: -894000, end: 6000 });
+    expect(frozen.active).toBeUndefined();
+    expect(frozen.stages).toHaveLength(1);
+    expect(buildGenerationWindow(input, undefined, 2000000)).toEqual(frozen);
+
+    input.requests.push(
+      request({
+        id: "resumed",
+        startedAt: 2000000,
+        status: "running",
+        streamedAt: undefined,
+        endedAt: undefined,
+        firstDeltaAt: undefined,
+        usage: undefined,
+      }),
+    );
+    input.updatedAt = 2000000;
+    const resumed = buildGenerationWindow(input, undefined, 2010000);
+    expect(resumed).toMatchObject({ start: 1110000, end: 2010000, active: true });
+    expect(resumed.stages.map(({ requestID }) => requestID)).toEqual(["resumed"]);
+  });
+
   test("estimates observed live output and reasoning, then replaces the same request with reported usage", () => {
     const live = request({
       status: "running",
@@ -78,6 +113,7 @@ describe("bounded generation window", () => {
     live.status = "completed";
     live.streamedAt = 11000;
     live.usage = { input: 100, output: 40, reasoning: 160, cacheRead: 0, cacheWrite: 0 };
+    input.updatedAt = 11000;
     const reported = buildGenerationWindow(input, undefined, 12000);
     expect(reported.stages).toHaveLength(1);
     expect(reported.stages[0]).toMatchObject({
@@ -101,6 +137,9 @@ describe("bounded generation window", () => {
       request({ id: "crossing", startedAt: 1000000, streamedAt: 1200000 }),
       request({ id: "recent", startedAt: 1900000, streamedAt: 1910000 }),
     ]);
+    input.tools = [
+      { id: "foreground", name: "shell", startedAt: 1910000, status: "running", background: false },
+    ];
     const result = buildGenerationWindow(input, undefined, 2000000);
     expect(result).toMatchObject({ start: 1100000, end: 2000000, durationMs: 900000 });
     expect(result.stages.map(({ requestID }) => requestID)).toEqual(["crossing", "recent"]);
@@ -120,10 +159,10 @@ describe("bounded generation window", () => {
     const requests = Array.from({ length: 41 }, (_, i) =>
       request({ id: String(i), startedAt: i * 1000, streamedAt: i * 1000 + 500 }),
     );
-    const dense = buildGenerationWindow(session(requests), undefined, 50000);
+    const dense = buildGenerationWindow(session(requests), { to: 50000 }, 50000);
     expect(dense).toMatchObject({ start: -850000, end: 50000, partial: true });
     expect(dense.stages).toHaveLength(40);
-    expect(buildGenerationWindow(session([]), undefined, 50000)).toMatchObject({
+    expect(buildGenerationWindow(session([]), { to: 50000 }, 50000)).toMatchObject({
       start: -850000,
       end: 50000,
       durationMs: 900000,
@@ -225,7 +264,7 @@ describe("bounded generation window", () => {
     expect(result.stages.find(({ requestID }) => requestID === "missing")?.output).toBeUndefined();
     expect(result).toMatchObject({ durationMs: 900000, unavailableCount: 7 });
     expect(result.tps).toBeUndefined();
-    expect(buildGenerationWindow(session([]), undefined, 9000)).toEqual({
+    expect(buildGenerationWindow(session([]), { to: 9000 }, 9000)).toEqual({
       start: -891000,
       end: 9000,
       partial: false,

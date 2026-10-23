@@ -98,6 +98,6 @@ describe("speed status section", () => {
     expect(button.closest("[hidden]")).not.toBeNull();
     expect(root.querySelector(".speed-summary strong")?.textContent).toBe("Unavailable");
     expect(root.querySelector<HTMLElement>(".chart")?.hidden).toBe(false);
-    expect(root.textContent).toContain("no measured model request duration");
+    expect(root.querySelector<HTMLElement>(".chart-empty")?.hidden).toBe(false);
   });
 });

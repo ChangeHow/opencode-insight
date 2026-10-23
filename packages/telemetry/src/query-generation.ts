@@ -25,6 +25,7 @@ export const generationWindowSchema = z.object({
   start: z.number().finite(),
   end: z.number().finite(),
   partial: z.boolean(),
+  active: z.literal(true).optional(),
   durationMs: z.number().nonnegative(),
   stages: z.array(generationStageSchema).max(MAX_GENERATION_STAGES),
   tps: z.number().nonnegative().optional(),
@@ -80,13 +81,16 @@ function liveTokens(request: RequestInsight, end: number) {
   return output + reasoning > 0 ? { output, reasoning } : undefined;
 }
 
-/** Wall-clock viewport; rates always retain the full measured request duration. */
+/** Follow active sessions and freeze idle ones; rates retain the full measured request duration. */
 export function buildGenerationWindow(
   session: SessionInsight,
   input?: { from?: number; to?: number },
   now = Date.now(),
 ): GenerationWindow {
-  const end = input?.to ?? now;
+  const active =
+    session.requests.some((request) => request.status === "running") ||
+    session.tools.some((tool) => tool.status === "running" && !tool.background);
+  const end = input?.to ?? (active ? now : Math.min(now, session.updatedAt));
   const start = input?.from ?? end - GENERATION_WINDOW_MS;
   // Select before removing unplottable requests so unknown durations consume the bound.
   const candidates = session.requests
@@ -97,9 +101,9 @@ export function buildGenerationWindow(
         request.endedAt ??
         (request.status === "running" ? now : request.startedAt),
     }))
-    .filter(({ request, end }) => {
-      if (request.startedAt >= (input?.to ?? now)) return false;
-      return end > request.startedAt ? end > start : request.startedAt >= start;
+    .filter(({ request, end: requestEnd }) => {
+      if (request.startedAt >= end) return false;
+      return requestEnd > request.startedAt ? requestEnd > start : request.startedAt >= start;
     })
     .sort((a, b) => a.request.startedAt - b.request.startedAt);
   const selected = candidates.slice(-MAX_GENERATION_STAGES);
@@ -146,6 +150,7 @@ export function buildGenerationWindow(
     start,
     end,
     partial: session.interruptedCapture || candidates.length > MAX_GENERATION_STAGES,
+    ...(active ? { active: true as const } : {}),
     durationMs: end - start,
     stages,
     tps: measuredMs > 0 ? (tokens * 1000) / measuredMs : undefined,

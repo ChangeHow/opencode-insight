@@ -28,7 +28,7 @@ export function createSpeedView(root: HTMLElement, retry: () => void, refresh: (
   const banner = mountBanner(errorSlot, { tone: "error", title: "Telemetry unavailable" });
   const empty = mountEmpty(emptySlot, { title: "Select an active OpenCode session" });
   const chart = createSpeedChart(chartSlot, refresh, (left) => {
-    summary.style.paddingInlineStart = `${left}px`;
+    root.style.setProperty("--speed-label-left", `${left}px`);
   });
   return {
     render(state: PanelState) {

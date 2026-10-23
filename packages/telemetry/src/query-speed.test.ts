@@ -9,7 +9,7 @@ function fixture(): SessionInsight {
     sessionID: "s",
     directory: "/project",
     revision: 1,
-    updatedAt: 0,
+    updatedAt: 31000,
     interruptedCapture: false,
     tools: [{ id: "t", name: "shell", startedAt: 1, status: "running", background: true }],
     requests: [
@@ -71,9 +71,13 @@ describe("bounded speed window", () => {
     const session = fixture();
     session.tools[0] = { ...session.tools[0], status: "completed", endedAt: 1 };
     session.requests[1] = { ...session.requests[1], status: "interrupted" };
-    for (const now of [16000, 30000, 999999]) {
+    const frozen = buildSpeedWindow(session, undefined, session.updatedAt).generation;
+    for (const now of [31000, 60000, 2000000]) {
       const { generation, ...legacy } = buildSpeedWindow(session, undefined, now);
-      expect(generation?.stages).toHaveLength(now < 916000 ? 1 : 0);
+      expect(generation).toEqual(frozen);
+      expect(generation).toMatchObject({ start: -869000, end: 31000 });
+      expect(generation?.active).toBeUndefined();
+      expect(generation?.stages).toHaveLength(1);
       expect(legacy).toEqual({
         sessionID: "s",
         directory: "/project",

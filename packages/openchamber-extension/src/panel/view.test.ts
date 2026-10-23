@@ -16,7 +16,7 @@ const session: SessionInsight = {
   version: 1,
   sessionID: "one",
   directory: "/local",
-  updatedAt: 1,
+  updatedAt: 2500,
   revision: 1,
   interruptedCapture: true,
   requests: [
@@ -265,6 +265,7 @@ describe("panel view", () => {
       loading: false,
       session: {
         ...session,
+        updatedAt: 17000,
         requests: [
           { ...session.requests[0], id: "baseline" },
           {
@@ -290,6 +291,7 @@ describe("panel view", () => {
       session: {
         ...session,
         revision: 2,
+        updatedAt: 17000,
         tools: [{ ...session.tools[0], endedAt: 3500 }],
         requests: [
           state.session.requests[0],

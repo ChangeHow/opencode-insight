@@ -132,7 +132,9 @@ export function createSpeedChart(
       ? "Only retained captured requests are shown (up to 40); earlier activity may be missing."
       : "Last fifteen wall-clock minutes";
     empty.textContent = window
-      ? "Generation speed unavailable: no measured model request duration."
+      ? window.generation?.active
+        ? "Waiting for speed data"
+        : "Frozen · awaiting next turn"
       : "No measured model requests.";
     attrs(svg, { viewBox: `0 0 ${g.width} ${HEIGHT}` });
     [0, 0.5, 1].forEach((ratio, i) => {

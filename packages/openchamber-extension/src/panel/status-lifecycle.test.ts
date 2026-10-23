@@ -392,15 +392,15 @@ describe("Resources Speed document lifecycle", () => {
     expect(b.root.querySelector("section")?.dataset.inspectedRequest).toBe("request");
   });
 
-  test("ages a verified cached projection before painting, excluding expired means and points", async () => {
+  test("retains a verified idle projection when reopening after a long pause", async () => {
     const b = mount(await captured());
     b.w.Date.now = () => 1000000;
     b.show();
     await turns();
     b.scope();
     await turns();
-    expect(b.root.querySelector(".speed-summary strong")?.textContent).toBe("Unavailable");
-    expect(b.root.querySelectorAll(".speed-points circle")).toHaveLength(0);
+    expect(b.root.querySelector(".speed-summary strong")?.textContent).toBe("10 tokens/s");
+    expect(b.root.querySelectorAll(".speed-points circle")).toHaveLength(1);
     expect(b.root.querySelector<HTMLElement>(".chart")!.hidden).toBe(false);
     b.show(false);
     b.w.Date.now = () => 2000000;
@@ -416,7 +416,9 @@ describe("Resources Speed document lifecycle", () => {
       b.show();
       await turns();
       b.scope();
-      b.respond("/speed-window", speed());
+      const active = speed();
+      active.generation!.active = true;
+      b.respond("/speed-window", active);
       await turns();
       expect(b.root.querySelector(".speed-summary strong")?.textContent).toBe("10 tokens/s");
       const path = b.root.querySelector("path.speed")?.getAttribute("d");

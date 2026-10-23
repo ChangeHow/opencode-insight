@@ -10,7 +10,7 @@ const session: SessionInsight = {
   sessionID: "one",
   directory: "/local",
   revision: 1,
-  updatedAt: 1,
+  updatedAt: 630000,
   interruptedCapture: false,
   tools: [],
   requests: [
@@ -57,6 +57,7 @@ describe("speed chart", () => {
     const data = buildSpeedWindow(
       {
         ...session,
+        updatedAt: 2000000,
         requests: [
           {
             ...session.requests[0],

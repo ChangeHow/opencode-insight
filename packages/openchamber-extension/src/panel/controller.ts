@@ -64,7 +64,14 @@ export function createPanelController(
   let clock: ReturnType<typeof setInterval> | undefined;
   const pollInterval = surface === "panel" ? 3000 : 1000;
   const visible = () => !disposed && !document.hidden && intersecting;
-  const emit = () =>
+  const emit = () => {
+    if (visible() && state.speed?.generation?.active) {
+      // Keep active charts moving even while a network read is delayed.
+      clock ??= setInterval(emit, 1000);
+    } else {
+      clearInterval(clock);
+      clock = undefined;
+    }
     change({
       ...state,
       speed:
@@ -72,6 +79,7 @@ export function createPanelController(
           ? advanceSpeedDisplay(state.speed, state.speedReceivedAt)
           : state.speed,
     });
+  };
   const stopTimer = () => clearTimeout(timer);
 
   async function read(path: string, body: object) {
@@ -263,12 +271,9 @@ export function createPanelController(
     generation++;
     stopTimer();
     clearInterval(clock);
+    clock = undefined;
     if (visible()) {
       emit();
-      // Local aging also runs while a network read is delayed; it never requests telemetry.
-      clock = setInterval(() => {
-        if (visible() && state.speed) emit();
-      }, 1000);
       speedRequested = true;
       void refresh();
     }

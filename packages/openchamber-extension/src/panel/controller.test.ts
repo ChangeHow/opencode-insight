@@ -246,22 +246,55 @@ describe("panel controller", () => {
     h.controller.dispose();
   });
 
-  test("advances the idle viewport without rereading an unchanged speed projection", async () => {
-    const h = harness(async (request) => json(response(request)));
-    h.select();
-    await vi.advanceTimersByTimeAsync(0);
-    const renders = h.states.length;
-    const initial = h.states.at(-1)!;
-    await vi.advanceTimersByTimeAsync(3000);
-    expect(h.serviceRequest).toHaveBeenCalledTimes(3);
-    expect(
-      h.serviceRequest.mock.calls.filter(([request]) => request.path === "/speed-window"),
-    ).toHaveLength(1);
-    expect(h.states).toHaveLength(renders + 3);
-    expect(h.states.at(-1)?.overview).toBe(initial.overview);
-    expect(h.states.at(-1)?.speed?.generation?.end).toBe(initial.speed!.generation!.end + 3000);
-    h.controller.dispose();
-  });
+  test.each(["panel", "status"] as const)(
+    "%s freezes the idle viewport, resumes on activity and freezes again on completion",
+    async (surface) => {
+      vi.setSystemTime(30000);
+      const raw = session();
+      const h = harness(async (request) => json(response(request, raw)), surface);
+      h.select();
+      await vi.advanceTimersByTimeAsync(0);
+      const initial = h.states.at(-1)!.speed!.generation!;
+      const renders = h.states.length;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(h.states.at(-1)?.speed?.generation).toEqual(initial);
+      if (surface === "panel") expect(h.states).toHaveLength(renders);
+
+      raw.requests.push({
+        id: "request",
+        model: "model",
+        startedAt: Date.now(),
+        status: "running",
+        reasoningMode: "unknown",
+        capture: "live",
+        buckets: [],
+        context: [],
+      });
+      raw.updatedAt = Date.now();
+      raw.revision++;
+      await vi.advanceTimersByTimeAsync(3000);
+      const running = h.states.at(-1)!.speed!.generation!;
+      expect(running.end).toBeGreaterThan(initial.end);
+      expect(running.end - running.start).toBe(900000);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(h.states.at(-1)!.speed!.generation!.end).toBe(running.end + 1000);
+
+      Object.assign(raw.requests[0], {
+        status: "completed",
+        streamedAt: Date.now(),
+        endedAt: Date.now(),
+        usage: { input: 0, output: 20, reasoning: 80, cacheRead: 0, cacheWrite: 0 },
+      });
+      raw.updatedAt = Date.now();
+      raw.revision++;
+      await vi.advanceTimersByTimeAsync(3000);
+      const completed = h.states.at(-1)!.speed!.generation!;
+      expect(completed.tps).toBe(25);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(h.states.at(-1)?.speed?.generation).toEqual(completed);
+      h.controller.dispose();
+    },
+  );
 
   test("retains failed overview data and fetches a changed revision after recovery", async () => {
     let revision = 1;
