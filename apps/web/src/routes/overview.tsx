@@ -8,6 +8,7 @@ import { Heatmap } from "@/components/dashboard/heatmap";
 import { OverviewEmptyState } from "@/components/dashboard/overview-empty-state";
 import { ProviderIcon } from "@/components/dashboard/provider-icon";
 import { RemoteUsagePanel } from "@/components/dashboard/remote-usage-panel";
+import { SessionInsightLookup } from "@/components/dashboard/session-insight-lookup";
 import { ResponsiveDisclosure } from "@/components/dashboard/responsive-disclosure";
 import { LedgerSparkline } from "@/components/dashboard/sparkline";
 import { TrendChart } from "@/components/dashboard/trend-chart";
@@ -113,6 +114,18 @@ export function DashboardPage() {
           </div>
         </div>
       </header>
+
+      <div className="px-4 sm:px-8 lg:px-10">
+        <SessionInsightLookup
+          onSelect={(session) =>
+            void navigate({
+              to: "/sessions/$session",
+              params: { session },
+              search: { from: undefined },
+            })
+          }
+        />
+      </div>
 
       <OverviewSummaryGrid
         summary={summary}

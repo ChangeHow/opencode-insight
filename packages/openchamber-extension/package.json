@@ -1,0 +1,48 @@
+{
+  "name": "@changehow/openchamber-insight",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openchamber/sdk": "2.5.0",
+    "@opencode-insight/client": "workspace:*",
+    "@opencode-insight/telemetry": "workspace:*",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "esbuild": "^0.27.4",
+    "jsdom": "^26.1.0",
+    "vitest": "^4.1.1"
+  },
+  "openchamber": {
+    "apiVersion": 1,
+    "engines": {
+      "openchamber": ">=2.5.0"
+    },
+    "contributes": {
+      "panel": {
+        "id": "opencode-insight",
+        "name": "Insight",
+        "icon": "bar-chart-box",
+        "entry": "dist/panel/index.html"
+      },
+      "statusSection": {
+        "entry": "dist/panel/index.html",
+        "title": "Speed",
+        "height": 300,
+        "defaultExpanded": false,
+        "requiresProject": true
+      },
+      "service": {
+        "entry": "dist/service/main.js",
+        "runtime": "host"
+      }
+    }
+  }
+}

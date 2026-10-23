@@ -14,9 +14,23 @@ import type {
   RemoteSyncActionPayload,
   RemoteUsagePayload,
   SessionDetailBreakdown,
+  SessionInsightPayload,
+  OverviewResponse,
+  SeriesWindow,
+  SourcePage,
+  ToolPage,
   TimeRange,
   TrendPoint,
 } from "@opencode-dashboard/shared";
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 async function getJson<T>(url: string) {
   const cached = inflightJsonRequests.get(url) as Promise<T> | undefined;
@@ -28,7 +42,7 @@ async function getJson<T>(url: string) {
     const response = await fetch(url);
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(payload?.error ?? "Request failed.");
+      throw new ApiError(payload?.error ?? "Request failed.", response.status);
     }
     return (await response.json()) as T;
   })();
@@ -93,6 +107,50 @@ export function fetchDay(
 export function fetchSession(sessionId: string) {
   const params = new URLSearchParams({ timeZone: getCurrentTimeZone(), range: "all" });
   return getJson<SessionDetailBreakdown>(`/api/session/${sessionId}?${params.toString()}`);
+}
+
+export function fetchSessionInsight(sessionId: string, after?: number) {
+  const query = after === undefined ? "" : `?${new URLSearchParams({ after: String(after) })}`;
+  return getJson<SessionInsightPayload>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight${query}`,
+  );
+}
+
+export function fetchSessionInsightOverview(sessionId: string, after?: number) {
+  const query = after === undefined ? "" : `?${new URLSearchParams({ after: String(after) })}`;
+  return getJson<OverviewResponse>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight/overview${query}`,
+  );
+}
+
+export function fetchSessionInsightSeriesWindow(sessionId: string) {
+  return getJson<SeriesWindow>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight/series-window`,
+  );
+}
+
+export function fetchSessionInsightSources(
+  sessionId: string,
+  scope: "current" | "cumulative",
+  options: { kind?: string; cursor?: string } = {},
+) {
+  const params = new URLSearchParams({ scope, limit: "50" });
+  if (options.kind !== undefined) params.set("kind", options.kind);
+  if (options.cursor !== undefined) params.set("cursor", options.cursor);
+  return getJson<SourcePage>(
+    `/api/session/${encodeURIComponent(sessionId)}/insight/sources?${params}`,
+  );
+}
+
+export function fetchSessionInsightTools(
+  sessionId: string,
+  options: { group?: string; toolID?: string; cursor?: string } = {},
+) {
+  const params = new URLSearchParams({ limit: "20" });
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) params.set(key, value);
+  }
+  return getJson<ToolPage>(`/api/session/${encodeURIComponent(sessionId)}/insight/tools?${params}`);
 }
 
 export function fetchSeries(

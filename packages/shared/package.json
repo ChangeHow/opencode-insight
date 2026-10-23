@@ -16,6 +16,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
+  "dependencies": {
+    "@opencode-insight/telemetry": "workspace:*"
+  },
   "devDependencies": {
     "vite": "^8.2.1"
   }

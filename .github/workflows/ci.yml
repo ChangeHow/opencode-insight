@@ -32,6 +32,17 @@ jobs:
       - name: Build shared package
         run: pnpm --filter @opencode-dashboard/shared build
 
+      - name: Build V2 extensions
+        run: pnpm build:extensions
+
+      - name: Typecheck V2 extensions
+        run: |
+          pnpm --filter @opencode-insight/telemetry --filter @opencode-insight/client --filter @changehow/opencode-insight-plugin --filter @changehow/openchamber-insight typecheck
+          pnpm exec tsc -p tsconfig.extensions.json --noEmit
+
+      - name: Test V2 extensions
+        run: pnpm test:extensions
+
       - name: Typecheck (BFF)
         run: pnpm --filter @opencode-dashboard/bff typecheck
 

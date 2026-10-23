@@ -4,8 +4,9 @@ import { useParams, useSearch } from "@tanstack/react-router";
 import { MessageAnalyticsPanel } from "@/components/dashboard/message-analytics-panel";
 import { SessionBreakdownPanel } from "@/components/dashboard/session-breakdown";
 import { DetailLayoutShell } from "@/components/dashboard/detail-layout-shell";
+import { LiveSessionInsight } from "@/components/dashboard/live-session-insight";
 import { detailLoadingAtom, errorAtom, sessionAtom } from "@/lib/atoms";
-import { fetchSession } from "@/lib/api";
+import { ApiError, fetchSession } from "@/lib/api";
 
 export function SessionDetailPage() {
   const { session: sessionId } = useParams({ from: "/dashboard/sessions/$session" });
@@ -13,10 +14,12 @@ export function SessionDetailPage() {
   const [session, setSession] = useAtom(sessionAtom);
   const [loading, setLoading] = useAtom(detailLoadingAtom);
   const [, setError] = useAtom(errorAtom);
+  const supportsInsight = /^ses_[A-Za-z0-9]+$/.test(sessionId);
 
   useEffect(() => {
     let canceled = false;
     setLoading(true);
+    setSession(null);
 
     async function loadSession() {
       try {
@@ -29,7 +32,11 @@ export function SessionDetailPage() {
         if (!canceled) {
           setSession(null);
           setError(
-            loadError instanceof Error ? loadError.message : "Failed to load session detail.",
+            loadError instanceof ApiError && loadError.status === 404 && supportsInsight
+              ? null
+              : loadError instanceof Error
+                ? loadError.message
+                : "Failed to load session detail.",
           );
         }
       } finally {
@@ -44,7 +51,7 @@ export function SessionDetailPage() {
     return () => {
       canceled = true;
     };
-  }, [sessionId, setError, setLoading, setSession]);
+  }, [sessionId, supportsInsight, setError, setLoading, setSession]);
 
   return (
     <DetailLayoutShell
@@ -59,12 +66,17 @@ export function SessionDetailPage() {
           </div>
         </div>
       ) : session ? (
-        <>
-          <SessionBreakdownPanel session={session} />
-          <div className="px-4 sm:px-8 lg:px-10">
-            <MessageAnalyticsPanel sessionId={sessionId} />
-          </div>
-        </>
+        <SessionBreakdownPanel session={session} />
+      ) : null}
+      {supportsInsight ? (
+        <div className="px-4 sm:px-8 lg:px-10">
+          <LiveSessionInsight key={sessionId} sessionId={sessionId} />
+        </div>
+      ) : null}
+      {!loading && session ? (
+        <div className="px-4 sm:px-8 lg:px-10">
+          <MessageAnalyticsPanel sessionId={sessionId} />
+        </div>
       ) : null}
     </DetailLayoutShell>
   );

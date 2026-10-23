@@ -343,3 +343,4 @@ export interface MessageAnalyticsPayload {
 }
 
 export * from "./date";
+export * from "./insight";

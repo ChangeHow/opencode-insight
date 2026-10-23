@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { box } from "@clack/prompts";
 import { registerQueryCommands } from "./opendash-query.mjs";
+import { registerExtensionCommands } from "./opendash-extensions.mjs";
 import packageJson from "../package.json" with { type: "json" };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -248,5 +249,6 @@ program
   .action(logsCommand);
 
 registerQueryCommands(program);
+registerExtensionCommands(program, ROOT);
 
 program.parse();

@@ -8,6 +8,7 @@ import { providers } from "./controllers/providers";
 import { day } from "./controllers/day";
 import { messages } from "./controllers/messages";
 import { system } from "./controllers/system";
+import { insight } from "./controllers/insight";
 
 const app = new Hono();
 
@@ -20,5 +21,6 @@ app.route("/", providers);
 app.route("/", day);
 app.route("/", messages);
 app.route("/", system);
+app.route("/", insight);
 
 export default app;

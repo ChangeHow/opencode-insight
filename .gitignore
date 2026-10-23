@@ -36,3 +36,11 @@ docs/plans/finished/
 .DS_Store
 test-results/
 playwright-report/
+
+# Built platform exports in the root npm package
+/openchamber/package.json
+/openchamber/panel/
+/openchamber/service/
+/openchamber/index.js
+/server.js
+/scripts/opendash-extensions.mjs

@@ -18,6 +18,8 @@
     "@clack/prompts": "1.1.0",
     "@hono/node-server": "^1.14.4",
     "@opencode-dashboard/shared": "workspace:*",
+    "@opencode-insight/client": "workspace:*",
+    "@opencode-insight/telemetry": "workspace:*",
     "dotenv": "^17.2.2",
     "hono": "^4.7.2",
     "pino": "^10.3.1",

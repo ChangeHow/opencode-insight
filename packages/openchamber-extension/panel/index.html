@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Session insight</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font: 0.875rem/1.45 var(--oc-font, system-ui);
+        color: var(--oc-fg, CanvasText);
+        background: var(--oc-bg, Canvas);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        padding: 12px 20px;
+        max-width: 1100px;
+        margin: auto;
+        overflow-wrap: anywhere;
+      }
+      h1 {
+        font-size: 1.15rem;
+        margin: 0;
+      }
+      h2 {
+        font-size: 1rem;
+        margin: 18px 0 10px;
+      }
+      p {
+        margin: 10px 0;
+      }
+      small {
+        font-size: 0.8rem;
+      }
+      .chart svg:focus-visible {
+        outline: none;
+        background-image: linear-gradient(var(--oc-hover), var(--oc-hover));
+      }
+      .muted,
+      code {
+        color: var(--oc-muted, GrayText);
+      }
+      code {
+        font-family: var(--oc-mono, monospace);
+        font-size: 0.8rem;
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .panel-header {
+        flex-wrap: nowrap;
+        gap: 8px;
+      }
+      .insight-section {
+        margin-top: 20px;
+      }
+      .insight-section + .insight-section {
+        border-top: 1px solid var(--oc-border, GrayText);
+        padding-top: 8px;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr));
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .metric {
+        background: var(--oc-muted-surface, ButtonFace);
+        border-radius: var(--oc-radius, 6px);
+        padding: 10px;
+        min-width: 0;
+      }
+      .metric > * {
+        display: block;
+      }
+      .metric > span {
+        font-size: 0.8rem;
+      }
+      .metric strong {
+        font-size: 1.2rem;
+        font-variant-numeric: tabular-nums;
+        margin: 3px 0;
+      }
+      .chart {
+        position: relative;
+        min-width: 0;
+        margin-top: 10px;
+        touch-action: pan-y;
+      }
+      .chart svg {
+        display: block;
+        width: 100%;
+        height: 280px;
+        overflow: visible;
+      }
+      .chart svg text {
+        font-size: 11px;
+        fill: var(--oc-muted, GrayText);
+      }
+      .grid {
+        stroke: var(--oc-border, GrayText);
+        opacity: 0.5;
+      }
+      .line {
+        fill: none;
+        stroke-width: 2;
+        vector-effect: non-scaling-stroke;
+        stroke-linecap: round;
+      }
+      .cursor {
+        stroke: var(--oc-muted, GrayText);
+        stroke-dasharray: 3 3;
+      }
+      .speed-boundary {
+        stroke: var(--oc-border, GrayText);
+        stroke-dasharray: 2 4;
+        opacity: 0.55;
+        vector-effect: non-scaling-stroke;
+      }
+      .speed-shade {
+        fill: var(--oc-fg, CanvasText);
+        opacity: 0.06;
+      }
+      .speed-inspection {
+        height: 2.5em;
+        font-size: 0.8rem;
+        padding-top: 6px;
+      }
+      .tooltip {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--oc-muted, GrayText);
+      }
+      .tooltip strong {
+        color: var(--oc-fg, CanvasText);
+        font-variant-numeric: tabular-nums;
+      }
+      main.speed-status {
+        padding: 0;
+      }
+      .speed-status .chart-heading {
+        display: none;
+      }
+      .speed-status .chart svg {
+        height: 200px;
+      }
+      .speed-status .speed-summary,
+      .speed-status .chart-empty {
+        padding-inline-start: var(--speed-label-left, 0px);
+      }
+      .speed-status .speed-summary {
+        flex-wrap: nowrap;
+        gap: 8px;
+      }
+      .speed-summary strong {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .speed-status .tooltip {
+        flex-wrap: wrap;
+        gap: 0 8px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .source {
+        padding: 9px 0;
+        border-bottom: 1px solid var(--oc-border, GrayText);
+      }
+      ul,
+      ol {
+        padding: 0;
+        list-style: none;
+      }
+      .source li {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 0;
+        flex-wrap: wrap;
+      }
+      .chart-heading {
+        margin-bottom: 8px;
+        font-size: 0.8rem;
+      }
+      .token-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+        gap: 24px;
+      }
+      .token-block {
+        min-width: 0;
+      }
+      .composition {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+        margin: 16px 0;
+      }
+      .donut {
+        width: 164px;
+        height: 164px;
+        flex: 0 0 164px;
+        border-radius: 50%;
+        background: conic-gradient(var(--slices));
+        display: grid;
+        place-items: center;
+      }
+      .donut > div {
+        width: 124px;
+        height: 124px;
+        background: var(--oc-bg, Canvas);
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .donut strong {
+        font-size: 1.5rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        min-width: 0;
+      }
+      .donut span {
+        font-size: 0.8rem;
+      }
+      .composition-legend {
+        flex: 1 1 240px;
+        max-width: 100%;
+        min-width: 0;
+      }
+      .legend-row {
+        display: grid;
+        grid-template-columns: 8px minmax(0, 1fr) auto 48px;
+        gap: 8px;
+        align-items: center;
+        padding: 7px 0;
+        text-align: left;
+        font-size: 0.85rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--oc-fg, CanvasText);
+      }
+      .legend-row > :last-child {
+        text-align: right;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--color);
+      }
+      h3 {
+        font-size: 0.85rem;
+        margin: 12px 0 4px;
+      }
+      .timing-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 0.8rem;
+        color: var(--oc-muted, GrayText);
+        margin: 12px 0;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 600px) {
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 420px) {
+        main {
+          padding: 10px 20px;
+        }
+        .metric strong {
+          font-size: 1.05rem;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="./trace.css" />
+  </head>
+  <body>
+    <main id="app"></main>
+    <script src="./main.js" defer></script>
+  </body>
+</html>
