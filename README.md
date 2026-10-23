@@ -12,7 +12,45 @@ The optional [V2 telemetry plugin and OpenChamber panel](docs/v2-insight.md) add
 
 The web dashboard also displays these metrics on OpenCode session detail pages. Use **Inspect an OpenCode V2 session** on the overview to open a session by ID, including sessions absent from the legacy usage ledger. This web view requires the dashboard server and an already-running OpenCode V2 instance with the plugin loaded.
 
-## Requirements
+## Install Insight plugins
+
+The OpenCode capture plugin and OpenChamber panel ship together in `@changehow/oc-insight` starting with version 1.1.0. Using the panel does not require the dashboard daemon, a source checkout, or a separate BFF.
+
+You need Node.js 24+, OpenCode 2.0.26 (or a compatible V2 plugin contract), and OpenChamber 2.5.0+ for the panel.
+
+### OpenCode capture plugin
+
+Add the package to `plugins` in the target OpenCode server's configuration. Use `~/.config/opencode/opencode.jsonc` for all projects, or a project-local `opencode.jsonc` for one project. Preserve any existing plugin entries:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@changehow/oc-insight"],
+}
+```
+
+OpenCode installs the package and loads its server entrypoint; a global npm installation is not needed for this step. Do not use `@changehow/oc-insight/opencode` as the package name.
+
+The target OpenCode server must pick up the configuration before capture begins. If a restart is needed, wait until its active sessions have finished. Insight itself never starts or restarts OpenCode.
+
+### OpenChamber Insight panel
+
+Install the package globally and print the extension directory:
+
+```bash
+npm install -g @changehow/oc-insight@latest
+opendash extension-path openchamber
+```
+
+In OpenChamber, open **Settings → Extensions → Add** and select the printed `openchamber/` folder. Approve its local-process capability, then open **Insight** on the rail and select an OpenCode session. Install the directory, not the JavaScript import specifier `@changehow/oc-insight/openchamber`.
+
+The panel's bridge discovers an already-running managed OpenCode V2 service by default. The service must have the capture plugin loaded. If OpenChamber uses another local or remote instance, configure the bridge's [OpenCode connection](docs/v2-insight.md#opencode-connection) on the machine running OpenChamber's backend.
+
+To upgrade the OpenChamber assets, rerun the npm installation and path commands and update the installed extension from that folder. OpenCode manages its configured package separately; a global npm upgrade does not update an already-loaded capture plugin.
+
+For source builds, beta releases, and measurement limits, see the [detailed Insight guide](docs/v2-insight.md).
+
+## Dashboard requirements
 
 | Dependency  | Minimum | Notes                                                               |
 | ----------- | ------- | ------------------------------------------------------------------- |
@@ -37,7 +75,7 @@ Expected files inside that directory:
 - `opencode.db`
 - `storage/message/`
 
-## Install
+## Install dashboard from source
 
 ```bash
 nvm use
