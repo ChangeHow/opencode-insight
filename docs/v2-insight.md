@@ -45,7 +45,7 @@ node scripts/opendash.mjs extension-path openchamber
 
 In OpenChamber 2.5.0 or later, open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve its local-process capability, then open **Insight** on the rail. Retain the built panel and service assets. OpenChamber does not compile TypeScript at runtime.
 
-After this change is released through the existing npm release workflow, install or upgrade the same package:
+For a published installation instead of a source build, install or upgrade the same package (version 1.1.0 or later):
 
 ```bash
 npm install -g @changehow/oc-insight@latest
@@ -61,7 +61,7 @@ OpenCode can load the published package directly:
 }
 ```
 
-Use the package name in OpenCode configuration; the loader selects its `server` export. The `/opencode` subpath is a module export, not a separate npm package to install. In OpenChamber, install the folder printed by `opendash extension-path openchamber`. Both platforms receive assets from the same release. These new exports are not present in earlier published versions.
+Use the package name in OpenCode configuration; the loader selects its `server` export and installs the package independently of the global npm installation. The `/opencode` subpath is a module export, not a separate npm package to install. In OpenChamber, install the folder printed by `opendash extension-path openchamber`. Both platforms receive assets from the same release; these exports are not present in versions earlier than 1.1.0. For a published-install quick start, see [Install Insight plugins](../README.md#install-insight-plugins).
 
 This implementation uses the existing SDK extension support for web and desktop. Other runtimes depend on their host's extension support.
 
