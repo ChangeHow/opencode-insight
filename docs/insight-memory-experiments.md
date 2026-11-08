@@ -41,10 +41,10 @@ extension/bridge/dashboard smoke passed; lint reports 0 errors and 11 existing
 warnings. No production installation, managed service restart, or Git commit was
 performed.
 
-Raw experiment root:
+Raw experiment root (local-only output, not included in this repository):
 
 ```text
-/private/var/folders/w3/wdx0702n4sn_82k5nhwz_rww0000gn/T/opencode/insight-server-matrix-uCljMC
+/absolute/path/to/experiment-output
 ```
 
 In `idle-soak/results.json`, **`control` is the selected implementation** and

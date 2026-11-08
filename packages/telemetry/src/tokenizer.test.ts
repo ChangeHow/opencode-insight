@@ -63,7 +63,7 @@ const GOLDEN: Array<[name: string, text: string, tokens: number]> = [
   ["digits", "1234567890 3.14159265358979323846264338327950288419716939937510582097494459", 28],
   ["contractions", "I'm you're we've they'll he'd it's don't CAN'T WON'T", 18],
   ["url", "https://example.com/path?query=1&x=2#fragment", 15],
-  ["path", "/Users/changehow/workspace/opencode-insight/packages/telemetry/src/tokenizer.ts", 16],
+  ["path", "/Users/demo/workspace/example-project/packages/telemetry/src/tokenizer.ts", 13],
   ["lone-surrogate", "\ud800", 1],
   ["surrogate-pair", "\ud800\udc00", 4],
   ["nul-bytes", "a\u0000b\u0001c", 5],

@@ -61,7 +61,7 @@ OpenCode can load the published package directly:
 }
 ```
 
-Use the package name in OpenCode configuration; the loader selects its `server` export and installs the package independently of the global npm installation. The `/opencode` subpath is a module export, not a separate npm package to install. In OpenChamber, install the folder printed by `opendash extension-path openchamber`. Both platforms receive assets from the same release; these exports are not present in versions earlier than 1.1.0. For a published-install quick start, see [Install Insight plugins](../README.md#install-insight-plugins).
+Use the package name in OpenCode configuration; the loader selects its `server` export and installs the package independently of the global npm installation. The `/opencode` subpath is a module export, not a separate npm package to install. In OpenChamber, install the folder printed by `opendash extension-path openchamber`. Both platforms receive assets from the same release; these exports are not present in versions earlier than 1.1.0. For a published-install quick start, see [OpenCode + OpenChamber plugins](../README.md#opencode--openchamber-plugins).
 
 This implementation uses the existing SDK extension support for web and desktop. Other runtimes depend on their host's extension support.
 
