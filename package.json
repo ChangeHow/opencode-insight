@@ -21,6 +21,7 @@
     "openchamber/package.json",
     "openchamber/panel",
     "openchamber/service",
+    "openchamber/opencode",
     "docs/v2-insight.md",
     "README.md",
     "THIRD_PARTY_NOTICES.md",

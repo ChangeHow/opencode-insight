@@ -44,14 +44,16 @@ const querySchema = seriesInputSchema.extend({
   directory: targetSchema.shape.directory,
 });
 
-const timedFetch: typeof fetch = (input, init) =>
-  fetch(input, {
-    ...init,
-    redirect: "error",
-    signal: init?.signal
-      ? AbortSignal.any([init.signal, AbortSignal.timeout(8000)])
-      : AbortSignal.timeout(8000),
-  });
+const timedFetch =
+  (request: typeof fetch = fetch): typeof fetch =>
+  (input, init) =>
+    request(input, {
+      ...init,
+      redirect: "error",
+      signal: init?.signal
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(8000)])
+        : AbortSignal.timeout(8000),
+    });
 
 type Connect = () => Promise<Connection>;
 interface QueryOutput {
@@ -131,7 +133,7 @@ async function query<M extends QueryMethod>(
 ): Promise<QueryOutput[M]> {
   try {
     const endpoint = await connect();
-    const client = OpenCode.make({ ...endpoint, fetch: timedFetch });
+    const client = OpenCode.make({ ...endpoint, fetch: timedFetch(endpoint.fetch) });
     const session = await client.session.get({ sessionID: target.sessionID });
     if (target.directory !== undefined && session.location.directory !== target.directory) {
       throw new BridgeError(

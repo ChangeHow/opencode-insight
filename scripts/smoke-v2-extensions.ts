@@ -1,11 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
+import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const temporary = await mkdtemp(path.join(tmpdir(), "insight-v2-smoke-"));
@@ -15,6 +16,8 @@ let child: ChildProcess | undefined;
 let bridge: ChildProcess | undefined;
 let dashboard: ChildProcess | undefined;
 let childOutput = "";
+let stopHost: (() => Promise<void>) | undefined;
+let withdrawHost: (() => void) | undefined;
 
 async function freePort() {
   const probe = net.createServer();
@@ -63,10 +66,12 @@ try {
   await readFile(path.join(root, "apps/bff/dist/index.js"));
   const project = path.join(temporary, "project");
   await mkdir(project);
+  const captureDirectory = path.join(temporary, "capture");
+  await cp(path.join(root, "openchamber/opencode"), captureDirectory, { recursive: true });
   await writeFile(
     path.join(project, "opencode.json"),
     JSON.stringify({
-      plugins: [root],
+      plugins: [captureDirectory],
       snapshots: false,
     }),
   );
@@ -136,12 +141,103 @@ try {
   );
   const bridgePort = await freePort();
   const bridgeToken = randomUUID();
+  let hostEnvironment: NodeJS.ProcessEnv;
+  const hostSource = process.env.OPENCHAMBER_SOURCE_DIR;
+  if (hostSource) {
+    const { createGuestOpenCodeProvider } = await import(
+      pathToFileURL(
+        path.resolve(hostSource, "packages/web/server/lib/guests/opencode-provider/index.js"),
+      ).href
+    );
+    const { parseManifest } = await import(
+      pathToFileURL(path.resolve(hostSource, "packages/sdk/dist/schemas.js")).href
+    );
+    const { requestedGuestCapabilities } = await import(
+      pathToFileURL(path.resolve(hostSource, "packages/sdk/dist/index.js")).href
+    );
+    const parsed = parseManifest(
+      JSON.parse(await readFile(path.join(root, "openchamber/package.json"), "utf8")),
+    );
+    if (!parsed.ok) throw new Error("The stock OpenChamber SDK rejected the extension manifest.");
+    const guest = {
+      ...parsed.manifest.contributes,
+      enabled: true,
+      capabilityGrants: requestedGuestCapabilities(parsed.manifest.contributes),
+    };
+    const provider = createGuestOpenCodeProvider({
+      currentGuest: async () => guest,
+      buildOpenCodeUrl: (route: string) => `${base}${route}`,
+      getOpenCodeAuthHeaders: () => ({ authorization: auth }),
+    });
+    hostEnvironment = await provider.environmentFor({
+      guestId: "opencode-insight",
+      token: bridgeToken,
+    });
+    stopHost = () => provider.stop();
+    withdrawHost = () => provider.revokeGuest("opencode-insight");
+  } else {
+    // CI can exercise the published read-only contract without checking out OpenChamber.
+    let granted = true;
+    const host = http.createServer((request, response) => {
+      if (!granted || request.headers.authorization !== `Bearer ${bridgeToken}`) {
+        response.writeHead(403).end();
+        return;
+      }
+      if (
+        request.method !== "GET" ||
+        !(
+          request.url === "/api/event" ||
+          /^\/api\/session\/ses_[A-Za-z0-9]+$/.test(request.url ?? "")
+        )
+      ) {
+        response.writeHead(403).end();
+        return;
+      }
+      const upstream = http.get(
+        `${base}${request.url}`,
+        { headers: { authorization: auth } },
+        (incoming) => {
+          response.writeHead(incoming.statusCode ?? 502, {
+            "content-type": incoming.headers["content-type"] ?? "application/json",
+          });
+          incoming.pipe(response);
+        },
+      );
+      upstream.on("error", () => response.destroy());
+      response.once("close", () => upstream.destroy());
+    });
+    host.listen(0, "127.0.0.1");
+    await once(host, "listening");
+    const address = host.address();
+    if (!address || typeof address === "string") throw new Error("Missing host fixture listener.");
+    hostEnvironment = { OPENCHAMBER_OPENCODE_URL: `http://127.0.0.1:${address.port}` };
+    stopHost = () =>
+      new Promise<void>((resolve) => {
+        host.close(() => resolve());
+        host.closeAllConnections();
+      });
+    withdrawHost = () => {
+      granted = false;
+      host.closeAllConnections();
+    };
+  }
+  const forbidden = await fetch(
+    `${hostEnvironment.OPENCHAMBER_OPENCODE_URL}/api/rpc/opencode-insight/session`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${bridgeToken}` },
+      body: "{}",
+    },
+  );
+  if (forbidden.status !== 403)
+    throw new Error("The host must continue refusing native plugin RPC.");
   bridge = spawn(process.execPath, [path.join(root, "openchamber/service/main.js")], {
     cwd: temporary,
     env: {
       ...env,
-      HOME: connectionHome,
-      USERPROFILE: connectionHome,
+      ...hostEnvironment,
+      HOME: path.join(temporary, "panel-home"),
+      USERPROFILE: path.join(temporary, "panel-home"),
       OPENCHAMBER_SERVICE_PORT: String(bridgePort),
       OPENCHAMBER_SERVICE_TOKEN: bridgeToken,
     },
@@ -162,7 +258,17 @@ try {
   if (!response.ok) throw new Error(`Built bridge returned ${response.status}.`);
   const bridged = await response.json();
   if (bridged.sessionID !== session.id) throw new Error("Built bridge returned another session.");
-  for (const route of ["overview", "speed-window", "tool-page", "series-window", "source-page"]) {
+  if (JSON.stringify(bridged) !== JSON.stringify(output))
+    throw new Error("The host bridge disagreed with the native capture source.");
+  for (const route of [
+    "series",
+    "overview",
+    "speed-window",
+    "speed-scope",
+    "tool-page",
+    "series-window",
+    "source-page",
+  ]) {
     const response = await fetch(`${bridgeBase}/${route}`, {
       method: "POST",
       headers: bridgeHeaders,
@@ -170,9 +276,17 @@ try {
     });
     if (!response.ok) throw new Error(`Built bridge ${route} returned ${response.status}.`);
     const value = await response.json();
-    if (value.sessionID !== session.id || value.directory !== project)
+    if (route !== "series" && (value.sessionID !== session.id || value.directory !== project))
       throw new Error(`Built bridge ${route} returned a different scope.`);
   }
+  withdrawHost();
+  const withdrawn = await fetch(`${bridgeBase}/overview`, {
+    method: "POST",
+    headers: bridgeHeaders,
+    body: JSON.stringify({ sessionID: session.id, directory: project }),
+  });
+  if (withdrawn.status !== 502)
+    throw new Error("Withdrawing host access must stop local telemetry queries.");
   const dashboardPort = await freePort();
   dashboard = spawn(process.execPath, [path.join(root, "apps/bff/dist/index.js")], {
     cwd: temporary,
@@ -218,11 +332,12 @@ try {
   if (legacy.status !== 404)
     throw new Error("Isolated V2 session unexpectedly entered the legacy usage ledger.");
   console.log(
-    "V2 plugin loaded; native RPC, built authenticated bridge and dashboard Insight passed without legacy usage. No model requests were sent.",
+    `V2 plugin loaded; all 8 panel queries passed through ${hostSource ? "the stock OpenChamber provider" : "a read-only host contract fixture"} while native RPC remained forbidden. Withdrawal and dashboard Insight passed. No model requests were sent.`,
   );
 } finally {
   await stop(dashboard);
   await stop(bridge);
+  await stopHost?.();
   await stop(child);
   await rm(temporary, { recursive: true, force: true });
 }

@@ -42,6 +42,7 @@ playwright-report/
 /openchamber/package.json
 /openchamber/panel/
 /openchamber/service/
+/openchamber/opencode/
 /openchamber/index.js
 /server.js
 /scripts/opendash-extensions.mjs

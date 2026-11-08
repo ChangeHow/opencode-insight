@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import http from "node:http";
-import { BridgeError, createBridge, type QueryMethod } from "@opencode-insight/client";
+import { BridgeError, createHostBridge, type QueryMethod } from "@opencode-insight/client";
+import { loadHostConnection } from "./connection";
 
 const BODY_LIMIT = 16384;
 const OUTPUT_LIMIT = 7_000_000;
@@ -36,8 +37,13 @@ async function readBody(req: http.IncomingMessage): Promise<unknown> {
   }
 }
 
-export function createInsightServer(token: string, query = createBridge()): http.Server {
+export function createInsightServer(
+  token: string,
+  query?: (method: QueryMethod, body: unknown) => Promise<unknown>,
+): http.Server {
   if (!token) throw new Error("An extension service token is required.");
+  const host = query ? undefined : createHostBridge(loadHostConnection);
+  const read = query ?? host!.query;
   const server = http.createServer(async (req, res) => {
     const respond = (status: number, value: unknown) => {
       const body = JSON.stringify(value);
@@ -66,7 +72,7 @@ export function createInsightServer(token: string, query = createBridge()): http
       return;
     }
     try {
-      respond(200, await query(operation, await readBody(req)));
+      respond(200, await read(operation, await readBody(req)));
     } catch (error) {
       if (error instanceof BridgeError) respond(error.status, { error: error.message });
       else respond(500, { error: "Insight bridge failed." });
@@ -74,5 +80,6 @@ export function createInsightServer(token: string, query = createBridge()): http
   });
   server.requestTimeout = 15000;
   server.headersTimeout = 10000;
+  server.once("close", () => host?.close());
   return server;
 }

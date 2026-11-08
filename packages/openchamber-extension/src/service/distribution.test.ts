@@ -18,6 +18,11 @@ describe("single-package platform distribution", () => {
     expect(panel.version).toBe(metadata.version);
     expect(parseManifest(panel).ok).toBe(true);
     expect(panel.openchamber.contributes.statusSection.entry).toBe("panel/index.html");
+    expect(panel.openchamber.contributes.opencodePlugin).toBe("opencode");
+    const capture = path.join(root, "openchamber/opencode");
+    const plugin = JSON.parse(await readFile(path.join(capture, "package.json"), "utf8"));
+    expect(plugin.version).toBe(metadata.version);
+    expect(plugin.exports).toEqual({ "./server": "./server.js", "./rpc": "./rpc.js" });
     await expect(
       readFile(path.join(root, "openchamber/panel/index.html"), "utf8"),
     ).resolves.toContain("main.js");
