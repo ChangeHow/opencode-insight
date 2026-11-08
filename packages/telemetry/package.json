@@ -8,7 +8,8 @@
     "./schema": "./src/schema.ts",
     "./summary": "./src/summary.ts",
     "./queries": "./src/queries.ts",
-    "./details": "./src/query-details.ts"
+    "./details": "./src/query-details.ts",
+    "./host": "./src/host.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

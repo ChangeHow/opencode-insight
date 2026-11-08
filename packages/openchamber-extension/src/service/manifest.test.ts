@@ -3,7 +3,7 @@ import { parseManifest } from "@openchamber/sdk/schemas";
 import { describe, expect, test } from "vitest";
 
 describe("OpenChamber extension manifest", () => {
-  test("uses the existing SDK panel and host-managed local service contracts", async () => {
+  test("declares host-selected OpenCode access and its bundled capture plugin", async () => {
     const input = JSON.parse(
       await readFile(new URL("../../package.json", import.meta.url), "utf8"),
     );
@@ -21,7 +21,9 @@ describe("OpenChamber extension manifest", () => {
     expect(result.manifest.contributes.service).toEqual({
       entry: "dist/service/main.js",
       runtime: "host",
+      provides: ["opencode"],
     });
+    expect(result.manifest.contributes.opencodePlugin).toBe("dist/opencode");
     expect(result.manifest.contributes.page).toBeUndefined();
     expect(result.manifest.contributes.origins).toBeUndefined();
     expect(result.manifest.contributes.integration).toBeUndefined();

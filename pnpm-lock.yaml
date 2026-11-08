@@ -282,8 +282,8 @@ importers:
   packages/openchamber-extension:
     dependencies:
       '@openchamber/sdk':
-        specifier: 2.5.0
-        version: 2.5.0
+        specifier: 2.7.0
+        version: 2.7.0
       '@opencode-insight/client':
         specifier: workspace:*
         version: link:../insight-client
@@ -1757,8 +1757,8 @@ packages:
     resolution: {integrity: sha512-mGUWr1uMnf0le2TwfOZY4SFxZGXGfm4Jtay/nwAa2FLNAKXUoUwaGwBMNH36UHPtinWfTSJ3nqFQr0091CxVGg==}
     engines: {node: ^20.17.0 || >=22.9.0}
 
-  '@openchamber/sdk@2.5.0':
-    resolution: {integrity: sha512-5gigGSmIIonZB0ZAfOFziKVZ6NpLt5HjUtrlMDnk4igQdgn++VvOL3gPdW5M6Ht7ldHceNKVU1Rsy+zxd9nzWA==}
+  '@openchamber/sdk@2.7.0':
+    resolution: {integrity: sha512-dYrQad76cm1YMOs9GEgX7f9pxzqozPQUmtsmqGUNdKADqhaWRg9vIHJiM5JptZgpmim0uwD8C/+Sz+5tRpZv/g==}
     hasBin: true
 
   '@opencode/ai@2.0.26':
@@ -9716,7 +9716,7 @@ snapshots:
       node-gyp: 12.4.0
       proc-log: 6.1.0
 
-  '@openchamber/sdk@2.5.0':
+  '@openchamber/sdk@2.7.0':
     dependencies:
       zod: 4.4.3
 

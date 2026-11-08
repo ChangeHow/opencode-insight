@@ -3,9 +3,9 @@
 The existing public package `@changehow/oc-insight` ships an OpenCode V2 plugin and an OpenChamber extension. It does not require the existing Insight BFF or a change to OpenChamber. The workspace packages below are private implementation modules, not separate npm releases.
 
 - `packages/telemetry` owns the shared telemetry contract and metric calculations.
-- `packages/insight-client` owns OpenCode connection discovery, authentication, and validated session queries shared by the dashboard BFF and OpenChamber bridge.
+- `packages/insight-client` owns validated session queries. The dashboard uses discovery/configuration and native RPC; the OpenChamber bridge binds local capture reads to the host's approved OpenCode event stream.
 - `packages/opencode-plugin` runs inside OpenCode. It collects numeric telemetry, persists snapshots, and exposes session queries through native plugin RPC.
-- `packages/openchamber-extension` contains the sandboxed panel and a small local bridge process. OpenChamber starts the bridge on demand and manages its lifetime. Building stages the installable directory at `openchamber/`, with the root npm package's version.
+- `packages/openchamber-extension` contains the sandboxed panel, a small local bridge process, and a dependency-free capture bundle for host-managed loading. OpenChamber starts the bridge on demand and manages its lifetime. Building stages the installable directory at `openchamber/`, with the root npm package's version.
 
 The root package exports `@changehow/oc-insight/opencode`, `@changehow/oc-insight/opencode/rpc`, and `@changehow/oc-insight/openchamber`. OpenCode's native package loader also receives its `server` and `rpc` entrypoints. The OpenChamber module exports `directory` and `manifest`; its installer consumes the actual directory, not a JavaScript import specifier.
 
@@ -20,7 +20,7 @@ pnpm install
 pnpm build:extensions
 ```
 
-For a local checkout, print the OpenCode plugin directory:
+For a standalone dashboard or an externally managed OpenCode, print the OpenCode plugin directory:
 
 ```bash
 node scripts/opendash.mjs extension-path opencode
@@ -43,9 +43,9 @@ Print the OpenChamber installable directory:
 node scripts/opendash.mjs extension-path openchamber
 ```
 
-In OpenChamber 2.5.0 or later, open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve its local-process capability, then open **Insight** on the rail. Retain the built panel and service assets. OpenChamber does not compile TypeScript at runtime.
+This source build requires OpenChamber 2.7.0+, without any host modifications. Its changeset plans Insight 1.2.0; published Insight 1.1.0 does not contain host-shared support. OpenChamber 2.7.0 itself requires OpenCode 2.2.4+; the integration is tested with 2.2.5. Open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve the local service, OpenCode reads, and bundled OpenCode plugin, then open **Insight** on the rail. Retain all built assets, including `opencode/`. OpenChamber does not compile TypeScript or install capture-bundle dependencies at runtime.
 
-For a published installation instead of a source build, install or upgrade the same package (version 1.1.0 or later):
+For the published Insight 1.1.0 installation, which supports OpenChamber 2.5.0+ with independently configured connections:
 
 ```bash
 npm install -g @changehow/oc-insight@latest
@@ -80,9 +80,23 @@ Configure OpenCode with `"plugins": ["@changehow/oc-insight@beta"]`, or pin the 
 
 # OpenCode connection
 
-By default the bridge uses `Service.discover()` from `@opencode/client/service` to find an already-running managed OpenCode V2 service and obtain its authentication headers. It never starts, stops, or restarts OpenCode. The bridge does not start the Insight BFF.
+## Host-shared panel
 
-OpenChamber can use an independently managed or remote OpenCode instance. In that case, configure the connection on the machine running OpenChamber's backend. The bridge reads this optional file:
+The OpenChamber backend and OpenCode must run on the same machine; the browser may connect remotely. An OpenChamber backend selecting OpenCode on another machine is not supported. Use the capture plugin and panel from the same Insight build.
+
+The extension declares the existing `service.provides: ["opencode"]` role and `opencodePlugin: "opencode"`. It needs the existing `service`, `opencode`, and `opencodePlugin` approvals. It does not request a new capability or require native RPC forwarding.
+
+OpenChamber supplies `OPENCHAMBER_OPENCODE_URL` and a service token. The bridge reads the selected session and the native event stream through that approved transport. The capture plugin publishes a small `rpc.opencode-insight.hostSource` announcement and serves numeric queries on an authenticated, ephemeral `127.0.0.1` listener inside the same OpenCode process. It exposes only the same 8 Insight queries, with their existing input/output schemas and size limits. Aggregation, pagination, storage, and history recovery stay in the capture plugin.
+
+Each read verifies the source through fresh nonce events on the host stream before reading and after receiving the response. A stale local address cannot supply accepted data after a host switch or withdrawal. Stream failure clears discovered sources and pending confirmations; the next panel refresh reconnects. There is no discovery/configuration fallback. This does not provide an atomic snapshot across multiple queries or a same-address process replacement.
+
+The local read token stays in the backend and never enters the iframe. No raw OpenCode credentials or server address are exported by the plugin. Browser-origin requests are refused. Unloading the capture plugin closes its listener and heartbeat; stopping the extension service closes its event subscription. The plugin does not write or replace session metadata, and announcements do not contain full telemetry snapshots.
+
+OpenChamber loads the bundled plugin into managed OpenCode when it owns the watched config file. A user-owned `OPENCODE_CONFIG` can defer delivery until the next managed start; do not restart an active server just to activate it. For external local OpenCode, configure the matching capture build explicitly. Avoid loading an older capture build alongside the host-managed bundle. A cold location without the capture plugin running has no source to query; load the plugin and start a request there.
+
+## Standalone dashboard and published 1.1.0 panel
+
+The dashboard continues to use `Service.discover()` from `@opencode/client/service` to find an already-running managed OpenCode V2 service and obtain authentication headers. The published 1.1.0 panel uses the same independent connection strategy. Neither starts, stops, or restarts OpenCode. For an independently managed or remote instance, configure this optional file on the machine running that dashboard or legacy bridge:
 
 ```text
 ~/.config/opencode-insight/connection.json
@@ -117,13 +131,13 @@ Keep credential files out of the repository and restrict their permissions:
 chmod 600 ~/.config/opencode-insight/connection.json
 ```
 
-The bridge rejects credential files readable by other users on Unix. Credentials stay in the bridge and never reach the iframe. It forwards only allowlisted Insight queries, validates the session directory against OpenCode, and sanitizes upstream failures. A wrong connection produces an error rather than an empty chart. A configured endpoint is instance-wide for this extension; switching OpenChamber to another server requires a matching bridge configuration on that server.
+The client rejects credential files readable by other users on Unix. Credentials stay server-side and never reach the browser. Queries validate the session directory and sanitize upstream failures. A wrong connection produces an error rather than an empty chart. The legacy panel needs matching configuration when OpenChamber switches servers. This file has no effect on the new host-shared panel.
 
 # Web dashboard
 
 Start the existing dashboard with `opendash server` after building or upgrading. Open **Inspect an OpenCode V2 session** on the overview and enter a `ses_…` ID. The existing `/sessions/<sessionID>` detail page includes **Context & speed insight**, with speed, input composition, and elapsed activity views. The plugin panel can load even if the legacy usage endpoint has no record for that V2 session. Codex details remain unchanged.
 
-The BFF uses the same discovery and optional `connection.json` as the OpenChamber bridge. OpenCode must already be running with the capture plugin loaded. Neither the dashboard nor the extension starts or restarts OpenCode. OpenChamber is not required for the web dashboard, and the dashboard is not required for the OpenChamber panel.
+The BFF uses discovery and optional `connection.json`, independently of the host-shared panel. OpenCode must already be running with the capture plugin loaded. Neither the dashboard nor the extension starts or restarts OpenCode. OpenChamber is not required for the web dashboard, and the dashboard is not required for the OpenChamber panel.
 
 The browser requests `GET /api/session/<sessionID>/insight/overview?after=<revision>` and `/insight/series-window` from the BFF. Sources and reported tool details use `/insight/sources` and `/insight/tools` only when expanded. Aggregation and pagination run inside the OpenCode plugin, not after transferring a full snapshot to the BFF. The legacy `/insight?after=<revision>` endpoint still returns its original `{ session, series }` payload for existing clients. The browser cannot choose an upstream URL and never receives OpenCode credentials. Visible pages refresh every second without overlapping requests; hidden pages pause. Switching sessions discards stale responses, and transient errors retain the last captured data with a warning.
 
@@ -206,6 +220,14 @@ pnpm build:extensions
 pnpm test:extensions
 ```
 
-With a compatible `opencode` executable on PATH, run `pnpm smoke:extensions` after `pnpm build`. It starts an isolated temporary V2 server, verifies plugin RPC, the built authenticated bridge, and the dashboard endpoint without a legacy usage record, then removes its own temporary state. It sends no model requests and does not touch the managed OpenCode service.
+With a compatible `opencode` executable on PATH, run `pnpm smoke:extensions` after `pnpm build`. It copies the bundled capture plugin to an isolated directory without `node_modules`, starts a temporary V2 server, and checks native RPC, all 8 built-panel queries through a read-only host fixture, withdrawal, and the independent dashboard path. The fixture refuses native RPC forwarding. No model requests are sent and the managed OpenCode service is untouched.
+
+To run the same check against an unmodified OpenChamber provider, build the SDK in an OpenChamber 2.7.0 checkout and run:
+
+```bash
+OPENCHAMBER_SOURCE_DIR=/absolute/path/to/openchamber pnpm smoke:extensions
+```
+
+The host's own parser validates the manifest and its provider enforces the existing grants. The test confirms that native RPC remains forbidden and the host-shared snapshot matches the native capture result.
 
 Before handing off source changes, run the repository's full build, typecheck, lint, format, test, and daemon smoke checks described in [AGENTS.md](../AGENTS.md).

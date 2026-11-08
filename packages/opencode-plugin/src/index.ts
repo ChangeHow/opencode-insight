@@ -1,20 +1,14 @@
 import { Plugin } from "@opencode/plugin";
 import { randomUUID } from "node:crypto";
-import { buildSeries, estimateTokens } from "@opencode-insight/telemetry";
-import {
-  buildOverview,
-  buildSpeedWindow,
-  buildToolPage,
-} from "@opencode-insight/telemetry/queries";
-import { buildSeriesWindow, buildSourcePage } from "@opencode-insight/telemetry/details";
+import { estimateTokens } from "@opencode-insight/telemetry";
 import { Collector } from "./collector";
 import { captureContext } from "./context";
 import { Provenance } from "./provenance";
 import { captureEvent, ensureTool, toolMetadata } from "./events";
 import { Insight } from "./rpc";
 import { trackToolScopes } from "./tool-scope";
-import { seedHistory } from "./history";
-import { snapshot } from "./snapshot";
+import { createQueries } from "./queries";
+import { startHostSource } from "./host-source";
 
 export { Insight } from "./rpc";
 
@@ -36,36 +30,18 @@ export default Plugin.define({
       }
     };
     const registrations: { dispose(): Promise<void> }[] = [];
-    const verifiedInfo = async (sessionID: string) => {
-      const info = await ctx.session.get({ sessionID });
-      if (info.location.directory !== ctx.location.directory)
-        throw new Error("Session belongs to another location");
-      return info;
-    };
-    const verifiedSession = async (sessionID: string) => {
-      const info = await verifiedInfo(sessionID);
-      return collector.session(sessionID, info.parentID);
-    };
-    const querySession = async (
-      sessionID: string,
-      info?: Awaited<ReturnType<typeof verifiedInfo>>,
-    ) => {
-      const verified = info ?? (await verifiedInfo(sessionID));
-      const session = await collector.session(sessionID, verified.parentID);
-      if (
-        !session.requests.length &&
-        seedHistory(session, await ctx.session.context({ sessionID }))
-      ) {
-        collector.touch(session, Date.now());
-      }
-      return session;
-    };
     const assertCapture = () => {
       collector.assertHealthy();
       if (captureError) throw new Error("Telemetry capture is incomplete", { cause: captureError });
       if (streamError)
         throw new Error("Telemetry event capture interrupted", { cause: streamError });
     };
+    const { queries, verifiedSession } = createQueries(
+      ctx,
+      collector,
+      assertCapture,
+      () => speedScope,
+    );
     registrations.push(
       await trackToolScopes(ctx, collector, (error) => {
         captureError = error;
@@ -122,79 +98,16 @@ export default Plugin.define({
         );
       }),
     );
-    registrations.push(
-      await ctx.rpc.register(Insight, {
-        session: (input) =>
-          collector.serialize(async () => {
-            assertCapture();
-            return snapshot(await querySession(input.sessionID));
-          }),
-        series: (input) =>
-          collector.serialize(async () => {
-            assertCapture();
-            const info = await verifiedInfo(input.sessionID);
-            const unchanged = collector.unchanged(input.sessionID, input.after);
-            return snapshot(
-              unchanged ?? buildSeries(await querySession(input.sessionID, info), input),
-            );
-          }),
-        overview: (input) =>
-          collector.serialize(async () => {
-            assertCapture();
-            const info = await verifiedInfo(input.sessionID);
-            const idle = collector.unchanged(input.sessionID, input.after);
-            const unchanged = (revision: number) => ({
-              sessionID: input.sessionID,
-              directory: ctx.location.directory,
-              revision,
-              unchanged: true,
-            });
-            if (idle) return unchanged(idle.revision);
-            const session = await querySession(input.sessionID, info);
-            if (
-              input.after === session.revision &&
-              !session.requests.some((request) => request.status === "running") &&
-              !session.tools.some((tool) => tool.status === "running")
-            )
-              return unchanged(session.revision);
-            return snapshot(buildOverview(session));
-          }),
-        speedScope: async (input) => {
-          assertCapture();
-          await verifiedInfo(input.sessionID);
-          return {
-            sessionID: input.sessionID,
-            directory: ctx.location.directory,
-            scope: speedScope,
-          };
-        },
-        speedWindow: (input) =>
-          collector.serialize(async () => {
-            assertCapture();
-            const scope = speedScope;
-            const session = await querySession(input.sessionID);
-            if (scope !== speedScope)
-              throw new Error("Telemetry source changed during speed query");
-            const measuredAt = Date.now();
-            return snapshot({ ...buildSpeedWindow(session, input, measuredAt), scope });
-          }),
-        toolPage: (input) =>
-          collector.serialize(async () => {
-            assertCapture();
-            return snapshot(buildToolPage(await querySession(input.sessionID), input));
-          }),
-        seriesWindow: (input) =>
-          collector.serialize(async () => {
-            assertCapture();
-            return snapshot(buildSeriesWindow(await querySession(input.sessionID), input));
-          }),
-        sourcePage: (input) =>
-          collector.serialize(async () => {
-            assertCapture();
-            return snapshot(buildSourcePage(await querySession(input.sessionID), input));
-          }),
-      }),
-    );
+    const rpcRegistration = await ctx.rpc.register(Insight, queries);
+    registrations.push(rpcRegistration);
+    let hostSource: Awaited<ReturnType<typeof startHostSource>>;
+    try {
+      hostSource = await startHostSource(queries, () => speedScope, rpcRegistration.events.emit);
+    } catch (error) {
+      for (const registration of registrations.reverse()) await registration.dispose();
+      await collector.close();
+      throw error;
+    }
     const stream = (async () => {
       let connected = false;
       try {
@@ -245,6 +158,7 @@ export default Plugin.define({
       streamError = error;
     });
     return async () => {
+      await hostSource.close();
       controller.abort();
       await stream;
       for (const registration of registrations.reverse()) await registration.dispose();

@@ -16,6 +16,7 @@ export class BridgeError extends Error {
 export interface Connection {
   baseUrl: string;
   headers: HeadersInit;
+  fetch?: typeof fetch;
 }
 
 const endpointSchema = z

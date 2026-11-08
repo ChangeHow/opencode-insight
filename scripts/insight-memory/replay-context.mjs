@@ -70,7 +70,7 @@ export function replayContext() {
     rpc: {
       register: async (_definition, methods) => {
         handlers = methods;
-        return { dispose };
+        return { dispose, events: { emit: async () => {} } };
       },
     },
     event: {

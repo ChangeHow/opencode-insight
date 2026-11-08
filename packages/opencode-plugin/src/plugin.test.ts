@@ -23,6 +23,12 @@ function harness(events: NativeEvent[] = []) {
   const hooks = new Map<string, (input: unknown) => Promise<void>>();
   let handlers: Record<string, Handler> = {};
   const dispose = vi.fn(async () => {});
+  const emit = vi.fn(
+    async (
+      _name: string,
+      _source: { port: number; token: string; scope: string; nonce?: string },
+    ) => {},
+  );
   const context = {
     location: { directory: "/a", workspaceID: undefined },
     storage: {
@@ -52,7 +58,7 @@ function harness(events: NativeEvent[] = []) {
     rpc: {
       register: vi.fn(async (_definition: unknown, input: Record<string, Handler>) => {
         handlers = input;
-        return { dispose };
+        return { dispose, events: { emit } };
       }),
     },
     event: {
@@ -70,6 +76,7 @@ function harness(events: NativeEvent[] = []) {
     hooks,
     persisted,
     dispose,
+    emit,
     get handlers() {
       return handlers;
     },
@@ -106,6 +113,76 @@ function admission(id: string, skills: unknown[] = []): NativeEvent {
 }
 
 describe("native V2 plugin", () => {
+  test("serves authenticated local queries and emits nonce receipts only on success", async () => {
+    const h = harness();
+    const cleanup = await plugin.setup(h.context as unknown as Plugin.Context);
+    const source = h.emit.mock.calls[0][1];
+    const url = `http://127.0.0.1:${source.port}/query`;
+    const nonce = crypto.randomUUID();
+    const request = (body: unknown, headers: Record<string, string> = {}) =>
+      fetch(url, {
+        method: "POST",
+        headers: { authorization: `Bearer ${source.token}`, ...headers },
+        body: JSON.stringify(body),
+      });
+    try {
+      expect(
+        (
+          await request(
+            { method: "speedScope", input: { sessionID: "s1" }, nonce },
+            { origin: "http://example.com" },
+          )
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await request(
+            { method: "speedScope", input: { sessionID: "s1" }, nonce },
+            { authorization: "Bearer wrong" },
+          )
+        ).status,
+      ).toBe(403);
+      expect(
+        (await fetch(url, { headers: { authorization: `Bearer ${source.token}` } })).status,
+      ).toBe(404);
+      expect(
+        (
+          await fetch(`http://127.0.0.1:${source.port}/other`, {
+            method: "POST",
+            headers: { authorization: `Bearer ${source.token}` },
+          })
+        ).status,
+      ).toBe(404);
+      expect((await request({ method: "missing", input: {}, nonce })).status).toBe(400);
+      expect((await request({ method: "speedScope", input: {}, nonce })).status).toBe(400);
+      expect(h.context.session.get).not.toHaveBeenCalled();
+      expect(h.emit.mock.calls.filter(([, event]) => event.nonce)).toHaveLength(0);
+      const response = await request({ method: "speedScope", input: { sessionID: "s1" }, nonce });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        output: { sessionID: "s1", scope: source.scope },
+        scope: source.scope,
+      });
+      expect(h.emit).toHaveBeenCalledWith("hostSource", { ...source, nonce });
+      h.emit.mockRejectedValueOnce(new Error("sensitive failure"));
+      const failed = await request({
+        method: "speedScope",
+        input: { sessionID: "s1" },
+        nonce: crypto.randomUUID(),
+      });
+      expect(failed.ok).toBe(false);
+      expect(await failed.text()).not.toContain("sensitive failure");
+    } finally {
+      await cleanup!();
+    }
+    const calls = h.emit.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    expect(h.emit).toHaveBeenCalledTimes(calls);
+    await expect(
+      request({ method: "speedScope", input: { sessionID: "s1" }, nonce }),
+    ).rejects.toThrow();
+  });
+
   test("owns one lightweight speed scope per setup and returns it with speed data", async () => {
     const first = harness();
     const second = harness();

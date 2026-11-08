@@ -13,6 +13,9 @@ await cp(path.join(extensionRoot, "dist/panel"), path.join(target, "panel"), { r
 await cp(path.join(extensionRoot, "dist/service"), path.join(target, "service"), {
   recursive: true,
 });
+await cp(path.join(extensionRoot, "dist/opencode"), path.join(target, "opencode"), {
+  recursive: true,
+});
 await writeFile(
   path.join(target, "package.json"),
   JSON.stringify(
@@ -31,6 +34,7 @@ await writeFile(
             entry: "panel/index.html",
           },
           service: { ...extension.openchamber.contributes.service, entry: "service/main.js" },
+          opencodePlugin: "opencode",
         },
       },
     },

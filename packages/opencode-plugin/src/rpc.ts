@@ -21,6 +21,7 @@ import {
   sourcePageSchema,
 } from "@opencode-insight/telemetry/details";
 import { z } from "zod";
+import { hostSourceSchema } from "@opencode-insight/telemetry/host";
 
 export const getSessionInputSchema = z.object({ sessionID: z.string().min(1).max(128) });
 export const Insight = Rpc.define({
@@ -35,5 +36,5 @@ export const Insight = Rpc.define({
     seriesWindow: { input: seriesWindowInputSchema, output: seriesWindowSchema },
     sourcePage: { input: sourcePageInputSchema, output: sourcePageSchema },
   },
-  events: {},
+  events: { hostSource: { schema: hostSourceSchema } },
 });
