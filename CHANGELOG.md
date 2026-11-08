@@ -1,5 +1,11 @@
 # @changehow/oc-insight
 
+## 1.2.0
+
+### Minor Changes
+
+- 70ccc53: Use OpenChamber's existing host-selected OpenCode access for Insight and bundle the capture plugin for host-managed loading. Do not discover or start a separate OpenCode instance.
+
 ## 1.1.0
 
 ### Minor Changes
