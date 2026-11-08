@@ -27,8 +27,9 @@ apps/web/design/
 log
 logs
 skills-lock.json
-.env.local
-.env.*.local
+.env
+.env.*
+!.env.example
 .telescope-daemon.pid
 docs/plans/finished/
 

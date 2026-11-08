@@ -75,7 +75,7 @@ export function makeSessionBreakdown(
     runtime: "opencode",
     title: "Session title",
     slug: "calm-river",
-    directory: "/Users/changehow/workspace/opencode-token-dashboard",
+    directory: "/workspace/example-project",
     tokens: model.tokens,
     pricedTokens: model.pricedTokens,
     cost: model.cost,

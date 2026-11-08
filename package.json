@@ -23,6 +23,7 @@
     "openchamber/service",
     "docs/v2-insight.md",
     "README.md",
+    "THIRD_PARTY_NOTICES.md",
     "LICENSE"
   ],
   "type": "module",
