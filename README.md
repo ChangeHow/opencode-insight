@@ -46,32 +46,32 @@ For live V2 session metrics, install the capture plugin below, then use **Inspec
 
 ## OpenCode + OpenChamber plugins
 
-The published **Insight 1.1.0** plugins require **Node.js 24+**, **OpenCode 2.0.26** (or a compatible V2 plugin contract), and **OpenChamber 2.5.0+** for the panel. That panel uses independent connection discovery; it does not automatically follow OpenChamber's selected instance.
+**Insight 1.2.0** requires **Node.js 24+** and **OpenChamber 2.7.0+** for the host-shared panel. OpenChamber 2.7.0 requires **OpenCode 2.2.4+**; this integration is verified with **OpenCode 2.2.5**. The panel follows OpenChamber's selected instance without a host patch. Insight 1.1.0 used independent connection discovery instead.
 
-Add the package to `plugins` in your global `~/.config/opencode/opencode.jsonc` or project-local `opencode.jsonc`, preserving existing entries:
+OpenChamber can load the bundled capture plugin into its managed OpenCode. For an externally managed local OpenCode or a standalone dashboard, add the matching package to `plugins` in your global `~/.config/opencode/opencode.jsonc` or project-local `opencode.jsonc`, preserving existing entries:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@changehow/oc-insight"],
+  "plugins": ["@changehow/oc-insight@1.2.0"],
 }
 ```
 
 OpenCode installs and loads the capture plugin itself. To install the OpenChamber panel:
 
 ```bash
-npm install -g @changehow/oc-insight@latest
+npm install -g @changehow/oc-insight@1.2.0
 opendash extension-path openchamber
 ```
 
-In OpenChamber, open **Settings → Extensions → Add**, select the printed `openchamber/` folder, and approve its local-process capability. Open **Insight** on the rail and select an OpenCode session.
+In OpenChamber, open **Settings → Extensions → Add**, select the printed `openchamber/` folder, and approve the local service, OpenCode reads, and bundled OpenCode plugin. Open **Insight** on the rail and select an OpenCode session. When upgrading, update both the panel and any separately configured capture plugin to the same version; avoid loading an older capture build alongside the host-managed bundle.
 
 OpenCode must already be running with the capture plugin loaded. Insight never starts or restarts it. See the [Insight guide](docs/v2-insight.md) for source builds, remote connections, upgrades, and measurement limits.
 
 ### Host-shared instance
 
-This checkout adds shared-instance support, planned for **Insight 1.2.0** and not yet published. It requires **OpenChamber 2.7.0+**, with **no host patch**, and the capture plugin and panel from the **same Insight build**. OpenChamber 2.7.0 requires OpenCode 2.2.4+; this integration is verified with OpenCode 2.2.5.
+**Insight 1.2.0** includes shared-instance support. It requires **OpenChamber 2.7.0+**, with **no host patch**, and the capture plugin and panel from the **same Insight build**.
 
 The **OpenChamber backend and OpenCode must run on the same machine**. The browser may connect remotely. An OpenChamber backend pointing to OpenCode on another machine is not supported by this mode. The panel follows the host-selected instance exclusively; it never falls back to `Service.discover()` or `connection.json`.
 
-Build with `pnpm install` and `pnpm build:extensions`, then install the folder printed by `node scripts/opendash.mjs extension-path openchamber`. Approve the local service, OpenCode reads, and the bundled OpenCode plugin. OpenChamber can load that plugin into its managed OpenCode; an external local OpenCode needs the matching capture build configured explicitly. See [host-shared connections](docs/v2-insight.md#host-shared-panel) for delivery limits.
+For a source installation, build with `pnpm install` and `pnpm build:extensions`, then install the folder printed by `node scripts/opendash.mjs extension-path openchamber`. Approve the same capabilities as for the npm installation above. See [host-shared connections](docs/v2-insight.md#host-shared-panel) for delivery limits.

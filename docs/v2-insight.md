@@ -43,25 +43,25 @@ Print the OpenChamber installable directory:
 node scripts/opendash.mjs extension-path openchamber
 ```
 
-This source build requires OpenChamber 2.7.0+, without any host modifications. Its changeset plans Insight 1.2.0; published Insight 1.1.0 does not contain host-shared support. OpenChamber 2.7.0 itself requires OpenCode 2.2.4+; the integration is tested with 2.2.5. Open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve the local service, OpenCode reads, and bundled OpenCode plugin, then open **Insight** on the rail. Retain all built assets, including `opencode/`. OpenChamber does not compile TypeScript or install capture-bundle dependencies at runtime.
+Insight 1.2.0 includes host-shared support and requires OpenChamber 2.7.0+, without any host modifications. Insight 1.1.0 uses independently configured connections and does not contain host-shared support. OpenChamber 2.7.0 itself requires OpenCode 2.2.4+; the integration is tested with 2.2.5. Open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve the local service, OpenCode reads, and bundled OpenCode plugin, then open **Insight** on the rail. Retain all built assets, including `opencode/`. OpenChamber does not compile TypeScript or install capture-bundle dependencies at runtime.
 
-For the published Insight 1.1.0 installation, which supports OpenChamber 2.5.0+ with independently configured connections:
+To install or upgrade to Insight 1.2.0 from npm instead of building from source:
 
 ```bash
-npm install -g @changehow/oc-insight@latest
+npm install -g @changehow/oc-insight@1.2.0
 opendash extension-path openchamber
 ```
 
-OpenCode can load the published package directly:
+OpenChamber can load the bundled capture plugin into its managed OpenCode. For an externally managed local OpenCode or a standalone dashboard, OpenCode can load the matching package directly:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@changehow/oc-insight"],
+  "plugins": ["@changehow/oc-insight@1.2.0"],
 }
 ```
 
-Use the package name in OpenCode configuration; the loader selects its `server` export and installs the package independently of the global npm installation. The `/opencode` subpath is a module export, not a separate npm package to install. In OpenChamber, install the folder printed by `opendash extension-path openchamber`. Both platforms receive assets from the same release; these exports are not present in versions earlier than 1.1.0. For a published-install quick start, see [OpenCode + OpenChamber plugins](../README.md#opencode--openchamber-plugins).
+Use the package name in OpenCode configuration; the loader selects its `server` export and installs the package independently of the global npm installation. The `/opencode` subpath is a module export, not a separate npm package to install. In OpenChamber, install the folder printed by `opendash extension-path openchamber`. When upgrading, update both the panel and any separately configured capture plugin to the same version; avoid loading an older capture build alongside the host-managed bundle. Both platforms receive assets from the same release; these exports are not present in versions earlier than 1.1.0. For an npm-install quick start, see [OpenCode + OpenChamber plugins](../README.md#opencode--openchamber-plugins).
 
 This implementation uses the existing SDK extension support for web and desktop. Other runtimes depend on their host's extension support.
 
