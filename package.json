@@ -2,6 +2,7 @@
   "name": "@changehow/oc-insight",
   "version": "1.2.0",
   "description": "Local-first token usage dashboard for OpenCode sessions.",
+  "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ChangeHow/opencode-insight.git"
