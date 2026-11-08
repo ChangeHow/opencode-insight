@@ -8,9 +8,9 @@ Local-first usage analytics and session insight for OpenCode.
 - **Dashboard:** explore token usage, estimated cost, activity trends, and model/provider breakdowns. Drill into sessions and message/tool timelines, query usage from the CLI, and optionally sync aggregates across machines. Reads local OpenCode usage and Codex transcripts.
 - **OpenCode + OpenChamber Insight:** an OpenCode V2 capture plugin and an OpenChamber panel for generation speed, context-source estimates, reported token usage, and tool timing. The panel works without the dashboard; the dashboard can also display V2 session insight.
 
-![Dashboard showing usage totals, token composition, and activity trends with synthetic data](docs/images/dashboard.webp)
+![Dashboard showing usage totals, token composition, and activity trends with synthetic data](https://raw.githubusercontent.com/ChangeHow/opencode-insight/main/docs/images/dashboard.webp)
 
-![Insight panel showing generation speed, token composition, and tool timing with synthetic data](docs/images/insight.webp)
+![Insight panel showing generation speed, token composition, and tool timing with synthetic data](https://raw.githubusercontent.com/ChangeHow/opencode-insight/main/docs/images/insight.webp)
 
 Screenshots use synthetic data. The Insight image is a standalone preview of the actual panel, not the OpenChamber application shell. Source estimates are not billing measurements, and capture begins when the plugin loads.
 
@@ -18,7 +18,34 @@ Screenshots use synthetic data. The Insight image is a standalone preview of the
 
 ## Dashboard
 
-Requires **Node.js 24+** and **pnpm 10+**.
+### From npm (recommended)
+
+Requires **Node.js 24+**. No source checkout, pnpm, or local build is needed.
+
+```bash
+npm install -g @changehow/oc-insight@1.2.1
+opendash server
+```
+
+Open [localhost:8787](http://127.0.0.1:8787). Keep the default loopback binding: the dashboard has **no authentication** and can display private session content.
+
+The dashboard reads OpenCode data from its default local directory and Codex transcripts from `CODEX_HOME`, defaulting to `~/.codex`. For custom data paths or sync settings, create a `.env.local` file in your working directory. Set `OPENCODE_DATA_DIR` to your OpenCode data directory (containing `opencode.db` or legacy `storage/`), then explicitly load the file when starting the globally installed CLI:
+
+```bash
+OPENDASH_ENV=.env.local opendash server
+```
+
+Relative `OPENDASH_ENV` paths resolve from the directory where you run the command. If the daemon is already running, run `opendash stop` before restarting it to load the configuration.
+
+```bash
+opendash summary --range month
+opendash models --json
+opendash stop
+```
+
+### From source
+
+Requires **Node.js 24+** and **pnpm 10+**. Use this option for development or local builds.
 
 ```bash
 git clone https://github.com/ChangeHow/opencode-insight.git
@@ -34,13 +61,7 @@ pnpm build
 node scripts/opendash.mjs server
 ```
 
-Open [localhost:8787](http://127.0.0.1:8787). Keep the default loopback binding: the dashboard has **no authentication** and can display private session content.
-
-```bash
-node scripts/opendash.mjs summary --range month
-node scripts/opendash.mjs models --json
-node scripts/opendash.mjs stop
-```
+For this installation, use `node scripts/opendash.mjs` in place of `opendash` for the query and stop commands above.
 
 For live V2 session metrics, install the capture plugin below, then use **Inspect an OpenCode V2 session** on the overview. Optional multi-machine sync is documented in [Connect another machine](ADD_MACHINE.md).
 
@@ -53,14 +74,14 @@ OpenChamber can load the bundled capture plugin into its managed OpenCode. For a
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@changehow/oc-insight@1.2.0"],
+  "plugins": ["@changehow/oc-insight@1.2.1"],
 }
 ```
 
 OpenCode installs and loads the capture plugin itself. To install the OpenChamber panel:
 
 ```bash
-npm install -g @changehow/oc-insight@1.2.0
+npm install -g @changehow/oc-insight@1.2.1
 opendash extension-path openchamber
 ```
 
@@ -75,3 +96,7 @@ OpenCode must already be running with the capture plugin loaded. Insight never s
 The **OpenChamber backend and OpenCode must run on the same machine**. The browser may connect remotely. An OpenChamber backend pointing to OpenCode on another machine is not supported by this mode. The panel follows the host-selected instance exclusively; it never falls back to `Service.discover()` or `connection.json`.
 
 For a source installation, build with `pnpm install` and `pnpm build:extensions`, then install the folder printed by `node scripts/opendash.mjs extension-path openchamber`. Approve the same capabilities as for the npm installation above. See [host-shared connections](docs/v2-insight.md#host-shared-panel) for delivery limits.
+
+# License
+
+Copyright (C) 2026 ChangeHow. Original project code is licensed under the [GNU General Public License, version 3 only](LICENSE) (`GPL-3.0-only`). When distributing covered versions, provide the corresponding source under the GPL; private use and modification do not require public disclosure. Vendored AgentPrism code retains its upstream MIT license and notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -45,10 +45,10 @@ node scripts/opendash.mjs extension-path openchamber
 
 Insight 1.2.0 includes host-shared support and requires OpenChamber 2.7.0+, without any host modifications. Insight 1.1.0 uses independently configured connections and does not contain host-shared support. OpenChamber 2.7.0 itself requires OpenCode 2.2.4+; the integration is tested with 2.2.5. Open **Settings → Extensions → Add** and install that `openchamber/` folder. Approve the local service, OpenCode reads, and bundled OpenCode plugin, then open **Insight** on the rail. Retain all built assets, including `opencode/`. OpenChamber does not compile TypeScript or install capture-bundle dependencies at runtime.
 
-To install or upgrade to Insight 1.2.0 from npm instead of building from source:
+To install or upgrade to Insight 1.2.1 from npm instead of building from source:
 
 ```bash
-npm install -g @changehow/oc-insight@1.2.0
+npm install -g @changehow/oc-insight@1.2.1
 opendash extension-path openchamber
 ```
 
@@ -57,7 +57,7 @@ OpenChamber can load the bundled capture plugin into its managed OpenCode. For a
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["@changehow/oc-insight@1.2.0"],
+  "plugins": ["@changehow/oc-insight@1.2.1"],
 }
 ```
 
